@@ -119,7 +119,7 @@ All development and builds run inside Docker (Windows host).
 docker build --target dev -t msmap-dev .
 
 # Dev shell with live source mount
-docker run -it --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev
+docker run -it --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev
 
 # Inside container – configure (Debug)
 cmake -B build -G Ninja \

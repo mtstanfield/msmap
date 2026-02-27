@@ -65,7 +65,7 @@ docker build --target dev -t msmap-dev .
 ### Dev shell (live source mount)
 
 ```bash
-docker run -it --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev
+docker run -it --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev
 ```
 
 ### Inside the container
@@ -88,7 +88,7 @@ cppcheck --enable=all src/
 ### One-off commands (non-interactive)
 
 ```bash
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   ninja -C build msmap
 ```
 

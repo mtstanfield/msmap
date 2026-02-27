@@ -16,20 +16,20 @@ docker build --target dev -t msmap-dev .
 ### Interactive dev shell
 
 ```bash
-docker run -it --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev
+docker run -it --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev
 ```
 
 ### One-off commands (non-interactive)
 
 ```bash
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev <command>
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev <command>
 ```
 
 ### Common command examples
 
 ```bash
 # Configure (Debug)
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_CXX_STANDARD=23 \
@@ -37,19 +37,19 @@ docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   ninja -C build msmap
 
 # Tests
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   ninja -C build test
 
 # clang-tidy
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   run-clang-tidy -p build
 
 # cppcheck
-docker run --rm -v "/c/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 ```
 
