@@ -20,6 +20,12 @@ option(MSMAP_ENABLE_CLANG_TIDY  "Run clang-tidy during build"       OFF)
 option(MSMAP_ENABLE_CPPCHECK    "Run cppcheck during build"         OFF)
 # Prefer .a over .so for app libraries. Set ON in release/distroless builds.
 option(MSMAP_LINK_STATIC        "Link app libraries statically"     OFF)
+# Build Catch2 unit tests. Default ON for Debug, OFF for Release.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    option(MSMAP_ENABLE_TESTS "Build unit tests" OFF)
+else()
+    option(MSMAP_ENABLE_TESTS "Build unit tests" ON)
+endif()
 
 # ── CMake modules ──────────────────────────────────────────────────────────
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -41,7 +47,9 @@ else()
 endif()
 
 # ── Target ─────────────────────────────────────────────────────────────────
-add_executable(msmap src/main.cpp)
+add_executable(msmap
+    src/main.cpp
+    src/parser.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
 
@@ -53,3 +61,34 @@ target_link_libraries(msmap PRIVATE
     PkgConfig::MICROHTTPD
     PkgConfig::SQLITE3
     PkgConfig::MAXMINDDB)
+
+# ── Tests ───────────────────────────────────────────────────────────────────
+# Catch2 is not in Debian bookworm; fetch it via CMake's built-in FetchContent.
+if(MSMAP_ENABLE_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.7.1
+        GIT_SHALLOW    TRUE
+        FIND_PACKAGE_ARGS NAMES Catch2)
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+    include(Catch)
+
+    enable_testing()
+
+    add_executable(test_parser
+        tests/test_parser.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_parser PRIVATE cxx_std_23)
+    target_include_directories(test_parser PRIVATE src)
+    # Apply warnings but not static-analysis tools to the test target;
+    # Catch2 macros generate code that confuses clang-tidy/cppcheck.
+    msmap_set_warnings(test_parser)
+    msmap_enable_sanitizers(test_parser)
+    target_link_libraries(test_parser PRIVATE Catch2::Catch2WithMain)
+
+    catch_discover_tests(test_parser)
+endif()
