@@ -1,0 +1,72 @@
+# C++ / CMake / Docker
+
+## Build directories
+build/
+_build/
+out/
+dist/
+bazel-*/
+
+## Binaries / Libraries
+*.exe
+*.dll
+*.dylib
+*.so.*
+*.so
+*.a
+*.lib
+*.o
+
+## CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+cmake-*.ninja
+*.ninja.log
+*.ninja_deps
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+cmake_install.cmake
+CMakeDoxyfile.in
+Doxyfile.in
+_dependencies/
+
+## Dependencies / Packages
+conan/
+.lock
+vendor/
+_ext/
+
+## IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+## Docker
+Dockerfile.*
+.dockerignore
+
+## OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+## Logs / Temp
+*.log
+logs/
+*.tmp
+tmp/
+.cache/
+
+## Testing
+coverage/
+test-results/
