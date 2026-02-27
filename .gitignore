@@ -21,7 +21,6 @@ bazel-*/
 CMakeCache.txt
 CMakeFiles/
 Makefile
-*.cmake
 cmake-*.ninja
 *.ninja.log
 *.ninja_deps

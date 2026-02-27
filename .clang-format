@@ -1,0 +1,33 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+
+# Braces
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers first
+  - Regex:    '^"'
+    Priority: 1
+  # System C++ headers
+  - Regex:    '^<[a-z_]+>$'
+    Priority: 2
+  # Everything else (C library, third-party)
+  - Regex:    '.*'
+    Priority: 3
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Left
+
+# C++
+Standard: c++23
+...

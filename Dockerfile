@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         # build
         build-essential \
         ninja-build \
+        pkg-config \
         git \
         # LLVM toolchain
         clang-${LLVM_VER} \
@@ -106,6 +107,7 @@ RUN cmake -B build -G Ninja \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
         -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+        -DMSMAP_LINK_STATIC=ON \
     && ninja -C build msmap
 
 # -----------------------------------------------------------------------------
