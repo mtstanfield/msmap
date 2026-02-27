@@ -49,6 +49,7 @@ endif()
 # ── Target ─────────────────────────────────────────────────────────────────
 add_executable(msmap
     src/main.cpp
+    src/listener.cpp
     src/parser.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
