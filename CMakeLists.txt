@@ -34,7 +34,8 @@ include(Sanitizers)
 include(StaticAnalyzers)
 
 # ── Dependencies ───────────────────────────────────────────────────────────
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig  REQUIRED)
+find_package(Python3    REQUIRED COMPONENTS Interpreter)
 
 if(MSMAP_LINK_STATIC)
     pkg_check_modules(MICROHTTPD REQUIRED STATIC IMPORTED_TARGET libmicrohttpd)
@@ -45,6 +46,34 @@ else()
     pkg_check_modules(SQLITE3    REQUIRED IMPORTED_TARGET sqlite3)
     pkg_check_modules(MAXMINDDB  REQUIRED IMPORTED_TARGET libmaxminddb)
 endif()
+
+# ── Web bundle ─────────────────────────────────────────────────────────────
+# Run web/bundle.py to inline Leaflet + app assets into a single HTML file,
+# then emit src/index_html.h as a constexpr string_view for embedding.
+set(WEB_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/web")
+set(INDEX_HTML_H  "${CMAKE_CURRENT_BINARY_DIR}/index_html.h")
+
+add_custom_command(
+    OUTPUT  "${INDEX_HTML_H}"
+    COMMAND "${Python3_EXECUTABLE}"
+            "${WEB_DIR}/bundle.py"
+            "${WEB_DIR}/index.html"
+            "${INDEX_HTML_H}"
+            kIndexHtml
+    DEPENDS
+        "${WEB_DIR}/bundle.py"
+        "${WEB_DIR}/index.html"
+        "${WEB_DIR}/app.js"
+        "${WEB_DIR}/app.css"
+        "${WEB_DIR}/vendor/leaflet.min.js"
+        "${WEB_DIR}/vendor/leaflet.min.css"
+        "${WEB_DIR}/vendor/leaflet.markercluster.js"
+        "${WEB_DIR}/vendor/MarkerCluster.css"
+        "${WEB_DIR}/vendor/MarkerCluster.Default.css"
+    VERBATIM
+    COMMENT "Bundling web assets → index_html.h")
+
+add_custom_target(web_bundle DEPENDS "${INDEX_HTML_H}")
 
 # ── Target ─────────────────────────────────────────────────────────────────
 add_executable(msmap
@@ -60,6 +89,10 @@ target_compile_features(msmap PRIVATE cxx_std_23)
 msmap_set_warnings(msmap)
 msmap_enable_sanitizers(msmap)
 msmap_enable_static_analyzers(msmap)
+
+# Make msmap depend on the web bundle and expose the build dir as an include path.
+add_dependencies(msmap web_bundle)
+target_include_directories(msmap PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 target_link_libraries(msmap PRIVATE
     PkgConfig::MICROHTTPD

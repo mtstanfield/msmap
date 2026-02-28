@@ -1,0 +1,87 @@
+/* msmap – Firewall Live Map */
+
+html, body {
+    margin: 0;
+    height: 100%;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+}
+
+#map {
+    position: fixed;
+    inset: 0 0 28px 0; /* leave room for status bar */
+}
+
+#status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    gap: 20px;
+    z-index: 1000;
+}
+
+#status-bar span { white-space: nowrap; }
+
+#stat-mapped { color: #58a6ff; }
+#stat-error  { color: #f85149; }
+
+/* Popup content */
+.popup-row {
+    font-size: 12px;
+    line-height: 1.7;
+    min-width: 200px;
+}
+
+.popup-row .label {
+    color: #8b949e;
+    font-size: 11px;
+}
+
+.popup-row .ip {
+    font-weight: 600;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.proto-tcp  { color: #58a6ff; font-weight: 600; }
+.proto-udp  { color: #3fb950; font-weight: 600; }
+.proto-icmp { color: #d29922; font-weight: 600; }
+.proto-other { color: #8b949e; font-weight: 600; }
+
+/* Override Leaflet popup default styles for dark theme */
+.leaflet-popup-content-wrapper {
+    background: #161b22;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.leaflet-popup-tip {
+    background: #161b22;
+}
+
+.leaflet-popup-close-button {
+    color: #8b949e !important;
+}
+
+.leaflet-popup-close-button:hover {
+    color: #e6edf3 !important;
+}
+
+/* Cluster styles */
+.marker-cluster-small  { background-color: rgba(88, 166, 255, 0.3); }
+.marker-cluster-small div  { background-color: rgba(88, 166, 255, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
+.marker-cluster-medium { background-color: rgba(63, 185, 80, 0.3); }
+.marker-cluster-medium div { background-color: rgba(63, 185, 80, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
+.marker-cluster-large  { background-color: rgba(248, 81, 73, 0.3); }
+.marker-cluster-large div  { background-color: rgba(248, 81, 73, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
