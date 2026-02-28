@@ -265,21 +265,34 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
     return true;
 }
 
-void Database::prune_old() noexcept
+int Database::prune_unlocked(std::int64_t cutoff_ts) noexcept
 {
-    const auto now    = static_cast<std::int64_t>(std::time(nullptr));
-    const auto cutoff = now - kRetentionSecs;
-
     sqlite3_stmt* const stmt = prune_stmt_.get();
-    (void)sqlite3_bind_int64(stmt, 1, cutoff);
+    (void)sqlite3_bind_int64(stmt, 1, cutoff_ts);
     (void)sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
+    return sqlite3_changes(db_.get());
+}
 
-    const int deleted = sqlite3_changes(db_.get());
+void Database::prune_old() noexcept
+{
+    // Called from insert() which already holds mutex_ — do NOT re-acquire here.
+    const auto now    = static_cast<std::int64_t>(std::time(nullptr));
+    const auto cutoff = now - kRetentionSecs;
+    const int deleted = prune_unlocked(cutoff);
     if (deleted > 0) {
         std::clog << "[INFO] pruned " << deleted
                   << " rows older than 1 year\n";
     }
+}
+
+int Database::prune_older_than(std::int64_t cutoff_ts) noexcept
+{
+    if (!db_) {
+        return 0;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    return prune_unlocked(cutoff_ts);
 }
 
 std::vector<ConnectionRow>

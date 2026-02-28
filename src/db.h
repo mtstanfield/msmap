@@ -95,8 +95,18 @@ public:
     [[nodiscard]] std::vector<ConnectionRow>
         query_connections(const QueryFilters& filters) const noexcept;
 
+    /// Delete all rows with ts < cutoff_ts and return the count removed.
+    /// Thread-safe: acquires an internal mutex.
+    /// Production code uses the automatic trigger inside insert() (every 10 000
+    /// rows, one-year cutoff); call this directly when a specific cutoff is
+    /// needed (manual maintenance, tests).
+    int prune_older_than(std::int64_t cutoff_ts) noexcept;
+
 private:
     bool exec(const char* sql) noexcept;
+    /// Shared DELETE implementation — caller must already hold mutex_.
+    int  prune_unlocked(std::int64_t cutoff_ts) noexcept;
+    /// Called from insert() (already under mutex_) with the 1-year cutoff.
     void prune_old() noexcept;
 
     // mutex_ serialises all SQLite calls from the listener thread (insert)

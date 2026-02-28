@@ -107,6 +107,66 @@ TEST_CASE("Multiple entries insert without error")
     }
 }
 
+TEST_CASE("prune_older_than: removes rows strictly below cutoff")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    // Insert three old rows and two new rows.
+    auto entry = make_tcp_entry();
+    entry.ts = 1000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 2000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 3000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 5000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 6000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    // Prune ts < 4000 — should remove the three old rows.
+    CHECK(db.prune_older_than(4000) == 3);
+
+    // Only the two new rows should survive, newest-first.
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    REQUIRE(rows.size() == 2);
+    CHECK(rows.at(0).ts == 6000);
+    CHECK(rows.at(1).ts == 5000);
+}
+
+TEST_CASE("prune_older_than: cutoff below all rows removes nothing")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.ts = 5000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 6000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    CHECK(db.prune_older_than(1000) == 0);
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    CHECK(rows.size() == 2);
+}
+
+TEST_CASE("prune_older_than: cutoff above all rows clears table")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.ts = 1000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 2000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    CHECK(db.prune_older_than(9'999'999) == 2);
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    CHECK(rows.empty());
+}
+
+TEST_CASE("prune_older_than: returns 0 safely on invalid database")
+{
+    msmap::Database db{"/nonexistent/path/msmap.db"};
+    REQUIRE_FALSE(db.valid());
+    CHECK(db.prune_older_than(999'999) == 0);
+}
+
 TEST_CASE("Entry parsed via parse_log inserts correctly")
 {
     using namespace std::string_view_literals;
