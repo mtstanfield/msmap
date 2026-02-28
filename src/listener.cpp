@@ -1,5 +1,6 @@
 #include "listener.h"
 #include "db.h"
+#include "geoip.h"
 #include "parser.h"
 
 #include <arpa/inet.h>
@@ -51,13 +52,16 @@ constexpr std::size_t kRecvBufSize{4096};
 
 // ── Per-connection handler ────────────────────────────────────────────────────
 
-void handle_connection(int conn_fd, Database& db) {
+void handle_connection(int conn_fd, Database& db, GeoIp& geoip) {
     std::string                  buf;
     std::array<char, kRecvBufSize> tmp{};
 
     buf.reserve(512);
 
     for (;;) {
+        // Check for updated mmdb files at most once per minute.
+        (void)geoip.reload_if_changed();
+
         const ssize_t n = recv(conn_fd, tmp.data(), tmp.size(), 0);
         if (n <= 0) {
             break; // peer closed or recv error
@@ -72,7 +76,8 @@ void handle_connection(int conn_fd, Database& db) {
 
             const ParseResult result = parse_log(line);
             if (result.ok()) {
-                (void)db.insert(result.entry);
+                const GeoIpResult geo = geoip.lookup(result.entry.src_ip);
+                (void)db.insert(result.entry, geo);
             } else {
                 std::clog << "[WARN] parse: " << result.error << " | " << line << '\n';
             }
@@ -97,7 +102,7 @@ void handle_connection(int conn_fd, Database& db) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void run_listener(int port, Database& db) {
+void run_listener(int port, Database& db, GeoIp& geoip) {
     const ScopedFd srv{socket(AF_INET, SOCK_STREAM, 0)};
     if (!srv.valid()) {
         std::clog << "[FATAL] socket: " << std::strerror(errno) << '\n';
@@ -144,7 +149,7 @@ void run_listener(int port, Database& db) {
         }
 
         std::clog << "[INFO] rsyslog connected\n";
-        handle_connection(conn.get(), db);
+        handle_connection(conn.get(), db, geoip);
         std::clog << "[INFO] rsyslog disconnected\n";
     }
 }

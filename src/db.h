@@ -13,6 +13,10 @@ struct sqlite3_stmt;
 
 namespace msmap {
 
+// Full definition in geoip.h; forward declaration is enough for the
+// insert() signature since GeoIpResult is passed by const reference.
+struct GeoIpResult;
+
 // Custom deleters for the unique_ptr handles — defined in db.cpp where
 // the full SQLite header is available.
 struct SqliteCloser   { void operator()(sqlite3*      p) const noexcept; };
@@ -37,9 +41,10 @@ public:
     /// True if the database was opened and initialised successfully.
     [[nodiscard]] bool valid() const noexcept { return db_ != nullptr; }
 
-    /// Insert a parsed log entry.  Returns true on success.
+    /// Insert a parsed log entry with its GeoIP enrichment.
+    /// Pass a default-constructed GeoIpResult{} to store NULLs for geo columns.
     /// Triggers a retention prune every kPruneInterval inserts.
-    bool insert(const LogEntry& entry) noexcept;
+    bool insert(const LogEntry& entry, const GeoIpResult& geo) noexcept;
 
 private:
     bool exec(const char* sql) noexcept;

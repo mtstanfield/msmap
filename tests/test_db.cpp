@@ -1,4 +1,5 @@
 #include "db.h"
+#include "geoip.h"
 #include "parser.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -67,18 +68,32 @@ TEST_CASE("In-memory database opens successfully")
     REQUIRE(db.valid());
 }
 
-TEST_CASE("TCP entry inserts without error")
+TEST_CASE("TCP entry inserts without error — no geo data")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(make_tcp_entry()));
+    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}));
 }
 
 TEST_CASE("ICMP entry inserts without error — ports stored as NULL")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(make_icmp_entry()));
+    REQUIRE(db.insert(make_icmp_entry(), msmap::GeoIpResult{}));
+}
+
+TEST_CASE("Entry inserts with populated GeoIpResult")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat     = 37.751;
+    geo.lon     = -97.822;
+    geo.asn     = "AS14618 Amazon.com Inc.";
+
+    REQUIRE(db.insert(make_tcp_entry(), geo));
 }
 
 TEST_CASE("Multiple entries insert without error")
@@ -87,8 +102,8 @@ TEST_CASE("Multiple entries insert without error")
     REQUIRE(db.valid());
 
     for (int i = 0; i < 10; ++i) {
-        REQUIRE(db.insert(make_tcp_entry()));
-        REQUIRE(db.insert(make_icmp_entry()));
+        REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}));
+        REQUIRE(db.insert(make_icmp_entry(), msmap::GeoIpResult{}));
     }
 }
 
@@ -106,5 +121,5 @@ TEST_CASE("Entry parsed via parse_log inserts correctly")
 
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(result.entry));
+    REQUIRE(db.insert(result.entry, msmap::GeoIpResult{}));
 }

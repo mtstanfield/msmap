@@ -1,4 +1,5 @@
 #include "db.h"
+#include "geoip.h"
 
 #include <cstdint>
 #include <ctime>
@@ -71,8 +72,9 @@ constexpr const char* kCreateIndexCountry =
 constexpr const char* kInsertSql = R"sql(
 INSERT INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
-    chain, in_iface, rule, conn_state, pkt_len)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    chain, in_iface, rule, conn_state, pkt_len,
+    country, lat, lon, asn)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
@@ -155,11 +157,11 @@ bool Database::exec(const char* sql) noexcept
     return true;
 }
 
-bool Database::insert(const LogEntry& entry) noexcept
+bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
 {
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
-    // Bind all twelve parameters (1-indexed).
+    // Bind all sixteen parameters (1-indexed).
     (void)sqlite3_bind_int64(stmt,  1, entry.ts);
     (void)sqlite3_bind_text( stmt,  2, entry.src_ip.c_str(), -1, kStaticText);
 
@@ -190,6 +192,23 @@ bool Database::insert(const LogEntry& entry) noexcept
     (void)sqlite3_bind_text(stmt, 10, entry.rule.c_str(),       -1, kStaticText);
     (void)sqlite3_bind_text(stmt, 11, entry.conn_state.c_str(), -1, kStaticText);
     (void)sqlite3_bind_int( stmt, 12, entry.pkt_len);
+
+    // GeoIP enrichment — NULL when not resolved.
+    if (geo.found()) {
+        (void)sqlite3_bind_text(  stmt, 13, geo.country.c_str(), -1, kStaticText);
+        (void)sqlite3_bind_double(stmt, 14, geo.lat);
+        (void)sqlite3_bind_double(stmt, 15, geo.lon);
+    } else {
+        (void)sqlite3_bind_null(stmt, 13);
+        (void)sqlite3_bind_null(stmt, 14);
+        (void)sqlite3_bind_null(stmt, 15);
+    }
+
+    if (!geo.asn.empty()) {
+        (void)sqlite3_bind_text(stmt, 16, geo.asn.c_str(), -1, kStaticText);
+    } else {
+        (void)sqlite3_bind_null(stmt, 16);
+    }
 
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
