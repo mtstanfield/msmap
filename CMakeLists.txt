@@ -49,6 +49,7 @@ endif()
 # ── Target ─────────────────────────────────────────────────────────────────
 add_executable(msmap
     src/main.cpp
+    src/db.cpp
     src/listener.cpp
     src/parser.cpp)
 
@@ -92,4 +93,19 @@ if(MSMAP_ENABLE_TESTS)
     target_link_libraries(test_parser PRIVATE Catch2::Catch2WithMain)
 
     catch_discover_tests(test_parser)
+
+    add_executable(test_db
+        tests/test_db.cpp
+        src/db.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_db PRIVATE cxx_std_23)
+    target_include_directories(test_db PRIVATE src)
+    msmap_set_warnings(test_db)
+    msmap_enable_sanitizers(test_db)
+    target_link_libraries(test_db PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3)
+
+    catch_discover_tests(test_db)
 endif()

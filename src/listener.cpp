@@ -1,4 +1,5 @@
 #include "listener.h"
+#include "db.h"
 #include "parser.h"
 
 #include <arpa/inet.h>
@@ -9,7 +10,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
-#include <iostream>
+#include <iostream> // std::clog
 #include <string>
 #include <string_view>
 
@@ -48,27 +49,9 @@ constexpr std::size_t kMaxLineLen{8192};
 // Receive buffer size (stack-allocated per connection).
 constexpr std::size_t kRecvBufSize{4096};
 
-// ── Output (placeholder until SQLite layer) ───────────────────────────────────
-
-void print_entry(const LogEntry& entry) {
-    std::cout << "ts=" << entry.ts << " proto=" << entry.proto << " src=" << entry.src_ip;
-    if (entry.src_port >= 0) {
-        std::cout << ':' << entry.src_port;
-    }
-    std::cout << " dst=" << entry.dst_ip;
-    if (entry.dst_port >= 0) {
-        std::cout << ':' << entry.dst_port;
-    }
-    if (!entry.tcp_flags.empty()) {
-        std::cout << " flags=" << entry.tcp_flags;
-    }
-    std::cout << " chain=" << entry.chain << " rule=" << entry.rule
-              << " state=" << entry.conn_state << " len=" << entry.pkt_len << '\n';
-}
-
 // ── Per-connection handler ────────────────────────────────────────────────────
 
-void handle_connection(int conn_fd) {
+void handle_connection(int conn_fd, Database& db) {
     std::string                  buf;
     std::array<char, kRecvBufSize> tmp{};
 
@@ -89,7 +72,7 @@ void handle_connection(int conn_fd) {
 
             const ParseResult result = parse_log(line);
             if (result.ok()) {
-                print_entry(result.entry);
+                (void)db.insert(result.entry);
             } else {
                 std::clog << "[WARN] parse: " << result.error << " | " << line << '\n';
             }
@@ -114,7 +97,7 @@ void handle_connection(int conn_fd) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void run_listener(int port) {
+void run_listener(int port, Database& db) {
     const ScopedFd srv{socket(AF_INET, SOCK_STREAM, 0)};
     if (!srv.valid()) {
         std::clog << "[FATAL] socket: " << std::strerror(errno) << '\n';
@@ -161,7 +144,7 @@ void run_listener(int port) {
         }
 
         std::clog << "[INFO] rsyslog connected\n";
-        handle_connection(conn.get());
+        handle_connection(conn.get(), db);
         std::clog << "[INFO] rsyslog disconnected\n";
     }
 }
