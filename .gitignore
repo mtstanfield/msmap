@@ -37,6 +37,9 @@ conan/
 .lock
 vendor/
 _ext/
+# Allow web/vendor/ – Leaflet + MarkerCluster are committed (no build-time download)
+!web/vendor/
+!web/vendor/**
 
 ## IDE / Editor
 .vscode/
