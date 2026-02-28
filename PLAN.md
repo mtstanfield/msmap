@@ -172,21 +172,21 @@ docker build -t msmap .
 - [x] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
 - [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by protocol
       (CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
-- [ ] Filter/time-range panel
+- [x] Filter/time-range panel: protocol, src IP, dst port, country, limit; Enter-key support
 - [ ] Raw query UI: read-only SQL input → JSON/table output
-- [ ] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat` (done in app.js)
+- [x] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
 
 ### Safety & Quality
 - [ ] GSL (header-only, CPM or vendored)
 - [ ] Sanitizer builds: ASan + UBSan enabled in Debug/CI
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
-- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON) — 43 tests passing
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON) — 47 tests passing
 - [ ] Integration test: full ingest → query pipeline
 
 ### Security
-- [ ] Input validation on all HTTP query params
-- [ ] SQL parameterized queries only — enforced, no exceptions
+- [x] Input validation on all HTTP query params: length caps, range checks, proto allowlist
+- [x] SQL parameterized queries only — enforced, no exceptions
 - [ ] Auth: handled by nginx reverse proxy, not the binary
 - [ ] Distroless nonroot confirmed in CI
 
