@@ -144,25 +144,25 @@ docker build -t msmap .
 - [x] Confirm router timezone (UTC) and NTP configuration
 - [x] Define log-prefix naming convention (`FW_` prefix)
 - [x] Multi-stage Dockerfile (dev / builder / distroless:nonroot)
-- [ ] CMakeLists.txt – warnings, sanitizers, static analysis hooks
-- [ ] `.clang-tidy` configuration
-- [ ] `.clang-format` configuration
-- [ ] `FINDINGS.md` template
+- [x] CMakeLists.txt – warnings, sanitizers, static analysis hooks
+- [x] `.clang-tidy` configuration
+- [x] `.clang-format` configuration
+- [x] `FINDINGS.md` template
 - [ ] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container
 
 ### Ingest
 - [ ] rsyslog config: receive UDP 514, reformat, forward TCP 5140
-- [ ] msmap TCP listener on 5140 (loopback only)
-- [ ] Log parser: hand-written linear tokenizer (see grammar above)
+- [x] msmap TCP listener on 5140 (loopback only)
+- [x] Log parser: hand-written linear tokenizer (see grammar above)
 - [ ] Fuzz the parser with libFuzzer
 
 ### Storage
-- [ ] SQLite schema (see table above) + WAL mode pragma
-- [ ] Indexes: `ts`, `src_ip`, `dst_port`, `country`
+- [x] SQLite schema (see table above) + WAL mode pragma
+- [x] Indexes: `ts`, `src_ip`, `dst_port`, `country`
 - [ ] Retention pruning (1 year): background thread, triggered on insert
 
 ### Enrichment
-- [ ] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
+- [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
 - [ ] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
 
 ### Web UI
@@ -177,9 +177,9 @@ docker build -t msmap .
 ### Safety & Quality
 - [ ] GSL (header-only, CPM or vendored)
 - [ ] Sanitizer builds: ASan + UBSan enabled in Debug/CI
-- [ ] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
-- [ ] cppcheck clean (`--error-exitcode=1`)
-- [ ] Unit tests: Catch2 (parser, DB layer, enrichment)
+- [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
+- [x] cppcheck clean (`--error-exitcode=1`)
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment) — 24 tests passing
 - [ ] Integration test: full ingest → query pipeline
 
 ### Security
@@ -189,8 +189,8 @@ docker build -t msmap .
 - [ ] Distroless nonroot confirmed in CI
 
 ### Deploy
-- [ ] `docker-compose.yml`: msmap + nginx (TLS) + rsyslog
-- [ ] GeoLite2 DB update script (MaxMind requires free registration)
+- [ ] `docker-compose.yml`: msmap + nginx (TLS) + rsyslog + geoipupdate sidecar
+- [ ] GeoLite2 DB update: geoipupdate sidecar on shared volume (free MaxMind account)
 - [ ] Documented rollback procedure (per FINDINGS.md process)
 
 ---
