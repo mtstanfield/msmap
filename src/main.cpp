@@ -2,6 +2,7 @@
 
 #include "db.h"
 #include "geoip.h"
+#include "http.h"
 #include "listener.h"
 
 #include <cstdlib>
@@ -10,10 +11,11 @@
 
 namespace {
 
-constexpr int         kListenPort   {5140};
-constexpr const char* kDbPath       {"msmap.db"};
-constexpr const char* kDefaultCityMmdb{"/var/lib/msmap/geoip/GeoLite2-City.mmdb"};
-constexpr const char* kDefaultAsnMmdb {"/var/lib/msmap/geoip/GeoLite2-ASN.mmdb"};
+constexpr int            kListenPort    {5140};
+constexpr std::uint16_t  kHttpPort      {8080};
+constexpr const char*    kDbPath        {"msmap.db"};
+constexpr const char*    kDefaultCityMmdb{"/var/lib/msmap/geoip/GeoLite2-City.mmdb"};
+constexpr const char*    kDefaultAsnMmdb {"/var/lib/msmap/geoip/GeoLite2-ASN.mmdb"};
 
 /// Return env var value if set, otherwise the compile-time default.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -32,10 +34,18 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
     const std::string city_path = env_or("MSMAP_CITY_MMDB", kDefaultCityMmdb);
     const std::string asn_path  = env_or("MSMAP_ASN_MMDB",  kDefaultAsnMmdb);
     msmap::GeoIp geoip{city_path, asn_path};
-    // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
+
+    // HTTP server starts its own internal thread; run_listener blocks below.
+    msmap::HttpServer const http{kHttpPort, db};
+    if (!http.valid()) {
+        std::clog << "[FATAL] HTTP server failed to start on port "
+                  << kHttpPort << '\n';
+        return EXIT_FAILURE;
+    }
 
     msmap::run_listener(kListenPort, db, geoip);
     return EXIT_SUCCESS;

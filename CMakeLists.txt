@@ -51,6 +51,7 @@ add_executable(msmap
     src/main.cpp
     src/db.cpp
     src/geoip.cpp
+    src/http.cpp
     src/listener.cpp
     src/parser.cpp)
 
@@ -125,4 +126,23 @@ if(MSMAP_ENABLE_TESTS)
         PkgConfig::MAXMINDDB)
 
     catch_discover_tests(test_geoip)
+
+    # test_http: tests the JSON serialiser (json.h) and Database::query_connections.
+    # Does not link MICROHTTPD — HttpServer is not instantiated in these tests.
+    add_executable(test_http
+        tests/test_http.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_http PRIVATE cxx_std_23)
+    target_include_directories(test_http PRIVATE src)
+    msmap_set_warnings(test_http)
+    msmap_enable_sanitizers(test_http)
+    target_link_libraries(test_http PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB)
+
+    catch_discover_tests(test_http)
 endif()

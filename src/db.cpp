@@ -5,11 +5,15 @@
 #include <ctime>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <sqlite3.h>
+#include <string>
+#include <vector>
 
 namespace msmap {
 
-// ── Custom deleters ────────────────────────────────────────────────────────
+// ── Custom deleters ────────────────────────────────────────────────────────────
 
 void SqliteCloser::operator()(sqlite3* p) const noexcept
 {
@@ -21,7 +25,7 @@ void StmtFinalizer::operator()(sqlite3_stmt* p) const noexcept
     sqlite3_finalize(p);
 }
 
-// ── Module-level constants ─────────────────────────────────────────────────
+// ── Module-level constants ─────────────────────────────────────────────────────
 
 namespace {
 
@@ -84,9 +88,43 @@ struct SqliteErrFree {
     void operator()(char* p) const noexcept { sqlite3_free(p); }
 };
 
+// ── Column-reading helpers (used by query_connections) ─────────────────────────
+
+/// Read a TEXT column; returns an empty string for SQL NULL.
+std::string col_text(sqlite3_stmt* stmt, int col) noexcept
+{
+    const auto* p = sqlite3_column_text(stmt, col);
+    if (p == nullptr) {
+        return {};
+    }
+    const int len = sqlite3_column_bytes(stmt, col);
+    // sqlite3_column_text returns UTF-8 as unsigned char*; reinterpret to char*
+    // is safe since both are single-byte, same-alignment types.
+    return {reinterpret_cast<const char*>(p), // NOLINT(*-reinterpret-cast)
+            static_cast<std::size_t>(len)};
+}
+
+/// Read an INTEGER column; returns nullopt for SQL NULL.
+std::optional<int> col_opt_int(sqlite3_stmt* stmt, int col) noexcept
+{
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {
+        return std::nullopt;
+    }
+    return sqlite3_column_int(stmt, col);
+}
+
+/// Read a REAL column; returns nullopt for SQL NULL.
+std::optional<double> col_opt_double(sqlite3_stmt* stmt, int col) noexcept
+{
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {
+        return std::nullopt;
+    }
+    return sqlite3_column_double(stmt, col);
+}
+
 } // anonymous namespace
 
-// ── Database implementation ────────────────────────────────────────────────
+// ── Database implementation ────────────────────────────────────────────────────
 
 Database::Database(const std::string& path) noexcept
 {
@@ -159,6 +197,8 @@ bool Database::exec(const char* sql) noexcept
 
 bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
 {
+    const std::lock_guard<std::mutex> lock{mutex_};
+
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
     // Bind all sixteen parameters (1-indexed).
@@ -220,7 +260,7 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
 
     ++insert_count_;
     if (insert_count_ % kPruneInterval == 0) {
-        prune_old();
+        prune_old(); // runs under the mutex already held by insert()
     }
     return true;
 }
@@ -240,6 +280,116 @@ void Database::prune_old() noexcept
         std::clog << "[INFO] pruned " << deleted
                   << " rows older than 1 year\n";
     }
+}
+
+std::vector<ConnectionRow>
+Database::query_connections(const QueryFilters& f) const noexcept
+{
+    if (!db_) {
+        return {};
+    }
+
+    const std::lock_guard<std::mutex> lock{mutex_};
+
+    // Build a fully-parameterised SELECT.  User values go through bind
+    // parameters only — no string concatenation of user data into SQL.
+    const bool has_since   = f.since > 0;
+    const bool has_until   = f.until > 0;
+    const bool has_src_ip  = !f.src_ip.empty();
+    const bool has_country = !f.country.empty();
+    const bool has_proto   = !f.proto.empty();
+    const bool has_port    = f.dst_port > 0;
+
+    std::string sql =
+        "SELECT id, ts, src_ip, src_port, dst_ip, dst_port, "
+        "proto, tcp_flags, chain, in_iface, rule, conn_state, pkt_len, "
+        "country, lat, lon, asn "
+        "FROM connections";
+
+    std::string where;
+    auto add_cond = [&where](const char* cond) {
+        where += where.empty() ? " WHERE " : " AND ";
+        where += cond;
+    };
+    if (has_since) {
+        add_cond("ts >= ?");
+    }
+    if (has_until) {
+        add_cond("ts <= ?");
+    }
+    if (has_src_ip) {
+        add_cond("src_ip = ?");
+    }
+    if (has_country) {
+        add_cond("country = ?");
+    }
+    if (has_proto) {
+        add_cond("proto = ?");
+    }
+    if (has_port) {
+        add_cond("dst_port = ?");
+    }
+
+    sql += where;
+    sql += " ORDER BY ts DESC LIMIT ?";
+
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db_.get(), sql.c_str(), -1, &raw, nullptr)
+            != SQLITE_OK) {
+        std::clog << "[WARN] query_connections prepare: "
+                  << sqlite3_errmsg(db_.get()) << '\n';
+        return {};
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+
+    // Bind parameters in the same order that WHERE conditions were added.
+    int idx = 1;
+    if (has_since) {
+        (void)sqlite3_bind_int64(stmt.get(), idx++, f.since);
+    }
+    if (has_until) {
+        (void)sqlite3_bind_int64(stmt.get(), idx++, f.until);
+    }
+    if (has_src_ip) {
+        (void)sqlite3_bind_text(stmt.get(), idx++, f.src_ip.c_str(), -1, kStaticText);
+    }
+    if (has_country) {
+        (void)sqlite3_bind_text(stmt.get(), idx++, f.country.c_str(), -1, kStaticText);
+    }
+    if (has_proto) {
+        (void)sqlite3_bind_text(stmt.get(), idx++, f.proto.c_str(), -1, kStaticText);
+    }
+    if (has_port) {
+        (void)sqlite3_bind_int(stmt.get(), idx++, f.dst_port);
+    }
+
+    const int cap = (f.limit > 0 && f.limit <= 10000) ? f.limit : 1000;
+    (void)sqlite3_bind_int(stmt.get(), idx, cap);
+
+    // Collect result rows.
+    std::vector<ConnectionRow> rows;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        ConnectionRow row;
+        row.id         = sqlite3_column_int64(stmt.get(),  0);
+        row.ts         = sqlite3_column_int64(stmt.get(),  1);
+        row.src_ip     = col_text(stmt.get(),              2);
+        row.src_port   = col_opt_int(stmt.get(),           3);
+        row.dst_ip     = col_text(stmt.get(),              4);
+        row.dst_port   = col_opt_int(stmt.get(),           5);
+        row.proto      = col_text(stmt.get(),              6);
+        row.tcp_flags  = col_text(stmt.get(),              7);
+        row.chain      = col_text(stmt.get(),              8);
+        row.in_iface   = col_text(stmt.get(),              9);
+        row.rule       = col_text(stmt.get(),             10);
+        row.conn_state = col_text(stmt.get(),             11);
+        row.pkt_len    = sqlite3_column_int(stmt.get(),   12);
+        row.country    = col_text(stmt.get(),             13);
+        row.lat        = col_opt_double(stmt.get(),       14);
+        row.lon        = col_opt_double(stmt.get(),       15);
+        row.asn        = col_text(stmt.get(),             16);
+        rows.push_back(std::move(row));
+    }
+    return rows;
 }
 
 } // namespace msmap

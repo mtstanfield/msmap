@@ -1,0 +1,209 @@
+#include "http.h"
+#include "db.h"
+#include "json.h"
+
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <microhttpd.h>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace msmap {
+
+// ── MhdDaemonCloser ────────────────────────────────────────────────────────────
+
+void MhdDaemonCloser::operator()(MHD_Daemon* d) const noexcept
+{
+    MHD_stop_daemon(d);
+}
+
+// ── Module helpers (file-scope) ────────────────────────────────────────────────
+
+namespace {
+
+// ── JSON serialisation ────────────────────────────────────────────────────────
+
+/// Serialise a vector of ConnectionRow objects as a JSON array.
+std::string connections_to_json(const std::vector<ConnectionRow>& rows)
+{
+    std::string out;
+    out.reserve(rows.size() * 256); // rough per-row estimate
+    out += '[';
+
+    bool first = true;
+    for (const ConnectionRow& row : rows) {
+        if (!first) {
+            out += ',';
+        }
+        first = false;
+
+        out += '{';
+        out += "\"id\":";         out += std::to_string(row.id);       out += ',';
+        out += "\"ts\":";         out += std::to_string(row.ts);       out += ',';
+        out += "\"src_ip\":";     json::append_string(out, row.src_ip);           out += ',';
+        out += "\"src_port\":";   json::append_int_or_null(out, row.src_port);    out += ',';
+        out += "\"dst_ip\":";     json::append_string(out, row.dst_ip);           out += ',';
+        out += "\"dst_port\":";   json::append_int_or_null(out, row.dst_port);    out += ',';
+        out += "\"proto\":";      json::append_string(out, row.proto);            out += ',';
+        out += "\"tcp_flags\":";  json::append_string_or_null(out, row.tcp_flags); out += ',';
+        out += "\"chain\":";      json::append_string(out, row.chain);            out += ',';
+        out += "\"in_iface\":";   json::append_string(out, row.in_iface);         out += ',';
+        out += "\"rule\":";       json::append_string(out, row.rule);             out += ',';
+        out += "\"conn_state\":"; json::append_string(out, row.conn_state);       out += ',';
+        out += "\"pkt_len\":";    out += std::to_string(row.pkt_len);             out += ',';
+        out += "\"country\":";    json::append_string_or_null(out, row.country);  out += ',';
+        out += "\"lat\":";        json::append_double_or_null(out, row.lat);       out += ',';
+        out += "\"lon\":";        json::append_double_or_null(out, row.lon);       out += ',';
+        out += "\"asn\":";        json::append_string_or_null(out, row.asn);
+        out += '}';
+    }
+
+    out += ']';
+    return out;
+}
+
+// ── Query-parameter parsing ────────────────────────────────────────────────────
+
+/// Parse URL query parameters from an MHD connection into a QueryFilters.
+QueryFilters parse_filters(MHD_Connection* conn)
+{
+    QueryFilters f;
+
+    const char* v = nullptr;
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "since");
+    if (v != nullptr) { f.since = std::strtoll(v, nullptr, 10); }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "until");
+    if (v != nullptr) { f.until = std::strtoll(v, nullptr, 10); }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
+    if (v != nullptr) { f.src_ip = v; }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
+    if (v != nullptr) { f.country = v; }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
+    if (v != nullptr) { f.proto = v; }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
+    if (v != nullptr) {
+        f.dst_port = static_cast<int>(std::strtol(v, nullptr, 10));
+    }
+
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
+    if (v != nullptr) {
+        const int n = static_cast<int>(std::strtol(v, nullptr, 10));
+        if (n > 0 && n <= 10000) {
+            f.limit = n;
+        }
+    }
+
+    return f;
+}
+
+// ── Response helper ────────────────────────────────────────────────────────────
+
+/// Queue a complete HTTP response and return MHD_YES / MHD_NO.
+MHD_Result send_response(MHD_Connection*    conn,
+                          unsigned int       status,
+                          const char*        content_type,
+                          std::string_view   body)
+{
+    // MHD_create_response_from_buffer takes non-const void* (C API wart).
+    // MHD_RESPMEM_MUST_COPY means MHD copies the buffer before returning, so
+    // casting away const here is safe — we never write through the pointer.
+    MHD_Response* const resp = MHD_create_response_from_buffer(
+        body.size(),
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        const_cast<void*>(static_cast<const void*>(body.data())),
+        MHD_RESPMEM_MUST_COPY);
+
+    if (resp == nullptr) {
+        return MHD_NO;
+    }
+    (void)MHD_add_response_header(resp, "Content-Type", content_type);
+    (void)MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+    const MHD_Result ret = MHD_queue_response(conn, status, resp);
+    MHD_destroy_response(resp);
+    return ret;
+}
+
+// ── MHD access-handler callback ───────────────────────────────────────────────
+
+/// Called by MHD for every incoming HTTP request.
+/// `cls` is a `Database*` set in HttpServer's constructor.
+MHD_Result handle_request(void*            cls,
+                           MHD_Connection*  conn,
+                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) — MHD callback
+                           const char*      url,
+                           const char*      method,
+                           [[maybe_unused]] const char*  version,
+                           [[maybe_unused]] const char*  upload_data,
+                           [[maybe_unused]] size_t*      upload_data_size,
+                           [[maybe_unused]] void**       con_cls)
+{
+    auto* db = static_cast<Database*>(cls);
+
+    const std::string_view method_sv{method};
+    if (method_sv != "GET") {
+        return send_response(conn, MHD_HTTP_METHOD_NOT_ALLOWED,
+                             "text/plain", "Method Not Allowed");
+    }
+
+    const std::string_view url_sv{url};
+
+    if (url_sv == "/api/connections") {
+        const QueryFilters filters  = parse_filters(conn);
+        const auto         rows     = db->query_connections(filters);
+        return send_response(conn, MHD_HTTP_OK,
+                             "application/json", connections_to_json(rows));
+    }
+
+    if (url_sv == "/" || url_sv == "/index.html") {
+        return send_response(conn, MHD_HTTP_OK,
+                             "text/html; charset=utf-8",
+                             "<html><body>"
+                             "<h1>msmap</h1>"
+                             "<p>Web UI coming soon.</p>"
+                             "<p><a href=\"/api/connections\">"
+                             "/api/connections</a></p>"
+                             "</body></html>");
+    }
+
+    return send_response(conn, MHD_HTTP_NOT_FOUND,
+                         "text/plain", "Not Found");
+}
+
+} // anonymous namespace
+
+// ── HttpServer implementation ──────────────────────────────────────────────────
+
+HttpServer::HttpServer(std::uint16_t port, Database& db) noexcept
+    : db_(db)
+{
+    // Pass &db_ (Database*) as cls so handle_request can reach it.
+    // MHD_USE_INTERNAL_POLLING_THREAD: MHD manages its own thread.
+    // MHD_USE_ERROR_LOG: MHD forwards error messages to stderr.
+    MHD_Daemon* const raw = MHD_start_daemon(
+        static_cast<unsigned int>(MHD_USE_INTERNAL_POLLING_THREAD) |
+        static_cast<unsigned int>(MHD_USE_ERROR_LOG),
+        port,
+        nullptr, nullptr,         // no access-policy callback
+        handle_request, &db_,     // request handler + cls
+        MHD_OPTION_END);
+
+    if (raw == nullptr) {
+        std::clog << "[FATAL] MHD_start_daemon on port " << port
+                  << " failed\n";
+        return;
+    }
+    daemon_.reset(raw);
+    std::clog << "[INFO] HTTP server listening on :" << port << '\n';
+}
+
+HttpServer::~HttpServer() noexcept = default;
+
+} // namespace msmap
