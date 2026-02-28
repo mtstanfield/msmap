@@ -11,12 +11,50 @@
 </head>
 <body>
     <div id="map"></div>
+
+    <!-- Filter toggle button (top-right, above Leaflet attribution) -->
+    <button id="filter-toggle" title="Toggle filters" aria-label="Toggle filters">&#9881;</button>
+
+    <!-- Filter panel (hidden by default) -->
+    <div id="filter-panel" hidden>
+        <div class="filter-title">Filters</div>
+
+        <label class="filter-label" for="f-proto">Protocol</label>
+        <select id="f-proto">
+            <option value="">All</option>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="ICMP">ICMP</option>
+        </select>
+
+        <label class="filter-label" for="f-ip">Source IP</label>
+        <input id="f-ip" type="text" placeholder="1.2.3.4" maxlength="45"
+               autocomplete="off" spellcheck="false">
+
+        <label class="filter-label" for="f-port">Dst Port</label>
+        <input id="f-port" type="number" placeholder="any" min="1" max="65535">
+
+        <label class="filter-label" for="f-country">Country</label>
+        <input id="f-country" type="text" placeholder="US" maxlength="2"
+               autocomplete="off" spellcheck="false" style="text-transform:uppercase">
+
+        <label class="filter-label" for="f-limit">Limit</label>
+        <input id="f-limit" type="number" value="1000" min="1" max="10000">
+
+        <div class="filter-actions">
+            <button id="f-apply">Apply</button>
+            <button id="f-clear">Clear</button>
+        </div>
+    </div>
+
+    <!-- Status bar -->
     <div id="status-bar">
         <span id="stat-mapped">0 mapped</span>
         <span id="stat-total">0 total</span>
         <span id="stat-time">&ndash;</span>
         <span id="stat-error" style="display:none"></span>
     </div>
+
     <script>{{LEAFLET_JS}}</script>
     <script>{{MARKERCLUSTER_JS}}</script>
     <script>{{APP_JS}}</script>

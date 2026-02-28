@@ -9,7 +9,7 @@
 const PROTO_COLORS = { TCP: '#58a6ff', UDP: '#3fb950', ICMP: '#d29922' };
 const DEFAULT_COLOR = '#8b949e';
 const REFRESH_MS    = 30000;       // poll interval
-const MAX_MARKERS   = 5000;        // cap on map to keep rendering fast
+const MAX_MARKERS   = 5000;        // cap to keep rendering fast
 
 // ── Map initialisation ───────────────────────────────────────────────────────
 
@@ -34,12 +34,47 @@ const cluster = L.markerClusterGroup({
 });
 lmap.addLayer(cluster);
 
-// ── Status bar references ────────────────────────────────────────────────────
+// ── DOM references ───────────────────────────────────────────────────────────
 
-const statMapped = document.getElementById('stat-mapped');
-const statTotal  = document.getElementById('stat-total');
-const statTime   = document.getElementById('stat-time');
-const statError  = document.getElementById('stat-error');
+const statMapped    = document.getElementById('stat-mapped');
+const statTotal     = document.getElementById('stat-total');
+const statTime      = document.getElementById('stat-time');
+const statError     = document.getElementById('stat-error');
+const filterToggle  = document.getElementById('filter-toggle');
+const filterPanel   = document.getElementById('filter-panel');
+const fProto        = document.getElementById('f-proto');
+const fIp           = document.getElementById('f-ip');
+const fPort         = document.getElementById('f-port');
+const fCountry      = document.getElementById('f-country');
+const fLimit        = document.getElementById('f-limit');
+
+// ── Filter panel ─────────────────────────────────────────────────────────────
+
+filterToggle.addEventListener('click', () => {
+    const open = !filterPanel.hidden;
+    filterPanel.hidden = open;
+    filterToggle.classList.toggle('active', !open);
+});
+
+document.getElementById('f-apply').addEventListener('click', () => {
+    resetAndFetch();
+});
+
+document.getElementById('f-clear').addEventListener('click', () => {
+    fProto.value   = '';
+    fIp.value      = '';
+    fPort.value    = '';
+    fCountry.value = '';
+    fLimit.value   = '1000';
+    resetAndFetch();
+});
+
+// Also apply when Enter is pressed in any text/number input.
+[fIp, fPort, fCountry, fLimit].forEach((el) => {
+    el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { resetAndFetch(); }
+    });
+});
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -59,7 +94,8 @@ function fmtPort(p) {
 
 function protoClass(proto) {
     const key = 'proto-' + String(proto || '').toLowerCase();
-    return (key in { 'proto-tcp': 1, 'proto-udp': 1, 'proto-icmp': 1 }) ? key : 'proto-other';
+    return (key === 'proto-tcp' || key === 'proto-udp' || key === 'proto-icmp')
+        ? key : 'proto-other';
 }
 
 function buildPopup(r) {
@@ -82,12 +118,29 @@ function buildPopup(r) {
     return rows.join('');
 }
 
+function buildQueryString() {
+    const params = new URLSearchParams();
+    if (lastTs > 0)           { params.set('since',   String(lastTs + 1)); }
+    if (fProto.value)         { params.set('proto',   fProto.value); }
+    if (fIp.value.trim())     { params.set('ip',      fIp.value.trim()); }
+    if (fPort.value)          { params.set('port',    fPort.value); }
+    if (fCountry.value.trim()) { params.set('country', fCountry.value.trim().toUpperCase()); }
+    const lim = parseInt(fLimit.value, 10);
+    if (lim > 0)              { params.set('limit',   String(lim)); }
+    const qs = params.toString();
+    return qs ? '?' + qs : '';
+}
+
+function setError(msg) {
+    statError.textContent   = msg;
+    statError.style.display = msg ? '' : 'none';
+}
+
 // ── Polling ──────────────────────────────────────────────────────────────────
 
 async function poll() {
     try {
-        const qs   = lastTs > 0 ? '?since=' + (lastTs + 1) : '';
-        const resp = await fetch('/api/connections' + qs);
+        const resp = await fetch('/api/connections' + buildQueryString());
 
         if (!resp.ok) {
             setError('API ' + resp.status);
@@ -126,11 +179,15 @@ async function poll() {
     }
 }
 
-function setError(msg) {
-    if (statError) {
-        statError.textContent = msg;
-        statError.style.display = msg ? '' : 'none';
-    }
+/// Reset all accumulated state and trigger a full re-fetch.
+function resetAndFetch() {
+    lastTs      = 0;
+    totalSeen   = 0;
+    mappedCount = 0;
+    cluster.clearLayers();
+    statMapped.textContent = '0 mapped';
+    statTotal.textContent  = '0 total';
+    poll();
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

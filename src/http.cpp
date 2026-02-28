@@ -67,33 +67,66 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
 
 // ── Query-parameter parsing ────────────────────────────────────────────────────
 
+/// Return a string from a raw C param value only if it fits within max_len.
+/// Returns empty string when v is null or too long (reject, don't truncate).
+std::string safe_param(const char* v, std::size_t max_len)
+{
+    if (v == nullptr) {
+        return {};
+    }
+    const std::string_view sv{v};
+    return (sv.size() <= max_len) ? std::string{sv} : std::string{};
+}
+
 /// Parse URL query parameters from an MHD connection into a QueryFilters.
+/// All fields are validated and range-checked; invalid values are silently
+/// discarded (treated as "no constraint") rather than propagated.
 QueryFilters parse_filters(MHD_Connection* conn)
 {
     QueryFilters f;
 
     const char* v = nullptr;
 
+    // Timestamps: must be a positive epoch value.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "since");
-    if (v != nullptr) { f.since = std::strtoll(v, nullptr, 10); }
-
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "until");
-    if (v != nullptr) { f.until = std::strtoll(v, nullptr, 10); }
-
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
-    if (v != nullptr) { f.src_ip = v; }
-
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
-    if (v != nullptr) { f.country = v; }
-
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
-    if (v != nullptr) { f.proto = v; }
-
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
     if (v != nullptr) {
-        f.dst_port = static_cast<int>(std::strtol(v, nullptr, 10));
+        const std::int64_t n = std::strtoll(v, nullptr, 10);
+        if (n > 0) { f.since = n; }
     }
 
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "until");
+    if (v != nullptr) {
+        const std::int64_t n = std::strtoll(v, nullptr, 10);
+        if (n > 0) { f.until = n; }
+    }
+
+    // IP address: IPv6 max representation is 45 chars (e.g. compressed form).
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
+    f.src_ip = safe_param(v, 45);
+
+    // Country: ISO 3166-1 alpha-2, exactly 2 characters.
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
+    f.country = safe_param(v, 2);
+
+    // Protocol: allowlist — only TCP, UDP, or ICMP are valid.
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
+    {
+        const std::string raw = safe_param(v, 4);
+        if (raw == "TCP" || raw == "UDP" || raw == "ICMP") {
+            f.proto = raw;
+        }
+    }
+
+    // Destination port: valid TCP/UDP range.
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
+    if (v != nullptr) {
+        const long n = std::strtol(v, nullptr, 10);
+        if (n >= 1 && n <= 65535) {
+            f.dst_port = static_cast<int>(n);
+        }
+    }
+
+    // Row limit: cap at the documented maximum of 10 000.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
     if (v != nullptr) {
         const int n = static_cast<int>(std::strtol(v, nullptr, 10));
