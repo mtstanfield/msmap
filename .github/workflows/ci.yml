@@ -1,0 +1,130 @@
+name: CI
+
+# Run on every push to main and on pull requests targeting main.
+# The 'publish' job (image push) only runs on pushes to main, not on PRs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Minimal permissions at the workflow level; 'publish' overrides with packages:write.
+permissions:
+  contents: read
+
+jobs:
+  # ── Build, test, and static analysis ───────────────────────────────────────
+  ci:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Buildx gives us access to GHA layer caching (type=gha).
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the dev image and cache it.  This is the heavy step (~2 min on
+      # cold cache; a few seconds on warm cache).  Subsequent docker run
+      # commands reuse this image for all build/test/lint operations.
+      - name: Build dev image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: dev
+          load: true          # load into local daemon so docker run works
+          tags: msmap-dev:ci
+          cache-from: type=gha,scope=dev
+          cache-to: type=gha,scope=dev,mode=max
+
+      # Configure in Debug mode.  ASan + UBSan are ON by default for
+      # non-Release builds (see CMakeLists.txt option block).
+      - name: Configure (Debug + ASan + UBSan)
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            cmake -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_CXX_STANDARD=23 \
+              -DCMAKE_CXX_EXTENSIONS=OFF \
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            ninja -C build
+
+      # 67 tests (unit + integration) under ASan + UBSan.
+      # Integration tests bind to 127.0.0.1:54340 — loopback is available
+      # inside Docker containers, so no host networking is required here.
+      - name: Test
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            ctest --test-dir build --output-on-failure
+
+      # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
+      # _deps/ from analysis.  run-clang-tidy-18 (not run-clang-tidy) is
+      # required because the unversioned alias is not installed in the image.
+      - name: clang-tidy
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            run-clang-tidy-18 -p build '/workspace/src/.*'
+
+      - name: cppcheck
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            cppcheck --enable=style,performance,warning,portability \
+              --error-exitcode=1 src/
+
+  # ── Build release image and publish to ghcr.io ─────────────────────────────
+  publish:
+    name: Publish Image
+    needs: ci
+    # Only push images for commits that reach main; never for PRs
+    # (forks cannot access GITHUB_TOKEN secrets for the target repo).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate image tags:
+      #   ghcr.io/mtstanfield/msmap:latest      (always, on main)
+      #   ghcr.io/mtstanfield/msmap:sha-<short> (per-commit, for Unraid pinning)
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/mtstanfield/msmap
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      # The release build reuses the dev-stage layers already cached by the
+      # 'ci' job (scope=dev), then adds the builder and runtime layers.
+      # Only the binary compilation and distroless copy need fresh compute.
+      - name: Build and push release image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=dev
+            type=gha,scope=release
+          cache-to: type=gha,scope=release,mode=max

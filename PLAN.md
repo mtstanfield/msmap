@@ -148,7 +148,7 @@ docker build -t msmap .
 - [x] `.clang-tidy` configuration
 - [x] `.clang-format` configuration
 - [x] `FINDINGS.md` template
-- [ ] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container
+- [x] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container; publishes release image to ghcr.io/mtstanfield/msmap on main
 
 ### Ingest
 - [ ] rsyslog config: receive UDP 514, reformat, forward TCP 5140
