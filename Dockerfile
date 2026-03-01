@@ -113,6 +113,14 @@ RUN cmake -B build -G Ninja \
         -DMSMAP_LINK_STATIC=ON \
     && ninja -C build msmap
 
+# Create persistent-data directories that are COPY-ed into the runtime stage.
+#   /data                  — default DB mount point  (MSMAP_DB_PATH)
+#   /var/lib/msmap/geoip   — default GeoIP mount point (MSMAP_CITY_MMDB / MSMAP_ASN_MMDB)
+# /data is owned by uid 65532 (distroless nonroot) so the process can write the DB.
+# GeoIP files are read-only; root ownership is fine.
+RUN mkdir -p /data /var/lib/msmap/geoip \
+    && chown 65532:65532 /data
+
 # -----------------------------------------------------------------------------
 # Stage 3: runtime
 #
@@ -128,6 +136,10 @@ FROM gcr.io/distroless/cc-debian12:nonroot
 # Explicitly copy the CA bundle so HTTPS (AbuseIPDB API) works regardless of
 # what the distroless base image includes across version updates.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Persistent-data directories (created in builder with correct ownership).
+COPY --from=builder /data /data
+COPY --from=builder /var/lib/msmap/geoip /var/lib/msmap/geoip
 
 COPY --from=builder /workspace/build/msmap /msmap
 
