@@ -5,58 +5,78 @@
 using namespace msmap;
 
 // ── Canonical test lines ──────────────────────────────────────────────────────
+//
+// Real Mikrotik production format (BSD syslog TAG field after hostname):
+//   TIMESTAMP HOSTNAME TAG: [RULE] CHAIN: in:IFACE out:IFACE, ...
+//
+// The TAG is the log-prefix + ':', e.g. "FW_INPUT_NEW:". It is discarded by
+// the parser; topic and level are always empty in parsed entries.
 
 // TCP with src-mac, out:(unknown 0), timezone +00:00
 // 2026-02-27T08:14:23 UTC = epoch 1772180063
 static constexpr std::string_view kTcpLine =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), "
     "172.234.31.140:65226->108.89.67.16:44258, len 52";
 
 // UDP, no flags, src-mac present
 static constexpr std::string_view kUdpLine =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto UDP, "
     "172.234.31.140:12345->108.89.67.16:53, len 28";
 
 // ICMP, no ports
 static constexpr std::string_view kIcmpLine =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto ICMP, "
     "172.234.31.140->108.89.67.16, len 28";
 
 // Forward chain, real out_iface (ether2), no src-mac, SYN flags
 static constexpr std::string_view kForwardLine =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_FWD_DROP forward: "
+    "2026-02-27T08:14:23+00:00 router FW_FWD_DROP: FW_FWD_DROP forward: "
     "in:ether1 out:ether2, connection-state:invalid "
     "proto TCP (SYN), 1.2.3.4:12345->10.0.0.1:80, len 44";
 
-// No rule name — chain keyword follows topic,level directly
+// No rule name — chain keyword follows tag directly
 static constexpr std::string_view kNoRuleLine =
-    "2026-02-27T08:14:23+00:00 router firewall,info input: "
+    "2026-02-27T08:14:23+00:00 router direct: input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "proto TCP (ACK), 1.2.3.4:1234->5.6.7.8:80, len 52";
 
 // Non-zero timezone offset (+05:00) — same UTC moment as kTcpLine
 static constexpr std::string_view kTzPlusLine =
-    "2026-02-27T13:14:23+05:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T13:14:23+05:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "proto TCP (ACK), 1.2.3.4:1234->5.6.7.8:80, len 52";
 
 // Negative timezone offset (-05:00) — same UTC moment (03:14:23 - (-5h) = 08:14:23 UTC)
 static constexpr std::string_view kTzMinusLine =
-    "2026-02-27T03:14:23-05:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T03:14:23-05:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "proto TCP (ACK), 1.2.3.4:1234->5.6.7.8:80, len 52";
 
-// TCP line with trailing newline (rsyslog may append one)
+// TCP line with trailing newline (may be present in stream framing)
 static constexpr std::string_view kTrailingNl =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "proto TCP (ACK), 1.2.3.4:1234->5.6.7.8:80, len 52\n";
+
+// DNAT forward: connection-state:new,dnat, NAT annotation before "len"
+static constexpr std::string_view kDnatLine =
+    "2026-02-27T08:14:23+00:00 router FW_FWD_DNAT: FW_FWD_DNAT forward: "
+    "in:ether1 out:(unknown 0), connection-state:new,dnat "
+    "src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), "
+    "108.89.70.182:54442->192.168.88.89:32400, "
+    "NAT 108.89.70.182:54442->(108.89.67.16:3240->192.168.88.89:32400), len 52";
+
+// Mismatched TAG vs body rule — TAG is discarded, body rule wins
+static constexpr std::string_view kMismatchedTagLine =
+    "2026-02-27T08:14:23+00:00 router FW_FWD_NEW: FW_INPUT_NEW input: "
+    "in:ether1 out:ether2, connection-state:new "
+    "proto TCP (ACK), 1.2.3.4:1234->5.6.7.8:80, len 52";
 
 // ── Happy-path tests ──────────────────────────────────────────────────────────
 
@@ -72,8 +92,8 @@ TEST_CASE("TCP line with src-mac parses correctly", "[parser][tcp]") {
     // = 1772180063
     CHECK(result.entry.ts         == 1772180063LL);
     CHECK(result.entry.hostname   == "router");
-    CHECK(result.entry.topic      == "firewall");
-    CHECK(result.entry.level      == "info");
+    CHECK(result.entry.topic.empty());
+    CHECK(result.entry.level.empty());
     CHECK(result.entry.rule       == "FW_INPUT_NEW");
     CHECK(result.entry.chain      == "input");
     CHECK(result.entry.in_iface   == "ether1");
@@ -130,7 +150,7 @@ TEST_CASE("Forward chain, real out_iface, no src-mac", "[parser][forward]") {
     CHECK(result.entry.pkt_len    == 44);
 }
 
-TEST_CASE("No rule name — chain keyword directly after level", "[parser][norule]") {
+TEST_CASE("No rule name — chain keyword directly after tag", "[parser][norule]") {
     const auto result = parse_log(kNoRuleLine);
     REQUIRE(result.ok());
 
@@ -158,34 +178,58 @@ TEST_CASE("Trailing newline stripped cleanly", "[parser][whitespace]") {
     CHECK(result.entry.pkt_len == 52);
 }
 
-// ── BSD syslog format tests ───────────────────────────────────────────────────
+TEST_CASE("DNAT forward: NAT annotation skipped, conn_state and len correct", "[parser][dnat]") {
+    const auto result = parse_log(kDnatLine);
+    REQUIRE(result.ok());
 
-// BSD syslog: <PRI>Mmm DD HH:MM:SS HOSTNAME MSG
-// PRI 134 = facility local0 (16*8) + severity info (6) — typical Mikrotik value.
-// These lines are what msmap receives directly from Mikrotik over UDP 514,
-// without any rsyslog reformatting.
+    CHECK(result.entry.chain      == "forward");
+    CHECK(result.entry.rule       == "FW_FWD_DNAT");
+    CHECK(result.entry.conn_state == "new,dnat");
+    CHECK(result.entry.proto      == "TCP");
+    CHECK(result.entry.tcp_flags  == "ACK");
+    CHECK(result.entry.src_ip     == "108.89.70.182");
+    CHECK(result.entry.src_port   == 54442);
+    CHECK(result.entry.dst_ip     == "192.168.88.89");
+    CHECK(result.entry.dst_port   == 32400);
+    CHECK(result.entry.pkt_len    == 52);
+}
+
+TEST_CASE("Mismatched TAG and body rule — body rule wins", "[parser][tag]") {
+    const auto result = parse_log(kMismatchedTagLine);
+    REQUIRE(result.ok());
+
+    // TAG "FW_FWD_NEW:" is discarded; body says FW_INPUT_NEW input:
+    CHECK(result.entry.rule  == "FW_INPUT_NEW");
+    CHECK(result.entry.chain == "input");
+}
+
+// ── BSD syslog format tests ───────────────────────────────────────────────────
+//
+// BSD syslog: <PRI>Mmm DD HH:MM:SS HOSTNAME TAG MSG
+// PRI 30 = facility daemon (3) + severity info (6) — matches Mikrotik.
+// These lines are what msmap receives directly from Mikrotik over UDP 514.
 
 static constexpr std::string_view kBsdTcpLine =
-    "<134>Feb 27 08:14:23 router firewall,info FW_INPUT_NEW input: "
+    "<30>Feb 27 08:14:23 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto TCP (SYN), "
     "185.220.101.47:54321->203.0.113.1:22, len 60";
 
 static constexpr std::string_view kBsdUdpLine =
-    "<134>Feb 27 08:14:26 router firewall,info FW_INPUT_NEW input: "
+    "<30>Feb 27 08:14:26 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto UDP, "
     "8.8.8.8:5353->203.0.113.1:53, len 64";
 
 static constexpr std::string_view kBsdIcmpLine =
-    "<134>Feb 27 08:14:27 router firewall,info FW_INPUT_DROP input: "
+    "<30>Feb 27 08:14:27 router FW_INPUT_DROP: FW_INPUT_DROP input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto ICMP, "
     "1.1.1.1->203.0.113.1, len 84";
 
 // Single-digit day uses space-padding: "Jan  5" (two spaces before the digit).
 static constexpr std::string_view kBsdSingleDigitDay =
-    "<134>Jan  5 12:00:00 router firewall,info FW_INPUT_NEW input: "
+    "<30>Jan  5 12:00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:ether2, connection-state:new "
     "proto TCP (ACK), 10.0.0.1:1234->10.0.0.2:80, len 52";
 
@@ -196,8 +240,8 @@ TEST_CASE("BSD syslog TCP line parses correctly", "[parser][bsd][tcp]") {
     // Year inferred from system clock; ts must be a plausible recent epoch.
     CHECK(result.entry.ts > 0);
     CHECK(result.entry.hostname   == "router");
-    CHECK(result.entry.topic      == "firewall");
-    CHECK(result.entry.level      == "info");
+    CHECK(result.entry.topic.empty());
+    CHECK(result.entry.level.empty());
     CHECK(result.entry.rule       == "FW_INPUT_NEW");
     CHECK(result.entry.chain      == "input");
     CHECK(result.entry.in_iface   == "ether1");
@@ -263,15 +307,24 @@ TEST_CASE("Empty line returns error", "[parser][error]") {
 }
 
 TEST_CASE("Bad timestamp returns error", "[parser][error]") {
-    const auto result = parse_log("NOT-A-TIMESTAMP router firewall,info input: "
+    const auto result = parse_log("NOT-A-TIMESTAMP router FW_INPUT_NEW: input: "
                                   "in:ether1 out:ether2, connection-state:new "
                                   "proto TCP (ACK), 1.2.3.4:1->2.3.4.5:2, len 1");
     CHECK_FALSE(result.ok());
     CHECK(result.error.substr(0, 14) == "bad timestamp:");
 }
 
+TEST_CASE("Missing BSD syslog tag colon returns error", "[parser][error]") {
+    // Word after hostname does not end with ':' — should fail
+    const auto result = parse_log("2026-02-27T08:14:23+00:00 router notag input: "
+                                  "in:ether1 out:ether2, connection-state:new "
+                                  "proto TCP (ACK), 1.2.3.4:1->2.3.4.5:2, len 1");
+    CHECK_FALSE(result.ok());
+    CHECK(result.error.find("expected BSD syslog tag") != std::string::npos);
+}
+
 TEST_CASE("Unknown chain name returns error", "[parser][error]") {
-    const auto result = parse_log("2026-02-27T08:14:23+00:00 router firewall,info "
+    const auto result = parse_log("2026-02-27T08:14:23+00:00 router sometag: "
                                   "boguschain: in:ether1 out:ether2, "
                                   "connection-state:new proto TCP (ACK), "
                                   "1.2.3.4:1->2.3.4.5:2, len 1");
@@ -280,7 +333,7 @@ TEST_CASE("Unknown chain name returns error", "[parser][error]") {
 }
 
 TEST_CASE("Unsupported protocol returns error", "[parser][error]") {
-    const auto result = parse_log("2026-02-27T08:14:23+00:00 router firewall,info "
+    const auto result = parse_log("2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: "
                                   "FW_INPUT_NEW input: in:ether1 out:(unknown 0), "
                                   "connection-state:new proto OSPF, len 1");
     CHECK_FALSE(result.ok());

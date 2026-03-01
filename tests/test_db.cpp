@@ -195,7 +195,7 @@ TEST_CASE("Entry parsed via parse_log inserts correctly")
 {
     using namespace std::string_view_literals;
     constexpr auto kLine =
-        "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW "
+        "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW "
         "input: in:ether1 out:(unknown 0), connection-state:new "
         "src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), "
         "172.234.31.140:65226->108.89.67.16:44258, len 52"sv;
@@ -206,4 +206,48 @@ TEST_CASE("Entry parsed via parse_log inserts correctly")
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
     REQUIRE(db.insert(result.entry, msmap::GeoIpResult{}));
+}
+
+TEST_CASE("Duplicate suppression: identical entries produce exactly one row")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    const auto entry = make_tcp_entry();
+
+    // First insert succeeds; second is silently ignored by INSERT OR IGNORE.
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    CHECK(rows.size() == 1);
+}
+
+TEST_CASE("Duplicate suppression: ICMP entries (NULL ports) deduplicate correctly")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    const auto entry = make_icmp_entry();
+
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    CHECK(rows.size() == 1);
+}
+
+TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.ts = 1000;
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = 2000;
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    CHECK(rows.size() == 2);
 }

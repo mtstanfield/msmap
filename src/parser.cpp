@@ -282,10 +282,14 @@ private:
     }
     entry.hostname = tok.read_until(' ');
     if (entry.hostname.empty()) { return "missing hostname"; }
-    entry.topic = tok.read_until(',');
-    if (entry.topic.empty()) { return "missing topic"; }
-    entry.level = tok.read_until(' ');
-    if (entry.level.empty()) { return "missing level"; }
+    // BSD syslog TAG field: log-prefix + colon, e.g. "FW_INPUT_NEW:".
+    // Discard it; topic and level remain empty (not stored in DB).
+    const std::string_view tag_word = tok.read_until(' ');
+    if (tag_word.empty() || tag_word.back() != ':') {
+        std::string err = "expected BSD syslog tag (word ending ':'), got: ";
+        err += tag_word;
+        return err;
+    }
     return {};
 }
 
@@ -406,7 +410,7 @@ private:
     }
     if (!err.empty()) { return err; }
 
-    if (!tok.consume(" len ")) { return "expected ' len '"; }
+    tok.read_until(" len "); // skip optional NAT annotation before "len"
     const std::string_view len_sv = tok.rest_trimmed();
     if (!sv_to_i32(len_sv, entry.pkt_len)) {
         std::string e = "bad pkt_len: ";

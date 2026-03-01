@@ -256,3 +256,84 @@ COPY --from=builder /lib/x86_64-linux-gnu/libp11-kit.so.0.3.0 /lib/x86_64-linux-
 ```
 All three only depend on `libc.so.6` which distroless already provides.
 Final image size: ~56 MB.
+
+---
+
+## Findings from Live Traffic Testing (2026-03-01)
+
+---
+
+### FIND-014: Parser expects TOPIC,LEVEL but Mikrotik sends BSD syslog TAG
+**Severity**: High
+**Status**:   Fixed (src/parser.cpp, src/parser.h, tests/test_parser.cpp)
+**File(s)**:  src/parser.cpp
+**Found**:    2026-03-01
+
+The parser called `tok.read_until(',')` for `topic` and `tok.read_until(' ')` for `level`,
+expecting the format `firewall,info` after the hostname. Real Mikrotik production output
+sends a BSD syslog TAG field instead — the log-prefix followed by a colon with no comma:
+
+```
+<30>Mar  1 20:21:01 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: ...
+                              ^^^^^^^^^^^^^  BSD TAG (log-prefix + colon)
+```
+
+Because `,` was never present, `read_until(',')` consumed the entire rest of the line
+as `topic` and the parser never matched any subsequent fields.
+
+**Resolution**: After reading hostname, read one space-delimited word and assert it
+ends with `:`. Discard it. `topic` and `level` in `LogEntry` remain empty strings.
+All test fixtures updated to the real wire format. The RFC 3339 path (rsyslog relay)
+receives the same TAG structure and is fixed identically.
+
+---
+
+### FIND-015: DNAT forward rules append NAT annotation before `len`
+**Severity**: Medium
+**Status**:   Fixed (src/parser.cpp, tests/test_parser.cpp)
+**File(s)**:  src/parser.cpp
+**Found**:    2026-03-01
+
+DNAT/masquerade forward rules produce a NAT annotation between the address pair and
+the packet length:
+
+```
+108.89.70.182:54442->192.168.88.89:32400, NAT 108.89.70.182:54442->(108.89.67.16:3240->192.168.88.89:32400), len 52
+```
+
+The parser used `tok.consume(" len ")` which failed when the NAT annotation was present,
+returning the error `"expected ' len '"` and dropping the packet.
+
+**Resolution**: Replace `tok.consume(" len ")` with `tok.read_until(" len ")`.
+This skips any NAT annotation if present, or advances past the immediate ` len ` in
+the normal case. `connection-state:new,dnat` already parsed correctly since
+`read_until(' ')` captures the comma-separated suffix whole.
+
+---
+
+### FIND-016: Router sends each syslog event multiple times
+**Severity**: Medium
+**Status**:   Fixed (src/db.cpp, schema.sql, tests/test_db.cpp)
+**File(s)**:  src/db.cpp, schema.sql
+**Found**:    2026-03-01
+
+The Mikrotik router logs the same packet through multiple firewall log rules (e.g. both
+an INPUT rule and a FORWARD rule) and may target multiple syslog destinations. Each
+copy produces an identical `LogEntry` at the DB level, inflating connection counts by
+approximately 4×.
+
+**Resolution**: Add a unique expression index on the natural dedup key and use
+`INSERT OR IGNORE`:
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS ux_conn_dedup
+ON connections(ts, src_ip, dst_ip, proto,
+               COALESCE(src_port, -1),
+               COALESCE(dst_port, -1));
+```
+
+`COALESCE(port, -1)` makes NULL (ICMP) ports participate in the unique key.
+`INSERT OR IGNORE` returns `SQLITE_DONE` for both successful inserts and silently
+ignored duplicates — the existing `rc != SQLITE_DONE` error check remains correct.
+`chain` and `rule` are intentionally excluded from the dedup key: the same physical
+packet logged by both INPUT and FORWARD rules is still a duplicate.
