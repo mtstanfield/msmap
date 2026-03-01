@@ -1,0 +1,33 @@
+# .dockerignore – keep the Docker build context lean.
+# The builder stage only needs source, headers, cmake config, and web assets.
+
+# Git internals (large, never needed)
+.git/
+.gitignore
+.gitattributes
+
+# Build artifacts (large; produced inside the container anyway)
+build/
+_build/
+out/
+
+# Claude Code worktree / session data
+.claude/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Docs (not needed to build the binary)
+*.md
+LICENSES/
+LICENSE
+
+# Dev scripts not needed in container
+scripts/

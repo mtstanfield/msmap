@@ -49,8 +49,11 @@ _ext/
 *~
 
 ## Docker
+# Dockerfile variants (e.g. Dockerfile.dev) – only the canonical Dockerfile is committed
 Dockerfile.*
-.dockerignore
+
+## Claude Code worktree / session data
+.claude/
 
 ## OS Generated
 .DS_Store
