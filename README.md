@@ -141,17 +141,41 @@ if $fromhost-ip == "YOUR.ROUTER.IP" then {
 
 ```
 .
-├── Dockerfile              # Multi-stage: dev → builder → distroless
-├── CMakeLists.txt          # (to be created)
+├── Dockerfile              # Multi-stage: dev → builder → distroless:nonroot
+├── CMakeLists.txt          # Build system (cmake 3.29+, Ninja, clang-18)
 ├── PLAN.md                 # Detailed feature plan and todo list
 ├── CLAUDE.md               # Instructions for Claude Code
 ├── FINDINGS.md             # Issues log for remediation tracking
+├── rsyslog.conf            # rsyslog forwarding config for Mikrotik logs
+├── schema.sql              # SQLite schema (reference copy; applied in db.cpp)
 ├── src/
-│   └── main.cpp
-├── include/
-├── web/                    # Leaflet.js and frontend assets (to be embedded)
+│   ├── main.cpp            # Entry point, signal handling, startup
+│   ├── listener.cpp/.h     # TCP listener on port 5140
+│   ├── parser.cpp/.h       # Hand-written RFC 3339 + Mikrotik log tokenizer
+│   ├── db.cpp/.h           # SQLite WAL database, schema, queries
+│   ├── geoip.cpp/.h        # MaxMind GeoLite2 enrichment
+│   ├── abuse_cache.cpp/.h  # AbuseIPDB cache (SQLite-backed, background refresh)
+│   ├── http.cpp/.h         # libmicrohttpd HTTP server + REST API
+│   └── json.h              # Hand-rolled JSON serializer
+├── web/
+│   ├── index.html          # Single-page app shell
+│   ├── app.js              # Leaflet map + filter panel
+│   ├── app.css             # Styles
+│   ├── bundle.py           # CMake step: inlines all assets → index_html.h
+│   └── vendor/             # Leaflet.js, MarkerCluster (local copies)
 ├── tests/
-└── cmake/
+│   ├── test_parser.cpp
+│   ├── test_db.cpp
+│   ├── test_geoip.cpp
+│   ├── test_http.cpp
+│   ├── test_abuse_cache.cpp
+│   └── test_integration.cpp  # End-to-end: TCP socket → DB → query
+├── cmake/
+│   ├── CompilerWarnings.cmake
+│   ├── Sanitizers.cmake
+│   └── StaticAnalyzers.cmake
+└── scripts/
+    └── smoke_test.sh       # Manual smoke test (listener + DB + HTTP)
 ```
 
 ---

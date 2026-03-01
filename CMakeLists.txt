@@ -43,16 +43,52 @@ find_package(PkgConfig  REQUIRED)
 find_package(Python3    REQUIRED COMPONENTS Interpreter)
 find_package(Threads    REQUIRED)
 
+# cmake (any version) does not support a STATIC keyword in pkg_check_modules;
+# passing STATIC is treated as a module name and causes a configure error.
+# Always discover with IMPORTED_TARGET for include paths and compile flags.
+# When MSMAP_LINK_STATIC=ON, INTERFACE_LINK_LIBRARIES is overridden below
+# using the <prefix>_STATIC_LIBRARIES variables (from pkg-config --static --libs)
+# with each name resolved to a full .a path where available.
+pkg_check_modules(MICROHTTPD REQUIRED IMPORTED_TARGET libmicrohttpd)
+pkg_check_modules(SQLITE3    REQUIRED IMPORTED_TARGET sqlite3)
+pkg_check_modules(MAXMINDDB  REQUIRED IMPORTED_TARGET libmaxminddb)
+pkg_check_modules(LIBCURL    REQUIRED IMPORTED_TARGET libcurl)
+
 if(MSMAP_LINK_STATIC)
-    pkg_check_modules(MICROHTTPD REQUIRED STATIC IMPORTED_TARGET libmicrohttpd)
-    pkg_check_modules(SQLITE3    REQUIRED STATIC IMPORTED_TARGET sqlite3)
-    pkg_check_modules(MAXMINDDB  REQUIRED STATIC IMPORTED_TARGET libmaxminddb)
-    pkg_check_modules(LIBCURL    REQUIRED STATIC IMPORTED_TARGET libcurl)
-else()
-    pkg_check_modules(MICROHTTPD REQUIRED IMPORTED_TARGET libmicrohttpd)
-    pkg_check_modules(SQLITE3    REQUIRED IMPORTED_TARGET sqlite3)
-    pkg_check_modules(MAXMINDDB  REQUIRED IMPORTED_TARGET libmaxminddb)
-    pkg_check_modules(LIBCURL    REQUIRED IMPORTED_TARGET libcurl)
+    # Walk each library's static-link list and resolve to .a where possible.
+    # Falls back to a bare library name (dynamic) for any lib without a .a;
+    # the linker includes those only if their symbols are actually referenced.
+    #
+    # Glibc sub-libraries (m, pthread, dl, rt, c, resolv) must remain dynamic
+    # even in a semi-static build.  Their .a archives use GNU IFUNCs that
+    # reference _dl_x86_cpu_features — a symbol that only exists in ld.so at
+    # runtime.  Statically linking them causes undefined-reference link errors.
+    # All of them are present in distroless/cc-debian12 via glibc.
+    set(_glibc_libs m pthread dl rt c resolv)
+    set(_saved_sfx "${CMAKE_FIND_LIBRARY_SUFFIXES}")
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    foreach(_prefix IN ITEMS MICROHTTPD SQLITE3 MAXMINDDB LIBCURL)
+        set(_static_link)
+        foreach(_lib IN LISTS ${_prefix}_STATIC_LIBRARIES)
+            if(_lib IN_LIST _glibc_libs)
+                # Keep dynamic: bare name → linker resolves as -l<name>.
+                list(APPEND _static_link "${_lib}")
+                continue()
+            endif()
+            # Unset before each call: find_library(NO_CACHE) reuses a stale
+            # variable value rather than re-searching if the var is already set.
+            unset(_lib_path)
+            find_library(_lib_path "${_lib}" NO_CACHE)
+            if(_lib_path)
+                list(APPEND _static_link "${_lib_path}")
+            else()
+                list(APPEND _static_link "${_lib}")
+            endif()
+        endforeach()
+        set_target_properties("PkgConfig::${_prefix}" PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${_static_link}")
+    endforeach()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES "${_saved_sfx}")
 endif()
 
 # ── Web bundle ─────────────────────────────────────────────────────────────
