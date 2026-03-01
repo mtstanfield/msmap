@@ -6,6 +6,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -14,6 +15,7 @@
 #include <cstring>
 #include <iostream> // std::clog
 #include <optional>
+#include <stop_token>
 #include <string>
 #include <string_view>
 
@@ -111,7 +113,9 @@ void handle_connection(int conn_fd, Database& db, GeoIp& geoip,
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse) {
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  const std::stop_token& stoken) {
     const ScopedFd srv{socket(AF_INET, SOCK_STREAM, 0)};
     if (!srv.valid()) {
         std::clog << "[FATAL] socket: " << std::strerror(errno) << '\n';
@@ -142,7 +146,17 @@ void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse) {
 
     std::clog << "[INFO] msmap listening on 127.0.0.1:" << port << '\n';
 
-    for (;;) {
+    while (!stoken.stop_requested()) {
+        // Poll with timeout so the stop token is checked periodically.
+        pollfd pfd{srv.get(), POLLIN, 0};
+        const int ready = poll(&pfd, 1, /*timeout_ms=*/50);
+        if (ready == 0)  { continue; }        // timeout — recheck stop token
+        if (ready < 0)   {
+            if (errno == EINTR) { continue; } // interrupted by signal — retry
+            std::clog << "[WARN] poll: " << std::strerror(errno) << '\n';
+            continue;
+        }
+
         sockaddr_in peer{};
         socklen_t   peer_len = sizeof(peer);
 
@@ -150,9 +164,7 @@ void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse) {
             accept(srv.get(), reinterpret_cast<sockaddr*>(&peer), &peer_len)};
 
         if (!conn.valid()) {
-            if (errno == EINTR) {
-                continue; // interrupted by signal — retry
-            }
+            if (errno == EINTR) { continue; }
             std::clog << "[WARN] accept: " << std::strerror(errno) << '\n';
             continue;
         }

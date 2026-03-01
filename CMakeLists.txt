@@ -41,6 +41,7 @@ include(StaticAnalyzers)
 # ── Dependencies ───────────────────────────────────────────────────────────
 find_package(PkgConfig  REQUIRED)
 find_package(Python3    REQUIRED COMPONENTS Interpreter)
+find_package(Threads    REQUIRED)
 
 if(MSMAP_LINK_STATIC)
     pkg_check_modules(MICROHTTPD REQUIRED STATIC IMPORTED_TARGET libmicrohttpd)
@@ -206,4 +207,29 @@ if(MSMAP_ENABLE_TESTS)
         PkgConfig::LIBCURL)
 
     catch_discover_tests(test_abuse_cache)
+
+    add_executable(test_integration
+        tests/test_integration.cpp
+        src/listener.cpp
+        src/abuse_cache.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_integration PRIVATE cxx_std_23)
+    target_include_directories(test_integration PRIVATE src)
+    msmap_set_warnings(test_integration)
+    msmap_enable_sanitizers(test_integration)
+    target_link_libraries(test_integration PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB
+        PkgConfig::LIBCURL
+        Threads::Threads)
+
+    # SQLite global state triggers LSAN false positives at process exit.
+    # Pass ASAN_OPTIONS to every discovered test case via catch_discover_tests PROPERTIES.
+    catch_discover_tests(test_integration
+        PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
 endif()

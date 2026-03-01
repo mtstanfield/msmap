@@ -182,7 +182,7 @@ docker build -t msmap .
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
 - [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing
-- [ ] Integration test: full ingest → query pipeline
+- [x] Integration test: full ingest → query pipeline (TCP socket → listener → parser → DB → query, 7 cases, 67 total)
 
 ### Security
 - [x] Input validation on all HTTP query params: length caps, range checks, proto allowlist
