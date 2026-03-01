@@ -41,8 +41,10 @@ RUN curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
         http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VER} main" \
         > /etc/apt/sources.list.d/llvm.list
 
-# cmake via pip – bookworm ships 3.25; best practices template requires 3.29+
-RUN pip3 install --break-system-packages cmake
+# cmake via pip – bookworm ships 3.25; best practices template requires 3.29+.
+# Pin to 3.x: cmake 4.x broke the STATIC keyword in pkg_check_modules, which
+# we rely on in CMakeLists.txt for the MSMAP_LINK_STATIC=ON release build.
+RUN pip3 install --break-system-packages "cmake>=3.29,<4"
 
 # Full toolchain + static analysis + project libraries
 # All -dev packages include static .a files for semi-static linking
