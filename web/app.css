@@ -35,11 +35,37 @@ html, body {
 #stat-mapped { color: #58a6ff; }
 #stat-error  { color: #f85149; }
 
+/* ── Filter toggle button ─────────────────────────────────────────────────── */
+
+#filter-toggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1001;
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+    padding: 0;
+    line-height: 1;
+}
+
+#filter-toggle:hover  { background: #21262d; border-color: #58a6ff; }
+#filter-toggle.active { color: #58a6ff; border-color: #58a6ff; }
+
 /* ── Filter panel ─────────────────────────────────────────────────────────── */
 
 #filter-panel {
     position: fixed;
-    top: 10px;
+    top: 52px;
     right: 10px;
     z-index: 1001;
     background: #161b22;

@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>msmap</title>
+    <meta name="description" content="Mikrotik firewall log live map">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺</text></svg>">
     <style>{{LEAFLET_CSS}}</style>
     <style>{{MARKERCLUSTER_CSS}}</style>
     <style>{{MARKERCLUSTER_DEFAULT_CSS}}</style>
@@ -12,7 +14,10 @@
 <body>
     <div id="map"></div>
 
-    <!-- Filter panel -->
+    <!-- Filter toggle button (top-right) -->
+    <button id="filter-toggle" title="Toggle filters" aria-label="Toggle filters">&#9881;</button>
+
+    <!-- Filter panel (open by default) -->
     <div id="filter-panel">
         <div class="filter-title">Filters</div>
 

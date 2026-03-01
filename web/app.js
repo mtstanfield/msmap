@@ -71,6 +71,8 @@ const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
 const statTime      = document.getElementById('stat-time');
 const statError     = document.getElementById('stat-error');
+const filterPanel   = document.getElementById('filter-panel');
+const filterToggle  = document.getElementById('filter-toggle');
 const fTime         = document.getElementById('f-time');
 const fDedup        = document.getElementById('f-dedup');
 const fProto        = document.getElementById('f-proto');
@@ -80,6 +82,16 @@ const fCountry      = document.getElementById('f-country');
 const fLimit        = document.getElementById('f-limit');
 
 // ── Filter panel ─────────────────────────────────────────────────────────────
+
+// Panel starts open; gear is active (blue) when panel is visible.
+// Use style.display (inline style = highest specificity) so it correctly
+// overrides the CSS `display: flex` rule — the old `hidden` attribute didn't.
+filterToggle.classList.add('active');
+filterToggle.addEventListener('click', () => {
+    const nowOpen = filterPanel.style.display !== 'none';
+    filterPanel.style.display = nowOpen ? 'none' : '';
+    filterToggle.classList.toggle('active', !nowOpen);
+});
 
 document.getElementById('f-apply').addEventListener('click', () => {
     resetAndFetch();
@@ -285,6 +297,6 @@ function resetAndFetch() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
-computeSincePreset(); // uses default 24h selection
-poll();
+computeSincePreset();
+setTimeout(poll, 0);          // defer first fetch past initial map paint
 setInterval(poll, REFRESH_MS);
