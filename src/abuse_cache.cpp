@@ -56,12 +56,12 @@ std::size_t curl_write_cb(const char* ptr, std::size_t /*size*/,
 /// Returns nullopt if the key is absent or the value is not a valid integer.
 std::optional<int> extract_score(const std::string& json) noexcept
 {
-    constexpr std::string_view kKey{"\"abuseConfidenceScore\":"};
-    const auto pos = json.find(kKey);
+    constexpr std::string_view key{"\"abuseConfidenceScore\":"};
+    const auto pos = json.find(key);
     if (pos == std::string::npos) {
         return std::nullopt;
     }
-    const char* p = json.c_str() + pos + kKey.size();
+    const char* p = json.c_str() + pos + key.size();
     while (*p == ' ' || *p == '\t') { ++p; }
     char* end = nullptr;
     const long val = std::strtol(p, &end, 10);
@@ -82,6 +82,7 @@ std::int64_t epoch_day() noexcept
 
 // ── AbuseCache implementation ─────────────────────────────────────────────────
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 AbuseCache::AbuseCache(const std::string& db_path,
                        const std::string& api_key) noexcept
     : db_path_(db_path), api_key_(api_key),
@@ -189,7 +190,7 @@ std::optional<int> AbuseCache::lookup(const std::string& ip) const noexcept
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         const int          score        = sqlite3_column_int(stmt,   0);
         const std::int64_t last_checked = sqlite3_column_int64(stmt, 1);
-        const std::int64_t now          = static_cast<std::int64_t>(std::time(nullptr));
+        const auto         now          = static_cast<std::int64_t>(std::time(nullptr));
         if (now - last_checked < kCacheTtlSecs) {
             result = score;
         }
@@ -207,7 +208,7 @@ void AbuseCache::submit(const std::string& ip) noexcept
 
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
-        if (queue_.count(ip) != 0 || in_flight_.count(ip) != 0) {
+        if (queue_.contains(ip) || in_flight_.contains(ip)) {
             return; // already queued or being fetched
         }
         queue_.insert(ip);

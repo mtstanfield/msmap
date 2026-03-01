@@ -176,8 +176,7 @@ TEST_CASE("threat score round-trips through insert and query_connections")
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
-    REQUIRE(rows.at(0).threat.has_value());
-    CHECK(*rows.at(0).threat == 75);
+    REQUIRE(rows.at(0).threat == 75);
 }
 
 TEST_CASE("threat score nullopt stores and reads as NULL")

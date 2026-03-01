@@ -178,7 +178,7 @@ docker build -t msmap .
 
 ### Safety & Quality
 - [ ] GSL (header-only, CPM or vendored)
-- [ ] Sanitizer builds: ASan + UBSan enabled in Debug/CI
+- [x] Sanitizer builds: ASan + UBSan + -fno-sanitize-recover=all enabled by default in Debug builds
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
 - [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing

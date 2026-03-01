@@ -73,9 +73,7 @@ TEST_CASE("AbuseCache: cache_store then lookup returns stored score")
     REQUIRE(cache.valid());
 
     REQUIRE(cache.cache_store("8.8.8.8", 99));
-    const auto result = cache.lookup("8.8.8.8");
-    REQUIRE(result.has_value());
-    CHECK(*result == 99);
+    REQUIRE(cache.lookup("8.8.8.8") == 99);
 }
 
 TEST_CASE("AbuseCache: cache_store zero score round-trips")
@@ -84,9 +82,7 @@ TEST_CASE("AbuseCache: cache_store zero score round-trips")
     REQUIRE(cache.valid());
 
     REQUIRE(cache.cache_store("1.1.1.1", 0));
-    const auto result = cache.lookup("1.1.1.1");
-    REQUIRE(result.has_value());
-    CHECK(*result == 0);
+    REQUIRE(cache.lookup("1.1.1.1") == 0);
 }
 
 // ── TTL constant ─────────────────────────────────────────────────────────────
@@ -157,8 +153,7 @@ TEST_CASE("AbuseCache: update_connections_threat patches NULL threat rows")
         REQUIRE(db.valid());
         const auto rows = db.query_connections(msmap::QueryFilters{});
         REQUIRE(rows.size() == 1);
-        REQUIRE(rows.at(0).threat.has_value());
-        CHECK(*rows.at(0).threat == 75);
+        REQUIRE(rows.at(0).threat == 75);
     }
 
     (void)std::remove(db_path.c_str());
@@ -190,8 +185,7 @@ TEST_CASE("AbuseCache: update_connections_threat does not overwrite existing sco
         REQUIRE(db.valid());
         const auto rows = db.query_connections(msmap::QueryFilters{});
         REQUIRE(rows.size() == 1);
-        REQUIRE(rows.at(0).threat.has_value());
-        CHECK(*rows.at(0).threat == 50);
+        REQUIRE(rows.at(0).threat == 50);
     }
 
     (void)std::remove(db_path.c_str());

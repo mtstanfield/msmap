@@ -17,7 +17,7 @@ struct sqlite3_stmt;
 namespace msmap {
 
 /// Cache TTL: re-query AbuseIPDB after this many seconds.
-inline constexpr std::int64_t kCacheTtlSecs{24 * 3600};
+inline constexpr std::int64_t kCacheTtlSecs{24LL * 3600};
 
 /// AbuseIPDB free-tier daily quota.
 inline constexpr int kDailyQuota{1000};
@@ -44,6 +44,7 @@ public:
     /// Open (or create) the abuse_cache table in the database at `db_path`.
     /// `api_key` is the raw AbuseIPDB API key string (not an env-var name).
     /// Pass an empty string to disable API lookups (cache reads still work).
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     AbuseCache(const std::string& db_path, const std::string& api_key) noexcept;
 
     /// Stop the background thread and close the SQLite connection.

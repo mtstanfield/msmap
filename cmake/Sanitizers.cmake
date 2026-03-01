@@ -14,7 +14,11 @@ function(msmap_enable_sanitizers target)
     endif()
 
     # ASan + UBSan. TSan is mutually exclusive with ASan; enable separately if needed.
-    set(SANITIZE_FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer)
+    # -fno-sanitize-recover=all: treat every UBSan finding as fatal (same as ASan default).
+    set(SANITIZE_FLAGS
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all)
 
     target_compile_options(${target} PRIVATE ${SANITIZE_FLAGS})
     target_link_options(${target}    PRIVATE ${SANITIZE_FLAGS})

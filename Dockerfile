@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         lldb-${LLVM_VER} \
         libc++-${LLVM_VER}-dev \
         libc++abi-${LLVM_VER}-dev \
+        libclang-rt-${LLVM_VER}-dev \
         # static analysis
         cppcheck \
         iwyu \

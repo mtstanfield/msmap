@@ -15,11 +15,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Options ────────────────────────────────────────────────────────────────
 option(MSMAP_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
-option(MSMAP_ENABLE_SANITIZERS  "Enable ASan + UBSan"               OFF)
 option(MSMAP_ENABLE_CLANG_TIDY  "Run clang-tidy during build"       OFF)
 option(MSMAP_ENABLE_CPPCHECK    "Run cppcheck during build"         OFF)
 # Prefer .a over .so for app libraries. Set ON in release/distroless builds.
 option(MSMAP_LINK_STATIC        "Link app libraries statically"     OFF)
+# ASan + UBSan: default ON for non-Release builds, OFF for Release.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    option(MSMAP_ENABLE_SANITIZERS "Enable ASan + UBSan" OFF)
+else()
+    option(MSMAP_ENABLE_SANITIZERS "Enable ASan + UBSan" ON)
+endif()
 # Build Catch2 unit tests. Default ON for Debug, OFF for Release.
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     option(MSMAP_ENABLE_TESTS "Build unit tests" OFF)
