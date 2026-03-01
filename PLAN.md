@@ -39,34 +39,37 @@ records in SQLite → enrich with GeoIP/OSINT → serve a self-contained web UI
 
 ### Pipeline
 ```
-Mikrotik (UDP 514) → rsyslog → TCP 5140 → msmap
+Mikrotik (UDP 514) → msmap (UDP 5140)
 ```
 
-rsyslog receives BSD syslog from Mikrotik and reformats the timestamp to RFC 3339
-before forwarding. msmap never sees a year-ambiguous timestamp.
+msmap listens directly on UDP — no rsyslog intermediary required. Mikrotik sends
+BSD syslog natively (`<PRI>Mmm DD HH:MM:SS HOSTNAME MSG`); msmap parses the BSD
+timestamp and infers the year from the system clock (router must be UTC with NTP).
 
-### rsyslog config (`/etc/rsyslog.d/msmap.conf`)
+**Rationale for UDP-direct (changed from TCP+rsyslog):**
+The original design used rsyslog to reformat the BSD timestamp to RFC 3339 and
+forward over TCP. This was discovered to be a portability issue: containers running
+on Unraid (or any Docker host) cannot rely on a host rsyslog being configured and
+running. The Mikrotik router sends BSD syslog over UDP — requiring a host daemon
+just to relay and reformat those packets adds an external dependency with no benefit.
+Moving timestamp parsing into msmap eliminates the dependency: the container is now
+fully self-contained. The rsyslog.conf is kept in the repo for reference but is no
+longer required.
+
+### Wire format (what msmap parses — BSD syslog from Mikrotik)
 ```
-template(name="MsmapFmt" type="string"
-    string="%TIMESTAMP:::date-rfc3339% %HOSTNAME% %msg%\n")
-
-input(type="imudp" port="514")
-
-if $fromhost-ip == "YOUR.ROUTER.IP" then {
-    action(type="omfwd" target="127.0.0.1" port="5140"
-           protocol="tcp" template="MsmapFmt")
-    stop
-}
+<134>Feb 27 08:14:23 router firewall,info FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
 ```
 
-### Wire format (what msmap parses)
+The parser also accepts RFC 3339 format (rsyslog-reformatted) via auto-detection:
 ```
-2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
+2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: ...
 ```
 
 ### Grammar
 ```
-message    := ISO8601_TS ' ' HOSTNAME ' ' mk_body
+bsd_message   := '<' PRI '>' BSD_TS ' ' HOSTNAME ' ' mk_body
+rfc3339_msg   := RFC3339_TS ' ' HOSTNAME ' ' mk_body   (auto-detected; rsyslog)
 mk_body    := TOPIC ',' LEVEL ' ' [RULE_NAME ' '] chain_line
 chain_line := CHAIN ': ' ifaces ', ' conn_state [' src-mac ' MAC ','] ' ' proto_line
 ifaces     := 'in:' IFACE ' out:' IFACE_OR_UNKNOWN
@@ -151,9 +154,9 @@ docker build -t msmap .
 - [x] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container; publishes release image to ghcr.io/mtstanfield/msmap on main
 
 ### Ingest
-- [ ] rsyslog config: receive UDP 514, reformat, forward TCP 5140
-- [x] msmap TCP listener on 5140 (loopback only)
-- [x] Log parser: hand-written linear tokenizer (see grammar above)
+- [~] rsyslog config: N/A — msmap now listens directly on UDP; rsyslog not required
+- [x] msmap UDP listener on 5140 (0.0.0.0 — accepts from LAN and loopback)
+- [x] Log parser: hand-written linear tokenizer; auto-detects BSD and RFC 3339 formats
 - [ ] Fuzz the parser with libFuzzer
 
 ### Storage
@@ -182,7 +185,7 @@ docker build -t msmap .
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
 - [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing
-- [x] Integration test: full ingest → query pipeline (TCP socket → listener → parser → DB → query, 7 cases, 67 total)
+- [x] Integration test: full ingest → query pipeline (UDP socket → listener → parser → DB → query, 7 cases)
 
 ### Security
 - [x] Input validation on all HTTP query params: length caps, range checks, proto allowlist
