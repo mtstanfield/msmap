@@ -6,10 +6,42 @@
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const PROTO_COLORS = { TCP: '#58a6ff', UDP: '#3fb950', ICMP: '#d29922' };
-const DEFAULT_COLOR = '#8b949e';
-const REFRESH_MS    = 30000;       // poll interval
-const MAX_MARKERS   = 5000;        // cap to keep rendering fast
+const GOOD_COLOR  = '#3fb950';     // green — all non-high-threat markers
+const REFRESH_MS  = 30000;         // poll interval
+const MAX_MARKERS = 5000;          // cap to keep rendering fast
+
+// ── Filter persistence ───────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'msmap_filters';
+
+function saveFilters() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            time:    fTime.value,
+            dedup:   fDedup.checked,
+            proto:   fProto.value,
+            ip:      fIp.value,
+            port:    fPort.value,
+            country: fCountry.value,
+            limit:   fLimit.value,
+        }));
+    } catch (_) { /* private/storage-full — silently ignore */ }
+}
+
+function loadFilters() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) { return; }
+        const s = JSON.parse(raw);
+        if (s.time    !== undefined) { fTime.value    = s.time; }
+        if (s.dedup   !== undefined) { fDedup.checked = s.dedup; }
+        if (s.proto   !== undefined) { fProto.value   = s.proto; }
+        if (s.ip      !== undefined) { fIp.value      = s.ip; }
+        if (s.port    !== undefined) { fPort.value    = s.port; }
+        if (s.country !== undefined) { fCountry.value = s.country; }
+        if (s.limit   !== undefined) { fLimit.value   = s.limit; }
+    } catch (_) { /* corrupted storage — silently ignore */ }
+}
 
 // ── Map initialisation ───────────────────────────────────────────────────────
 
@@ -30,10 +62,11 @@ L.tileLayer(
             ' contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains:        'abcd',
         maxZoom:           19,
-        noWrap:            true,  // don't repeat tiles outside ±180°
-        updateWhenIdle:    true,  // load tiles only after pan/zoom settles
-        updateWhenZooming: false, // skip tile loads during zoom animation
-        keepBuffer:        4,     // pre-render 4 tile-widths beyond viewport
+        noWrap:            true,       // don't repeat tiles outside ±180°
+        updateWhenIdle:    true,       // load tiles only after pan/zoom settles
+        updateWhenZooming: false,      // skip tile loads during zoom animation
+        keepBuffer:        4,          // pre-render 4 tile-widths beyond viewport
+        crossOrigin:       'anonymous', // allow HTTP cache sharing across tabs
     }
 ).addTo(lmap);
 
@@ -254,7 +287,7 @@ async function poll() {
             if (r.lat !== null && r.lon !== null) {
                 const color = (r.threat !== null && r.threat !== undefined && r.threat >= 67)
                     ? '#f85149'
-                    : (PROTO_COLORS[r.proto] || DEFAULT_COLOR);
+                    : GOOD_COLOR;
                 const m = L.circleMarker([r.lat, r.lon], {
                     radius:      5,
                     color:       color,
@@ -284,6 +317,7 @@ async function poll() {
 
 /// Reset all accumulated state and trigger a full re-fetch.
 function resetAndFetch() {
+    saveFilters();
     computeSincePreset();
     lastTs      = 0;
     totalSeen   = 0;
@@ -297,6 +331,7 @@ function resetAndFetch() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
+loadFilters();                // restore before computeSincePreset reads fTime
 computeSincePreset();
 setTimeout(poll, 0);          // defer first fetch past initial map paint
 setInterval(poll, REFRESH_MS);

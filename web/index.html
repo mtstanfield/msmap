@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>msmap</title>
     <meta name="description" content="Mikrotik firewall log live map">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
     <style>{{LEAFLET_CSS}}</style>
     <style>{{MARKERCLUSTER_CSS}}</style>
     <style>{{MARKERCLUSTER_DEFAULT_CSS}}</style>
@@ -71,6 +71,8 @@
         <span id="stat-total">0 total</span>
         <span id="stat-time">&ndash;</span>
         <span id="stat-error" style="display:none"></span>
+        <span id="stat-spacer"></span>
+        <a id="stat-repo" href="https://github.com/mtstanfield/msmap" target="_blank" rel="noopener noreferrer">msmap</a>
     </div>
 
     <script>{{LEAFLET_JS}}</script>
