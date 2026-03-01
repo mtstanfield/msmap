@@ -15,11 +15,22 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Options ────────────────────────────────────────────────────────────────
 option(MSMAP_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
-option(MSMAP_ENABLE_SANITIZERS  "Enable ASan + UBSan"               OFF)
 option(MSMAP_ENABLE_CLANG_TIDY  "Run clang-tidy during build"       OFF)
 option(MSMAP_ENABLE_CPPCHECK    "Run cppcheck during build"         OFF)
 # Prefer .a over .so for app libraries. Set ON in release/distroless builds.
 option(MSMAP_LINK_STATIC        "Link app libraries statically"     OFF)
+# ASan + UBSan: default ON for non-Release builds, OFF for Release.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    option(MSMAP_ENABLE_SANITIZERS "Enable ASan + UBSan" OFF)
+else()
+    option(MSMAP_ENABLE_SANITIZERS "Enable ASan + UBSan" ON)
+endif()
+# Build Catch2 unit tests. Default ON for Debug, OFF for Release.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    option(MSMAP_ENABLE_TESTS "Build unit tests" OFF)
+else()
+    option(MSMAP_ENABLE_TESTS "Build unit tests" ON)
+endif()
 
 # ── CMake modules ──────────────────────────────────────────────────────────
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -28,20 +39,59 @@ include(Sanitizers)
 include(StaticAnalyzers)
 
 # ── Dependencies ───────────────────────────────────────────────────────────
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig  REQUIRED)
+find_package(Python3    REQUIRED COMPONENTS Interpreter)
+find_package(Threads    REQUIRED)
 
 if(MSMAP_LINK_STATIC)
     pkg_check_modules(MICROHTTPD REQUIRED STATIC IMPORTED_TARGET libmicrohttpd)
     pkg_check_modules(SQLITE3    REQUIRED STATIC IMPORTED_TARGET sqlite3)
     pkg_check_modules(MAXMINDDB  REQUIRED STATIC IMPORTED_TARGET libmaxminddb)
+    pkg_check_modules(LIBCURL    REQUIRED STATIC IMPORTED_TARGET libcurl)
 else()
     pkg_check_modules(MICROHTTPD REQUIRED IMPORTED_TARGET libmicrohttpd)
     pkg_check_modules(SQLITE3    REQUIRED IMPORTED_TARGET sqlite3)
     pkg_check_modules(MAXMINDDB  REQUIRED IMPORTED_TARGET libmaxminddb)
+    pkg_check_modules(LIBCURL    REQUIRED IMPORTED_TARGET libcurl)
 endif()
 
+# ── Web bundle ─────────────────────────────────────────────────────────────
+# Run web/bundle.py to inline Leaflet + app assets into a single HTML file,
+# then emit src/index_html.h as a constexpr string_view for embedding.
+set(WEB_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/web")
+set(INDEX_HTML_H  "${CMAKE_CURRENT_BINARY_DIR}/index_html.h")
+
+add_custom_command(
+    OUTPUT  "${INDEX_HTML_H}"
+    COMMAND "${Python3_EXECUTABLE}"
+            "${WEB_DIR}/bundle.py"
+            "${WEB_DIR}/index.html"
+            "${INDEX_HTML_H}"
+            kIndexHtml
+    DEPENDS
+        "${WEB_DIR}/bundle.py"
+        "${WEB_DIR}/index.html"
+        "${WEB_DIR}/app.js"
+        "${WEB_DIR}/app.css"
+        "${WEB_DIR}/vendor/leaflet.min.js"
+        "${WEB_DIR}/vendor/leaflet.min.css"
+        "${WEB_DIR}/vendor/leaflet.markercluster.js"
+        "${WEB_DIR}/vendor/MarkerCluster.css"
+        "${WEB_DIR}/vendor/MarkerCluster.Default.css"
+    VERBATIM
+    COMMENT "Bundling web assets → index_html.h")
+
+add_custom_target(web_bundle DEPENDS "${INDEX_HTML_H}")
+
 # ── Target ─────────────────────────────────────────────────────────────────
-add_executable(msmap src/main.cpp)
+add_executable(msmap
+    src/main.cpp
+    src/db.cpp
+    src/geoip.cpp
+    src/http.cpp
+    src/listener.cpp
+    src/parser.cpp
+    src/abuse_cache.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
 
@@ -49,7 +99,137 @@ msmap_set_warnings(msmap)
 msmap_enable_sanitizers(msmap)
 msmap_enable_static_analyzers(msmap)
 
+# Make msmap depend on the web bundle and expose the build dir as an include path.
+add_dependencies(msmap web_bundle)
+target_include_directories(msmap PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+
 target_link_libraries(msmap PRIVATE
     PkgConfig::MICROHTTPD
     PkgConfig::SQLITE3
-    PkgConfig::MAXMINDDB)
+    PkgConfig::MAXMINDDB
+    PkgConfig::LIBCURL)
+
+# ── Tests ───────────────────────────────────────────────────────────────────
+# Catch2 is not in Debian bookworm; fetch it via CMake's built-in FetchContent.
+if(MSMAP_ENABLE_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.7.1
+        GIT_SHALLOW    TRUE
+        FIND_PACKAGE_ARGS NAMES Catch2)
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+    include(Catch)
+
+    enable_testing()
+
+    add_executable(test_parser
+        tests/test_parser.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_parser PRIVATE cxx_std_23)
+    target_include_directories(test_parser PRIVATE src)
+    # Apply warnings but not static-analysis tools to the test target;
+    # Catch2 macros generate code that confuses clang-tidy/cppcheck.
+    msmap_set_warnings(test_parser)
+    msmap_enable_sanitizers(test_parser)
+    target_link_libraries(test_parser PRIVATE Catch2::Catch2WithMain)
+
+    catch_discover_tests(test_parser)
+
+    add_executable(test_db
+        tests/test_db.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_db PRIVATE cxx_std_23)
+    target_include_directories(test_db PRIVATE src)
+    msmap_set_warnings(test_db)
+    msmap_enable_sanitizers(test_db)
+    target_link_libraries(test_db PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB)
+
+    catch_discover_tests(test_db)
+
+    add_executable(test_geoip
+        tests/test_geoip.cpp
+        src/geoip.cpp)
+
+    target_compile_features(test_geoip PRIVATE cxx_std_23)
+    target_include_directories(test_geoip PRIVATE src)
+    msmap_set_warnings(test_geoip)
+    msmap_enable_sanitizers(test_geoip)
+    target_link_libraries(test_geoip PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::MAXMINDDB)
+
+    catch_discover_tests(test_geoip)
+
+    # test_http: tests the JSON serialiser (json.h) and Database::query_connections.
+    # Does not link MICROHTTPD — HttpServer is not instantiated in these tests.
+    add_executable(test_http
+        tests/test_http.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_http PRIVATE cxx_std_23)
+    target_include_directories(test_http PRIVATE src)
+    msmap_set_warnings(test_http)
+    msmap_enable_sanitizers(test_http)
+    target_link_libraries(test_http PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB)
+
+    catch_discover_tests(test_http)
+
+    add_executable(test_abuse_cache
+        tests/test_abuse_cache.cpp
+        src/abuse_cache.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_abuse_cache PRIVATE cxx_std_23)
+    target_include_directories(test_abuse_cache PRIVATE src)
+    msmap_set_warnings(test_abuse_cache)
+    msmap_enable_sanitizers(test_abuse_cache)
+    target_link_libraries(test_abuse_cache PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB
+        PkgConfig::LIBCURL)
+
+    catch_discover_tests(test_abuse_cache)
+
+    add_executable(test_integration
+        tests/test_integration.cpp
+        src/listener.cpp
+        src/abuse_cache.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_integration PRIVATE cxx_std_23)
+    target_include_directories(test_integration PRIVATE src)
+    msmap_set_warnings(test_integration)
+    msmap_enable_sanitizers(test_integration)
+    target_link_libraries(test_integration PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB
+        PkgConfig::LIBCURL
+        Threads::Threads)
+
+    # SQLite global state triggers LSAN false positives at process exit.
+    # Pass ASAN_OPTIONS to every discovered test case via catch_discover_tests PROPERTIES.
+    catch_discover_tests(test_integration
+        PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+endif()

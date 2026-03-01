@@ -44,13 +44,22 @@ docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
 docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   ninja -C build test
 
-# clang-tidy
+# clang-tidy (src/ only — excludes Catch2 in _deps/)
 docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
-  run-clang-tidy -p build
+  run-clang-tidy-18 -p build '/workspace/src/.*'
 
 # cppcheck
 docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+
+# Local smoke test (listener + DB + HTTP + optional AbuseIPDB)
+# Opens web UI at http://localhost:8080; Ctrl-C to stop.
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "C:/Users/ms/projects/msmap:/workspace" \
+  -p 8080:8080 \
+  [-e ABUSEIPDB_API_KEY=<key>] \
+  [-e MSMAP_CITY_MMDB=/path/to/GeoLite2-City.mmdb] \
+  msmap-dev bash -c "bash /workspace/scripts/smoke_test.sh"
 ```
 
 ---

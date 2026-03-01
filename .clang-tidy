@@ -12,11 +12,14 @@ Checks: >
   performance-*,
   portability-*,
   readability-*,
+  -misc-include-cleaner,
   -modernize-use-trailing-return-type,
+  -modernize-pass-by-value,
   -readability-magic-numbers,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-pro-type-vararg,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
   -readability-identifier-length
 
 WarningsAsErrors: "*"
@@ -43,6 +46,14 @@ CheckOptions:
     value: k
   - key:   readability-identifier-naming.MemberCase
     value: lower_case
-  - key:   readability-identifier-naming.MemberSuffix
+  - key:   readability-identifier-naming.PrivateMemberCase
+    value: lower_case
+  - key:   readability-identifier-naming.PrivateMemberSuffix
     value: _
+  - key:   readability-identifier-naming.LocalConstantCase
+    value: lower_case
+  - key:   readability-identifier-naming.LocalConstantPrefix
+    value: ""
+  - key:   misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: true
 ...

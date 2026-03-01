@@ -29,5 +29,5 @@ SpaceBeforeParens: ControlStatements
 PointerAlignment: Left
 
 # C++
-Standard: c++23
+Standard: Latest
 ...

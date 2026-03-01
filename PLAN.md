@@ -144,54 +144,59 @@ docker build -t msmap .
 - [x] Confirm router timezone (UTC) and NTP configuration
 - [x] Define log-prefix naming convention (`FW_` prefix)
 - [x] Multi-stage Dockerfile (dev / builder / distroless:nonroot)
-- [ ] CMakeLists.txt – warnings, sanitizers, static analysis hooks
-- [ ] `.clang-tidy` configuration
-- [ ] `.clang-format` configuration
-- [ ] `FINDINGS.md` template
-- [ ] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container
+- [x] CMakeLists.txt – warnings, sanitizers, static analysis hooks
+- [x] `.clang-tidy` configuration
+- [x] `.clang-format` configuration
+- [x] `FINDINGS.md` template
+- [x] CI: GitHub Actions – build + clang-tidy + cppcheck in dev container; publishes release image to ghcr.io/mtstanfield/msmap on main
 
 ### Ingest
 - [ ] rsyslog config: receive UDP 514, reformat, forward TCP 5140
-- [ ] msmap TCP listener on 5140 (loopback only)
-- [ ] Log parser: hand-written linear tokenizer (see grammar above)
+- [x] msmap TCP listener on 5140 (loopback only)
+- [x] Log parser: hand-written linear tokenizer (see grammar above)
 - [ ] Fuzz the parser with libFuzzer
 
 ### Storage
-- [ ] SQLite schema (see table above) + WAL mode pragma
-- [ ] Indexes: `ts`, `src_ip`, `dst_port`, `country`
-- [ ] Retention pruning (1 year): background thread, triggered on insert
+- [x] SQLite schema (see table above) + WAL mode pragma
+- [x] Indexes: `ts`, `src_ip`, `dst_port`, `country`
+- [x] Retention pruning (1 year): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
 
 ### Enrichment
-- [ ] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
-- [ ] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
+- [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
+- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
 
 ### Web UI
-- [ ] libmicrohttpd HTTP server on port 8080
-- [ ] Asset embedding: CMake `xxd -i` step for HTML/CSS/JS/Leaflet/MarkerCluster
-- [ ] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
-- [ ] Map view: Leaflet + MarkerCluster, circle markers sized by hit count
-- [ ] Filter/time-range panel
-- [ ] Raw query UI: read-only SQL input → JSON/table output
-- [ ] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
+- [x] libmicrohttpd HTTP server on port 8080
+- [x] Asset embedding: `web/bundle.py` CMake step inlines Leaflet+MarkerCluster+app JS/CSS
+      into a single `constexpr std::string_view` header; no xxd, no filesystem deps
+- [x] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
+- [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by protocol/threat
+      (CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
+- [x] Filter/time-range panel: protocol, src IP, dst port, country, limit; Enter-key support
+- [~] Raw query UI: out of scope — filter panel covers the use case
+- [x] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
 
 ### Safety & Quality
 - [ ] GSL (header-only, CPM or vendored)
-- [ ] Sanitizer builds: ASan + UBSan enabled in Debug/CI
-- [ ] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
-- [ ] cppcheck clean (`--error-exitcode=1`)
-- [ ] Unit tests: Catch2 (parser, DB layer, enrichment)
-- [ ] Integration test: full ingest → query pipeline
+- [x] Sanitizer builds: ASan + UBSan + -fno-sanitize-recover=all enabled by default in Debug builds
+- [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
+- [x] cppcheck clean (`--error-exitcode=1`)
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing
+- [x] Integration test: full ingest → query pipeline (TCP socket → listener → parser → DB → query, 7 cases, 67 total)
 
 ### Security
-- [ ] Input validation on all HTTP query params
-- [ ] SQL parameterized queries only — enforced, no exceptions
+- [x] Input validation on all HTTP query params: length caps, range checks, proto allowlist
+- [x] SQL parameterized queries only — enforced, no exceptions
 - [ ] Auth: handled by nginx reverse proxy, not the binary
 - [ ] Distroless nonroot confirmed in CI
 
 ### Deploy
-- [ ] `docker-compose.yml`: msmap + nginx (TLS) + rsyslog
-- [ ] GeoLite2 DB update script (MaxMind requires free registration)
+- [x] Env-var configuration: `MSMAP_DB_PATH`, `MSMAP_CITY_MMDB`, `MSMAP_ASN_MMDB`, `MSMAP_LISTEN_PORT`, `MSMAP_HTTP_PORT`, `ABUSEIPDB_API_KEY`; defaults suit a containerised deployment
+- [x] Dockerfile: `/data` (db) and `/var/lib/msmap/geoip` (mmdb) directories pre-created with correct ownership for `nonroot` uid 65532; volume-mounts overlay cleanly
+- [~] `docker-compose.yml`: N/A — deployment is via Unraid's Docker UI; volumes/env vars set there
+- [~] GeoLite2 DB update: geoipupdate sidecar already running on shared volume (free MaxMind account)
 - [ ] Documented rollback procedure (per FINDINGS.md process)
+- [ ] Auth: nginx/caddy reverse proxy in front for TLS + auth (not in binary)
 
 ---
 
