@@ -74,13 +74,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         # documentation
         doxygen \
         graphviz \
-        # project libraries
-        # all provide static .a files for semi-static release builds
+        # project libraries (direct deps)
         libmicrohttpd-dev \
         libsqlite3-dev \
         libmaxminddb-dev \
         libcurl4-openssl-dev \
         libssl-dev \
+        # static .a files for libmicrohttpd's GnuTLS transitive deps.
+        # Needed only for MSMAP_LINK_STATIC=ON release builds; harmless in dev.
+        libgnutls28-dev \
+        libgmp-dev \
+        nettle-dev \
+        libtasn1-6-dev \
+        libidn2-dev \
+        libunistring-dev \
+        zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Unversioned symlinks – CMake find_program and editors find tools without suffix
@@ -99,9 +107,47 @@ CMD ["/bin/bash"]
 # Compiles the release binary.
 # Semi-static: libgcc + libstdc++ linked statically; glibc stays dynamic
 # (fully static glibc has known NSS/getaddrinfo runtime issues).
-# Project libs (sqlite, libmaxminddb, libmicrohttpd) are linked as .a.
+# Project libs (sqlite, libmaxminddb, libmicrohttpd, curl) are linked as .a.
 # -----------------------------------------------------------------------------
 FROM dev AS builder
+
+# Re-declare so ARG values are available in this stage's RUN commands.
+ARG LLVM_VER=18
+
+# ── Minimal static libcurl ────────────────────────────────────────────────────
+# The Debian system libcurl4-openssl-dev links against nghttp2, rtmp, ssh2,
+# brotli, zstd, gssapi, ldap… none of which have static .a files on bookworm.
+# We build an HTTP-only + OpenSSL-only libcurl whose sole static deps are
+# libssl.a and libcrypto.a — both available from libssl-dev.
+ARG CURL_VER=8.11.0
+RUN curl -fsSL \
+        "https://github.com/curl/curl/releases/download/curl-$(echo ${CURL_VER} | tr . _)/curl-${CURL_VER}.tar.gz" \
+        | tar -xz -C /tmp \
+    && cmake -B /tmp/curl-build -G Ninja \
+             -S /tmp/curl-${CURL_VER} \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_C_COMPILER=clang-${LLVM_VER} \
+             -DBUILD_SHARED_LIBS=OFF \
+             -DBUILD_STATIC_LIBS=ON \
+             -DBUILD_TESTING=OFF \
+             -DBUILD_CURL_EXE=OFF \
+             -DCURL_USE_OPENSSL=ON \
+             -DHTTP_ONLY=ON \
+             -DUSE_NGHTTP2=OFF \
+             -DCURL_USE_LIBPSL=OFF \
+             -DCURL_USE_LIBRTMP=OFF \
+             -DCURL_USE_LIBSSH2=OFF \
+             -DCURL_USE_LIBSSH=OFF \
+             -DUSE_LIBIDN2=OFF \
+             -DCURL_USE_GSSAPI=OFF \
+             -DCURL_DISABLE_LDAP=ON \
+             -DCURL_BROTLI=OFF \
+             -DCURL_ZSTD=OFF \
+             -DCURL_ZLIB=OFF \
+             -DCMAKE_INSTALL_PREFIX=/opt/curl-static \
+    && ninja -C /tmp/curl-build \
+    && ninja -C /tmp/curl-build install \
+    && rm -rf /tmp/curl-build /tmp/curl-${CURL_VER}
 
 COPY . .
 
@@ -110,9 +156,12 @@ RUN cmake -B build -G Ninja \
         -DCMAKE_CXX_STANDARD=23 \
         -DCMAKE_CXX_EXTENSIONS=OFF \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DCMAKE_C_COMPILER=clang-${LLVM_VER} \
+        -DCMAKE_CXX_COMPILER=clang++-${LLVM_VER} \
         -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
         -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
         -DMSMAP_LINK_STATIC=ON \
+        -DCMAKE_PREFIX_PATH=/opt/curl-static \
     && ninja -C build msmap
 
 # Create persistent-data directories that are COPY-ed into the runtime stage.
@@ -138,6 +187,15 @@ FROM gcr.io/distroless/cc-debian12:nonroot
 # Explicitly copy the CA bundle so HTTPS (AbuseIPDB API) works regardless of
 # what the distroless base image includes across version updates.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Runtime shared libs not present in distroless/cc-debian12.
+# libmicrohttpd.a pulls in libgnutls.a which requires p11-kit (PKCS#11 provider).
+# p11-kit requires libffi.  libatomic is a GCC runtime dep referenced by gnutls.
+# All three depend only on libc.so.6 which distroless already provides.
+# Copy versioned files (Docker COPY dereferences symlinks) with SONAME as dest.
+COPY --from=builder /lib/x86_64-linux-gnu/libatomic.so.1.2.0    /lib/x86_64-linux-gnu/libatomic.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libffi.so.8.1.2       /lib/x86_64-linux-gnu/libffi.so.8
+COPY --from=builder /lib/x86_64-linux-gnu/libp11-kit.so.0.3.0   /lib/x86_64-linux-gnu/libp11-kit.so.0
 
 # Persistent-data directories (created in builder with correct ownership).
 COPY --from=builder /data /data
