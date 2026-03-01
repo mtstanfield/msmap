@@ -6,9 +6,15 @@
 #include "http.h"
 #include "listener.h"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -26,6 +32,34 @@ std::string env_or(const char* var, const char* fallback)
 {
     const char* val = std::getenv(var); // NOLINT(concurrency-mt-unsafe)
     return val != nullptr ? std::string{val} : std::string{fallback};
+}
+
+/// Parse a comma-separated list of IPv4 addresses into network-byte-order u32s.
+/// Tokens that fail inet_pton are skipped with a warning.
+std::vector<std::uint32_t> parse_allow_ips(std::string_view raw)
+{
+    std::vector<std::uint32_t> result;
+    while (!raw.empty()) {
+        const auto comma = raw.find(',');
+        const std::string_view token = (comma == std::string_view::npos)
+            ? raw : raw.substr(0, comma);
+        raw = (comma == std::string_view::npos) ? "" : raw.substr(comma + 1);
+
+        // Trim leading/trailing whitespace from token.
+        const auto first = token.find_first_not_of(" \t");
+        if (first == std::string_view::npos) { continue; }
+        const auto last  = token.find_last_not_of(" \t");
+        const std::string ip_str{token.substr(first, last - first + 1)};
+
+        in_addr addr{};
+        if (inet_pton(AF_INET, ip_str.c_str(), &addr) == 1) {
+            result.push_back(addr.s_addr);
+        } else {
+            std::clog << "[WARN] MSMAP_INGEST_ALLOW: invalid IP skipped: "
+                      << ip_str << '\n';
+        }
+    }
+    return result;
 }
 
 /// Return the integer value of an env var, or `fallback` if unset / invalid.
@@ -51,12 +85,26 @@ int main() {
     const std::string abuse_key   = env_or("ABUSEIPDB_API_KEY",  "");
     const int         listen_port = env_int("MSMAP_LISTEN_PORT",  kDefaultListenPort);
     const int         http_port   = env_int("MSMAP_HTTP_PORT",    kDefaultHttpPort);
+    const std::vector<std::uint32_t> allow_ips =
+        parse_allow_ips(env_or("MSMAP_INGEST_ALLOW", ""));
 
     std::clog << "[INFO] db        : " << db_path     << '\n'
               << "[INFO] city mmdb : " << city_path   << '\n'
               << "[INFO] asn mmdb  : " << asn_path    << '\n'
               << "[INFO] listen    : 0.0.0.0:"   << listen_port << " (UDP/syslog)\n"
               << "[INFO] http      : 0.0.0.0:"   << http_port   << '\n';
+
+    if (allow_ips.empty()) {
+        std::clog << "[INFO] ingest    : open (no allowlist)\n";
+    } else {
+        for (const std::uint32_t ip : allow_ips) {
+            std::array<char, INET_ADDRSTRLEN> buf{};
+            in_addr a{};
+            a.s_addr = ip;
+            std::clog << "[INFO] ingest allow: "
+                      << inet_ntop(AF_INET, &a, buf.data(), buf.size()) << '\n';
+        }
+    }
 
     msmap::Database db{db_path};
     if (!db.valid()) {
@@ -85,6 +133,6 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    msmap::run_listener(listen_port, db, geoip, abuse_ptr);
+    msmap::run_listener(listen_port, db, geoip, abuse_ptr, allow_ips);
     return EXIT_SUCCESS;
 }

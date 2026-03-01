@@ -10,13 +10,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <iostream> // std::clog
 #include <optional>
 #include <stop_token>
 #include <string_view>
+#include <vector>
 
 namespace msmap {
 namespace {
@@ -82,6 +85,7 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  const std::vector<std::uint32_t>& allow_ips,
                   const std::stop_token& stoken) {
     const ScopedFd sock{socket(AF_INET, SOCK_DGRAM, 0)};
     if (!sock.valid()) {
@@ -134,6 +138,13 @@ void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
         if (n < 0) {
             if (errno == EINTR) { continue; }
             std::clog << "[WARN] recvfrom: " << std::strerror(errno) << '\n';
+            continue;
+        }
+
+        // Enforce IP allowlist — silently drop datagrams from unknown senders.
+        if (!allow_ips.empty() &&
+            std::find(allow_ips.begin(), allow_ips.end(),
+                      peer.sin_addr.s_addr) == allow_ips.end()) {
             continue;
         }
 

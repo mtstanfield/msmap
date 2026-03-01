@@ -40,8 +40,7 @@ const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
 const statTime      = document.getElementById('stat-time');
 const statError     = document.getElementById('stat-error');
-const filterToggle  = document.getElementById('filter-toggle');
-const filterPanel   = document.getElementById('filter-panel');
+const fTime         = document.getElementById('f-time');
 const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
@@ -50,17 +49,12 @@ const fLimit        = document.getElementById('f-limit');
 
 // ── Filter panel ─────────────────────────────────────────────────────────────
 
-filterToggle.addEventListener('click', () => {
-    const open = !filterPanel.hidden;
-    filterPanel.hidden = open;
-    filterToggle.classList.toggle('active', !open);
-});
-
 document.getElementById('f-apply').addEventListener('click', () => {
     resetAndFetch();
 });
 
 document.getElementById('f-clear').addEventListener('click', () => {
+    fTime.value    = '86400';
     fProto.value   = '';
     fIp.value      = '';
     fPort.value    = '';
@@ -81,8 +75,14 @@ document.getElementById('f-clear').addEventListener('click', () => {
 let totalSeen   = 0;
 let mappedCount = 0;
 let lastTs      = 0;
+let sincePreset = 0;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function computeSincePreset() {
+    const offset = parseInt(fTime.value, 10);
+    sincePreset = (offset > 0) ? Math.floor(Date.now() / 1000) - offset : 0;
+}
 
 function fmtTs(ts) {
     return new Date(ts * 1000).toLocaleString();
@@ -138,7 +138,9 @@ function buildPopup(r) {
 
 function buildQueryString() {
     const params = new URLSearchParams();
-    if (lastTs > 0)           { params.set('since',   String(lastTs + 1)); }
+    // since = incremental watermark (if any rows received), else preset floor
+    const since = (lastTs > 0) ? lastTs + 1 : sincePreset;
+    if (since > 0)            { params.set('since',   String(since)); }
     if (fProto.value)         { params.set('proto',   fProto.value); }
     if (fIp.value.trim())     { params.set('ip',      fIp.value.trim()); }
     if (fPort.value)          { params.set('port',    fPort.value); }
@@ -201,6 +203,7 @@ async function poll() {
 
 /// Reset all accumulated state and trigger a full re-fetch.
 function resetAndFetch() {
+    computeSincePreset();
     lastTs      = 0;
     totalSeen   = 0;
     mappedCount = 0;
@@ -212,5 +215,6 @@ function resetAndFetch() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
+computeSincePreset(); // uses default 24h selection
 poll();
 setInterval(poll, REFRESH_MS);

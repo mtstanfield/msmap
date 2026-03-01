@@ -12,12 +12,20 @@
 <body>
     <div id="map"></div>
 
-    <!-- Filter toggle button (top-right, above Leaflet attribution) -->
-    <button id="filter-toggle" title="Toggle filters" aria-label="Toggle filters">&#9881;</button>
-
-    <!-- Filter panel (hidden by default) -->
-    <div id="filter-panel" hidden>
+    <!-- Filter panel -->
+    <div id="filter-panel">
         <div class="filter-title">Filters</div>
+
+        <label class="filter-label" for="f-time">Time range</label>
+        <select id="f-time">
+            <option value="900">Last 15 minutes</option>
+            <option value="3600">Last hour</option>
+            <option value="21600">Last 6 hours</option>
+            <option value="86400" selected>Last 24 hours</option>
+            <option value="604800">Last 7 days</option>
+            <option value="2592000">Last 30 days</option>
+            <option value="0">All time</option>
+        </select>
 
         <label class="filter-label" for="f-proto">Protocol</label>
         <select id="f-proto">
