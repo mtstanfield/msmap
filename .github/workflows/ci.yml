@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  # ── Build, test, and static analysis ───────────────────────────────────────
-  ci:
+  # ── Build and test ───────────────────────────────────────────────────────────
+  build-test:
     name: Build & Test
     runs-on: ubuntu-latest
 
@@ -27,7 +27,7 @@ jobs:
 
       # Build the dev image and cache it.  This is the heavy step (~2 min on
       # cold cache; a few seconds on warm cache).  Subsequent docker run
-      # commands reuse this image for all build/test/lint operations.
+      # commands reuse this image for all build/test operations.
       - name: Build dev image
         uses: docker/build-push-action@v6
         with:
@@ -38,29 +38,66 @@ jobs:
           cache-from: type=gha,scope=dev
           cache-to: type=gha,scope=dev,mode=max
 
-      # Configure in Debug mode.  ASan + UBSan are ON by default for
-      # non-Release builds (see CMakeLists.txt option block).
-      - name: Configure (Debug + ASan + UBSan)
+      # Configure and build in a single container invocation.
+      # Debug mode enables ASan + UBSan (see CMakeLists.txt option block).
+      - name: Configure and Build (Debug + ASan + UBSan)
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
             cmake -B build -G Ninja \
               -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_STANDARD=23 \
               -DCMAKE_CXX_EXTENSIONS=OFF \
-              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            && ninja -C build"
 
-      - name: Build
-        run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
-            ninja -C build
-
-      # 67 tests (unit + integration) under ASan + UBSan.
+      # Unit + integration tests under ASan + UBSan.
       # Integration tests bind to 127.0.0.1:54340 — loopback is available
       # inside Docker containers, so no host networking is required here.
       - name: Test
         run: |
           docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
             ctest --test-dir build --output-on-failure
+
+  # ── Static analysis (runs in parallel with build-test) ───────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Pull dev image from cache — build-test writes the cache (cache-to);
+      # we only read here (no cache-to) to avoid a write race between jobs.
+      - name: Pull dev image from cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: dev
+          load: true
+          tags: msmap-dev:ci
+          cache-from: type=gha,scope=dev
+
+      # Configure and generate index_html.h via the web_bundle target.
+      # http.cpp #includes index_html.h, so clang-tidy requires it.
+      # CMAKE_CXX_SCAN_FOR_MODULES=OFF: CMake 3.28+ scans C++20/23 sources for
+      # module imports by default, injecting @*.o.modmap response-file flags into
+      # compile_commands.json.  Those files are only created during a real
+      # compile; without a full build they are absent and clang-tidy errors out.
+      # The project uses no C++ modules (no 'import' statements), so scanning
+      # is unnecessary and safe to disable.
+      - name: Configure and generate web bundle
+        run: |
+          docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
+            cmake -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_CXX_STANDARD=23 \
+              -DCMAKE_CXX_EXTENSIONS=OFF \
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
+            && ninja -C build web_bundle"
 
       # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
       # _deps/ from analysis.  run-clang-tidy-18 (not run-clang-tidy) is
@@ -79,7 +116,7 @@ jobs:
   # ── Build release image and publish to ghcr.io ─────────────────────────────
   publish:
     name: Publish Image
-    needs: ci
+    needs: [build-test, lint]
     # Only push images for commits that reach master; never for PRs
     # (forks cannot access GITHUB_TOKEN secrets for the target repo).
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -115,7 +152,7 @@ jobs:
             type=sha,prefix=sha-,format=short
 
       # The release build reuses the dev-stage layers already cached by the
-      # 'ci' job (scope=dev), then adds the builder and runtime layers.
+      # 'build-test' job (scope=dev), then adds the builder and runtime layers.
       # Only the binary compilation and distroless copy need fresh compute.
       - name: Build and push release image
         uses: docker/build-push-action@v6
