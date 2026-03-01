@@ -13,7 +13,13 @@ const MAX_MARKERS   = 5000;        // cap to keep rendering fast
 
 // ── Map initialisation ───────────────────────────────────────────────────────
 
-const lmap = L.map('map', { center: [20, 0], zoom: 2, minZoom: 2 });
+const lmap = L.map('map', {
+    center:             [20, 0],
+    zoom:               2,
+    minZoom:            2,
+    maxBounds:          [[-90, -180], [90, 180]], // single world copy
+    maxBoundsViscosity: 1.0,                      // hard edge — no rubber-band past ±180°
+});
 
 // CartoDB Dark Matter – suits a security dashboard; no API key required.
 L.tileLayer(
@@ -22,8 +28,12 @@ L.tileLayer(
         attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
             ' contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
+        subdomains:        'abcd',
+        maxZoom:           19,
+        noWrap:            true,  // don't repeat tiles outside ±180°
+        updateWhenIdle:    true,  // load tiles only after pan/zoom settles
+        updateWhenZooming: false, // skip tile loads during zoom animation
+        keepBuffer:        4,     // pre-render 4 tile-widths beyond viewport
     }
 ).addTo(lmap);
 
@@ -31,6 +41,27 @@ const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
     maxClusterRadius:    50,
     chunkedLoading:      true,
+    // Colour cluster badge by ratio of high-threat (threat >= 67) children.
+    iconCreateFunction(clusterMarker) {
+        const children = clusterMarker.getAllChildMarkers();
+        const total    = children.length;
+        const nHigh    = children.filter(
+            m => m.options.threat !== null &&
+                 m.options.threat !== undefined &&
+                 m.options.threat >= 67
+        ).length;
+        const ratio = total > 0 ? nHigh / total : 0;
+        let cls;
+        if      (ratio === 0)  { cls = 'safe'; }
+        else if (ratio < 0.34) { cls = 'low';  }
+        else if (ratio < 0.67) { cls = 'mid';  }
+        else                   { cls = 'high'; }
+        return L.divIcon({
+            html:      '<div><span>' + total + '</span></div>',
+            className: 'marker-cluster marker-cluster-threat-' + cls,
+            iconSize:  L.point(40, 40),
+        });
+    },
 });
 lmap.addLayer(cluster);
 
@@ -41,6 +72,7 @@ const statTotal     = document.getElementById('stat-total');
 const statTime      = document.getElementById('stat-time');
 const statError     = document.getElementById('stat-error');
 const fTime         = document.getElementById('f-time');
+const fDedup        = document.getElementById('f-dedup');
 const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
@@ -54,14 +86,17 @@ document.getElementById('f-apply').addEventListener('click', () => {
 });
 
 document.getElementById('f-clear').addEventListener('click', () => {
-    fTime.value    = '86400';
-    fProto.value   = '';
-    fIp.value      = '';
-    fPort.value    = '';
-    fCountry.value = '';
-    fLimit.value   = '1000';
+    fTime.value      = '86400';
+    fDedup.checked   = true;
+    fProto.value     = '';
+    fIp.value        = '';
+    fPort.value      = '';
+    fCountry.value   = '';
+    fLimit.value     = '1000';
     resetAndFetch();
 });
+
+fDedup.addEventListener('change', () => { resetAndFetch(); });
 
 // Also apply when Enter is pressed in any text/number input.
 [fIp, fPort, fCountry, fLimit].forEach((el) => {
@@ -76,6 +111,9 @@ let totalSeen   = 0;
 let mappedCount = 0;
 let lastTs      = 0;
 let sincePreset = 0;
+
+// src_ip → { count, latestTs, marker } — populated only when fDedup.checked.
+const dedupMap = new Map();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,13 +149,14 @@ function threatLabel(score) {
     return 'score ' + score + '%';
 }
 
-function buildPopup(r) {
+function buildPopup(r, hitCount) {
     const rows = [
         '<div class="popup-row">',
         '<span class="ip">' + r.src_ip + '</span>',
         ' &rarr; ',
         '<span class="ip">' + r.dst_ip + fmtPort(r.dst_port) + '</span>',
         '<br>',
+        hitCount > 1 ? '<span class="label">hits </span>' + hitCount + '<br>' : '',
         '<span class="' + protoClass(r.proto) + '">' + (r.proto || '?') + '</span>',
         r.tcp_flags ? ' (' + r.tcp_flags + ')' : '',
         '<br>',
@@ -125,6 +164,10 @@ function buildPopup(r) {
         '<span class="label">rule </span>' + r.rule + '<br>',
         r.country ? '<span class="label">country </span>' + r.country + '<br>' : '',
         r.asn     ? '<span class="label">asn </span>' + r.asn + '<br>'     : '',
+        (r.lat !== null && r.lat !== undefined && r.lon !== null && r.lon !== undefined)
+            ? '<span class="label">geo </span>' +
+              r.lat.toFixed(4) + ', ' + r.lon.toFixed(4) + '<br>'
+            : '',
         (r.threat !== null && r.threat !== undefined)
             ? '<span class="label">threat </span>'
               + '<span class="' + threatClass(r.threat) + '">'
@@ -173,10 +216,32 @@ async function poll() {
         totalSeen += rows.length;
 
         for (const r of rows) {
+            // Dedup mode: merge into existing marker when this IP is already mapped.
+            // Rows arrive newest-first (ORDER BY ts DESC), so the first occurrence
+            // in a batch is already the most recent — only update popup when newer.
+            if (fDedup.checked && r.lat !== null && r.lon !== null
+                    && dedupMap.has(r.src_ip)) {
+                const entry = dedupMap.get(r.src_ip);
+                entry.count++;
+                // Escalate color on confirmed high-threat (never downgrade).
+                if (r.threat !== null && r.threat !== undefined && r.threat >= 67) {
+                    entry.marker.setStyle({ color: '#f85149', fillColor: '#f85149' });
+                    entry.marker.options.threat = r.threat;
+                }
+                // Refresh popup details only when this row is more recent.
+                if (r.ts > entry.latestTs) {
+                    entry.latestTs = r.ts;
+                    entry.marker.setPopupContent(buildPopup(r, entry.count));
+                }
+                if (r.ts > lastTs) { lastTs = r.ts; }
+                continue;
+            }
+
+            // New marker path (both modes).
             if (mappedCount >= MAX_MARKERS) { break; }
             if (r.lat !== null && r.lon !== null) {
                 const color = (r.threat !== null && r.threat !== undefined && r.threat >= 67)
-                    ? '#f85149'                               // high-threat → red
+                    ? '#f85149'
                     : (PROTO_COLORS[r.proto] || DEFAULT_COLOR);
                 const m = L.circleMarker([r.lat, r.lon], {
                     radius:      5,
@@ -184,10 +249,14 @@ async function poll() {
                     fillColor:   color,
                     fillOpacity: 0.75,
                     weight:      1,
+                    threat:      r.threat,  // stored for iconCreateFunction
                 });
-                m.bindPopup(buildPopup(r), { maxWidth: 340 });
+                m.bindPopup(buildPopup(r, 1), { maxWidth: 340 });
                 cluster.addLayer(m);
                 mappedCount++;
+                if (fDedup.checked) {
+                    dedupMap.set(r.src_ip, { count: 1, latestTs: r.ts, marker: m });
+                }
             }
             if (r.ts > lastTs) { lastTs = r.ts; }
         }
@@ -207,6 +276,7 @@ function resetAndFetch() {
     lastTs      = 0;
     totalSeen   = 0;
     mappedCount = 0;
+    dedupMap.clear();
     cluster.clearLayers();
     statMapped.textContent = '0 mapped';
     statTotal.textContent  = '0 total';
