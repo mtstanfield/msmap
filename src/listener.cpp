@@ -1,4 +1,5 @@
 #include "listener.h"
+#include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
 #include "parser.h"
@@ -12,6 +13,7 @@
 #include <cerrno>
 #include <cstring>
 #include <iostream> // std::clog
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -52,7 +54,8 @@ constexpr std::size_t kRecvBufSize{4096};
 
 // ── Per-connection handler ────────────────────────────────────────────────────
 
-void handle_connection(int conn_fd, Database& db, GeoIp& geoip) {
+void handle_connection(int conn_fd, Database& db, GeoIp& geoip,
+                       AbuseCache* abuse) {
     std::string                  buf;
     std::array<char, kRecvBufSize> tmp{};
 
@@ -76,8 +79,14 @@ void handle_connection(int conn_fd, Database& db, GeoIp& geoip) {
 
             const ParseResult result = parse_log(line);
             if (result.ok()) {
-                const GeoIpResult geo = geoip.lookup(result.entry.src_ip);
-                (void)db.insert(result.entry, geo);
+                const GeoIpResult    geo    = geoip.lookup(result.entry.src_ip);
+                const std::optional<int> threat =
+                    (abuse != nullptr) ? abuse->lookup(result.entry.src_ip)
+                                       : std::optional<int>{std::nullopt};
+                (void)db.insert(result.entry, geo, threat);
+                if (abuse != nullptr) {
+                    abuse->submit(result.entry.src_ip);
+                }
             } else {
                 std::clog << "[WARN] parse: " << result.error << " | " << line << '\n';
             }
@@ -102,7 +111,7 @@ void handle_connection(int conn_fd, Database& db, GeoIp& geoip) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void run_listener(int port, Database& db, GeoIp& geoip) {
+void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse) {
     const ScopedFd srv{socket(AF_INET, SOCK_STREAM, 0)};
     if (!srv.valid()) {
         std::clog << "[FATAL] socket: " << std::strerror(errno) << '\n';
@@ -149,7 +158,7 @@ void run_listener(int port, Database& db, GeoIp& geoip) {
         }
 
         std::clog << "[INFO] rsyslog connected\n";
-        handle_connection(conn.get(), db, geoip);
+        handle_connection(conn.get(), db, geoip, abuse);
         std::clog << "[INFO] rsyslog disconnected\n";
     }
 }

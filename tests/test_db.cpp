@@ -167,6 +167,31 @@ TEST_CASE("prune_older_than: returns 0 safely on invalid database")
     CHECK(db.prune_older_than(999'999) == 0);
 }
 
+TEST_CASE("threat score round-trips through insert and query_connections")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}, std::optional<int>{75}));
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    REQUIRE(rows.size() == 1);
+    REQUIRE(rows.at(0).threat.has_value());
+    CHECK(*rows.at(0).threat == 75);
+}
+
+TEST_CASE("threat score nullopt stores and reads as NULL")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{})); // default threat = nullopt
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    REQUIRE(rows.size() == 1);
+    CHECK_FALSE(rows.at(0).threat.has_value());
+}
+
 TEST_CASE("Entry parsed via parse_log inserts correctly")
 {
     using namespace std::string_view_literals;

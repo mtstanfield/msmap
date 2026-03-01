@@ -169,6 +169,14 @@ html, body {
 .proto-icmp  { color: #d29922; font-weight: 600; }
 .proto-other { color: #8b949e; font-weight: 600; }
 
+/* ── AbuseIPDB threat score ───────────────────────────────────────────────── */
+
+.threat-unknown { color: #8b949e; }
+.threat-clean   { color: #3fb950; font-weight: 600; }
+.threat-low     { color: #d29922; font-weight: 600; }
+.threat-medium  { color: #f0883e; font-weight: 600; }
+.threat-high    { color: #f85149; font-weight: 600; }
+
 /* ── Leaflet popup dark theme ─────────────────────────────────────────────── */
 
 .leaflet-popup-content-wrapper {

@@ -98,6 +98,19 @@ function protoClass(proto) {
         ? key : 'proto-other';
 }
 
+function threatClass(score) {
+    if (score === null || score === undefined) { return 'threat-unknown'; }
+    if (score === 0)   { return 'threat-clean'; }
+    if (score <= 33)   { return 'threat-low'; }
+    if (score <= 66)   { return 'threat-medium'; }
+    return 'threat-high';
+}
+
+function threatLabel(score) {
+    if (score === null || score === undefined) { return null; }
+    return 'score ' + score + '%';
+}
+
 function buildPopup(r) {
     const rows = [
         '<div class="popup-row">',
@@ -112,6 +125,11 @@ function buildPopup(r) {
         '<span class="label">rule </span>' + r.rule + '<br>',
         r.country ? '<span class="label">country </span>' + r.country + '<br>' : '',
         r.asn     ? '<span class="label">asn </span>' + r.asn + '<br>'     : '',
+        (r.threat !== null && r.threat !== undefined)
+            ? '<span class="label">threat </span>'
+              + '<span class="' + threatClass(r.threat) + '">'
+              + threatLabel(r.threat) + '</span><br>'
+            : '',
         '<span class="label">len </span>' + r.pkt_len + ' B',
         '</div>',
     ];
@@ -155,7 +173,9 @@ async function poll() {
         for (const r of rows) {
             if (mappedCount >= MAX_MARKERS) { break; }
             if (r.lat !== null && r.lon !== null) {
-                const color = PROTO_COLORS[r.proto] || DEFAULT_COLOR;
+                const color = (r.threat !== null && r.threat !== undefined && r.threat >= 67)
+                    ? '#f85149'                               // high-threat → red
+                    : (PROTO_COLORS[r.proto] || DEFAULT_COLOR);
                 const m = L.circleMarker([r.lat, r.lon], {
                     radius:      5,
                     color:       color,

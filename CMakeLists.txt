@@ -41,10 +41,12 @@ if(MSMAP_LINK_STATIC)
     pkg_check_modules(MICROHTTPD REQUIRED STATIC IMPORTED_TARGET libmicrohttpd)
     pkg_check_modules(SQLITE3    REQUIRED STATIC IMPORTED_TARGET sqlite3)
     pkg_check_modules(MAXMINDDB  REQUIRED STATIC IMPORTED_TARGET libmaxminddb)
+    pkg_check_modules(LIBCURL    REQUIRED STATIC IMPORTED_TARGET libcurl)
 else()
     pkg_check_modules(MICROHTTPD REQUIRED IMPORTED_TARGET libmicrohttpd)
     pkg_check_modules(SQLITE3    REQUIRED IMPORTED_TARGET sqlite3)
     pkg_check_modules(MAXMINDDB  REQUIRED IMPORTED_TARGET libmaxminddb)
+    pkg_check_modules(LIBCURL    REQUIRED IMPORTED_TARGET libcurl)
 endif()
 
 # ── Web bundle ─────────────────────────────────────────────────────────────
@@ -82,7 +84,8 @@ add_executable(msmap
     src/geoip.cpp
     src/http.cpp
     src/listener.cpp
-    src/parser.cpp)
+    src/parser.cpp
+    src/abuse_cache.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
 
@@ -97,7 +100,8 @@ target_include_directories(msmap PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(msmap PRIVATE
     PkgConfig::MICROHTTPD
     PkgConfig::SQLITE3
-    PkgConfig::MAXMINDDB)
+    PkgConfig::MAXMINDDB
+    PkgConfig::LIBCURL)
 
 # ── Tests ───────────────────────────────────────────────────────────────────
 # Catch2 is not in Debian bookworm; fetch it via CMake's built-in FetchContent.
@@ -178,4 +182,23 @@ if(MSMAP_ENABLE_TESTS)
         PkgConfig::MAXMINDDB)
 
     catch_discover_tests(test_http)
+
+    add_executable(test_abuse_cache
+        tests/test_abuse_cache.cpp
+        src/abuse_cache.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_abuse_cache PRIVATE cxx_std_23)
+    target_include_directories(test_abuse_cache PRIVATE src)
+    msmap_set_warnings(test_abuse_cache)
+    msmap_enable_sanitizers(test_abuse_cache)
+    target_link_libraries(test_abuse_cache PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB
+        PkgConfig::LIBCURL)
+
+    catch_discover_tests(test_abuse_cache)
 endif()

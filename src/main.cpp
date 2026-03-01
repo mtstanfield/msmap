@@ -1,5 +1,6 @@
 // msmap – Mikrotik Firewall Log Viewer
 
+#include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
 #include "http.h"
@@ -39,6 +40,17 @@ int main() {
     const std::string asn_path  = env_or("MSMAP_ASN_MMDB",  kDefaultAsnMmdb);
     msmap::GeoIp geoip{city_path, asn_path};
 
+    // AbuseIPDB OSINT enrichment — optional; disabled when key is unset.
+    const std::string abuse_key = env_or("ABUSEIPDB_API_KEY", "");
+    msmap::AbuseCache abuse{kDbPath, abuse_key};
+    if (!abuse.valid()) {
+        std::clog << "[WARN] AbuseCache failed to open; threat scores disabled\n";
+    }
+    if (abuse_key.empty()) {
+        std::clog << "[INFO] ABUSEIPDB_API_KEY not set; threat scores disabled\n";
+    }
+    msmap::AbuseCache* const abuse_ptr = abuse.valid() ? &abuse : nullptr;
+
     // HTTP server starts its own internal thread; run_listener blocks below.
     msmap::HttpServer const http{kHttpPort, db};
     if (!http.valid()) {
@@ -47,6 +59,6 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    msmap::run_listener(kListenPort, db, geoip);
+    msmap::run_listener(kListenPort, db, geoip, abuse_ptr);
     return EXIT_SUCCESS;
 }

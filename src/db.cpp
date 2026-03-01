@@ -77,8 +77,8 @@ constexpr const char* kInsertSql = R"sql(
 INSERT INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
     chain, in_iface, rule, conn_state, pkt_len,
-    country, lat, lon, asn)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    country, lat, lon, asn, threat)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
@@ -195,13 +195,14 @@ bool Database::exec(const char* sql) noexcept
     return true;
 }
 
-bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
+bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
+                      std::optional<int> threat) noexcept
 {
     const std::lock_guard<std::mutex> lock{mutex_};
 
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
-    // Bind all sixteen parameters (1-indexed).
+    // Bind all seventeen parameters (1-indexed).
     (void)sqlite3_bind_int64(stmt,  1, entry.ts);
     (void)sqlite3_bind_text( stmt,  2, entry.src_ip.c_str(), -1, kStaticText);
 
@@ -248,6 +249,13 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo) noexcept
         (void)sqlite3_bind_text(stmt, 16, geo.asn.c_str(), -1, kStaticText);
     } else {
         (void)sqlite3_bind_null(stmt, 16);
+    }
+
+    // AbuseIPDB threat score — NULL when not yet enriched.
+    if (threat.has_value()) {
+        (void)sqlite3_bind_int(stmt, 17, *threat);
+    } else {
+        (void)sqlite3_bind_null(stmt, 17);
     }
 
     const int rc = sqlite3_step(stmt);
@@ -316,7 +324,7 @@ Database::query_connections(const QueryFilters& f) const noexcept
     std::string sql =
         "SELECT id, ts, src_ip, src_port, dst_ip, dst_port, "
         "proto, tcp_flags, chain, in_iface, rule, conn_state, pkt_len, "
-        "country, lat, lon, asn "
+        "country, lat, lon, asn, threat "
         "FROM connections";
 
     std::string where;
@@ -400,6 +408,7 @@ Database::query_connections(const QueryFilters& f) const noexcept
         row.lat        = col_opt_double(stmt.get(),       14);
         row.lon        = col_opt_double(stmt.get(),       15);
         row.asn        = col_text(stmt.get(),             16);
+        row.threat     = col_opt_int(stmt.get(),          17);
         rows.push_back(std::move(row));
     }
     return rows;

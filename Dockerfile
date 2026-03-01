@@ -76,6 +76,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libmicrohttpd-dev \
         libsqlite3-dev \
         libmaxminddb-dev \
+        libcurl4-openssl-dev \
+        libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Unversioned symlinks – CMake find_program and editors find tools without suffix

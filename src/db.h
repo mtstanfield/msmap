@@ -48,6 +48,7 @@ struct ConnectionRow {
     std::optional<double> lat;          // nullopt when no GeoIP
     std::optional<double> lon;          // nullopt when no GeoIP
     std::string        asn;             // empty string when no GeoIP
+    std::optional<int> threat;          // nullopt = not yet enriched
 };
 
 // ── Query filter type ─────────────────────────────────────────────────────────
@@ -86,8 +87,10 @@ public:
 
     /// Insert a parsed log entry with its GeoIP enrichment.
     /// Pass a default-constructed GeoIpResult{} to store NULLs for geo columns.
+    /// `threat` is the AbuseIPDB confidence score (0-100), or nullopt if not yet known.
     /// Thread-safe: acquires an internal mutex before touching SQLite.
-    bool insert(const LogEntry& entry, const GeoIpResult& geo) noexcept;
+    bool insert(const LogEntry& entry, const GeoIpResult& geo,
+                std::optional<int> threat = std::nullopt) noexcept;
 
     /// Return up to filters.limit rows matching the given filters.
     /// Rows are ordered newest-first (ORDER BY ts DESC).

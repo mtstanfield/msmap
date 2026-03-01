@@ -163,17 +163,17 @@ docker build -t msmap .
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
-- [ ] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
+- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
 
 ### Web UI
 - [x] libmicrohttpd HTTP server on port 8080
 - [x] Asset embedding: `web/bundle.py` CMake step inlines Leaflet+MarkerCluster+app JS/CSS
       into a single `constexpr std::string_view` header; no xxd, no filesystem deps
 - [x] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
-- [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by protocol
+- [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by protocol/threat
       (CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
 - [x] Filter/time-range panel: protocol, src IP, dst port, country, limit; Enter-key support
-- [ ] Raw query UI: read-only SQL input → JSON/table output
+- [~] Raw query UI: out of scope — filter panel covers the use case
 - [x] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
 
 ### Safety & Quality
@@ -181,7 +181,7 @@ docker build -t msmap .
 - [ ] Sanitizer builds: ASan + UBSan enabled in Debug/CI
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
-- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON) — 47 tests passing
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing
 - [ ] Integration test: full ingest → query pipeline
 
 ### Security
