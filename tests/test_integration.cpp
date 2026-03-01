@@ -1,11 +1,11 @@
 // test_integration.cpp
 //
 // End-to-end integration tests for the full ingest pipeline:
-//   TCP socket → listener → parser → SQLite → query
+//   UDP socket → listener → parser → SQLite → query
 //
 // Each test spins up a fresh in-memory Database and GeoIp (disabled),
-// starts run_listener() on a std::jthread, injects log lines over a
-// loopback socket, then queries the DB and asserts field values.
+// starts run_listener() on a std::jthread, injects log lines as UDP
+// datagrams to loopback, then queries the DB and asserts field values.
 //
 // Thread lifecycle: jthread destructor calls request_stop() then join();
 // the listener's poll(50 ms) timeout ensures it exits within 50 ms.
@@ -35,35 +35,21 @@ namespace {
 
 constexpr int kPort{54340};
 
-/// Poll-retry connect until the listener is accepting.
-/// The probe connect+close is a benign no-op session for the listener
-/// (recv immediately returns 0, handle_connection exits cleanly).
-[[nodiscard]] bool wait_ready(int port) noexcept
+/// Wait for the listener to bind and enter its recvfrom loop.
+/// A short sleep is sufficient: socket() + bind() complete in microseconds
+/// and the listener logs "[INFO]" before entering the poll loop.
+[[nodiscard]] bool wait_ready(int /*port*/) noexcept
 {
-    for (int i = 0; i < 20; ++i) {
-        const int probe = socket(AF_INET, SOCK_STREAM, 0);
-        if (probe < 0) { return false; }
-
-        sockaddr_in addr{};
-        addr.sin_family      = AF_INET;
-        addr.sin_port        = htons(static_cast<std::uint16_t>(port));
-        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-        const bool ok = connect(probe,
-            reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0;
-        (void)close(probe);
-        if (ok) { return true; }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    return false;
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    return true;
 }
 
-/// Connect to the listener, send each line with a trailing newline, close.
-/// Sleeps 20 ms after close so the listener can flush the last insert to the DB.
+/// Send each line as an individual UDP datagram to the listener on loopback.
+/// Sleeps 20 ms after the last send so the listener has time to process and
+/// insert all rows before the test queries the DB.
 void send_lines(int port, std::initializer_list<std::string_view> lines)
 {
-    const int sock = socket(AF_INET, SOCK_STREAM, 0);
+    const int sock = socket(AF_INET, SOCK_DGRAM, 0);
     REQUIRE(sock >= 0);
 
     sockaddr_in addr{};
@@ -71,14 +57,11 @@ void send_lines(int port, std::initializer_list<std::string_view> lines)
     addr.sin_port        = htons(static_cast<std::uint16_t>(port));
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    REQUIRE(connect(sock,
-        reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0);
-
     for (const std::string_view line : lines) {
-        std::string msg{line};
-        msg += '\n';
-        const auto sent = send(sock, msg.data(), msg.size(), 0);
-        REQUIRE(sent == static_cast<ssize_t>(msg.size()));
+        const auto sent = sendto(sock, line.data(), line.size(), 0,
+                                 reinterpret_cast<const sockaddr*>(&addr),
+                                 sizeof(addr));
+        REQUIRE(sent == static_cast<ssize_t>(line.size()));
     }
 
     (void)close(sock);
@@ -207,7 +190,7 @@ TEST_CASE("Integration: ICMP line — ports stored as NULL")
 TEST_CASE("Integration: non-UTC timezone normalised to UTC epoch")
 {
     ListenerFixture fix{kPort};
-    // Send the UTC line and its +02:00 equivalent in one connection.
+    // Send the UTC line and its +02:00 equivalent as separate datagrams.
     send_lines(kPort, {kTcpSyn, kTcpSynPlusTwoHours});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
@@ -216,7 +199,7 @@ TEST_CASE("Integration: non-UTC timezone normalised to UTC epoch")
     CHECK(rows.at(0).ts == rows.at(1).ts);
 }
 
-TEST_CASE("Integration: multiple lines in one connection all inserted")
+TEST_CASE("Integration: multiple datagrams all inserted")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn, kUdp, kIcmp});
@@ -237,7 +220,7 @@ TEST_CASE("Integration: unparseable line skipped, valid line still inserted")
     CHECK(rows.front().src_ip == "172.234.31.140");
 }
 
-TEST_CASE("Integration: two sequential connections accumulate rows")
+TEST_CASE("Integration: two sequential datagrams accumulate rows")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn});

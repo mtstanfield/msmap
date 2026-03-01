@@ -55,7 +55,7 @@ int main() {
     std::clog << "[INFO] db        : " << db_path     << '\n'
               << "[INFO] city mmdb : " << city_path   << '\n'
               << "[INFO] asn mmdb  : " << asn_path    << '\n'
-              << "[INFO] listen    : 127.0.0.1:" << listen_port << '\n'
+              << "[INFO] listen    : 0.0.0.0:"   << listen_port << " (UDP/syslog)\n"
               << "[INFO] http      : 0.0.0.0:"   << http_port   << '\n';
 
     msmap::Database db{db_path};

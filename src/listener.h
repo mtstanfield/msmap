@@ -8,12 +8,14 @@ class Database;
 class GeoIp;
 class AbuseCache;
 
-/// Block on TCP 127.0.0.1:port, parse each received syslog line,
-/// enrich with GeoIP and AbuseIPDB, and insert into `db`.
+/// Listen on UDP 0.0.0.0:port for BSD syslog datagrams sent directly by
+/// Mikrotik (native format; no rsyslog intermediary required).
 ///
-/// One connection at a time; rsyslog opens a single persistent connection.
-/// On disconnection, waits for the next connect (no busy-loop).
-/// Checks geoip.reload_if_changed() on every recv() iteration (fast no-op
+/// Each UDP datagram contains exactly one syslog message. The parser
+/// auto-detects BSD (<PRI>) and RFC 3339 timestamp formats, so both
+/// direct Mikrotik datagrams and rsyslog-reformatted lines are accepted.
+/// Enriches each entry with GeoIP and AbuseIPDB data and inserts into `db`.
+/// Checks geoip.reload_if_changed() on every received datagram (fast no-op
 /// when the mmdb files have not changed).
 /// Parse warnings and socket errors go to stderr.
 ///

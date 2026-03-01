@@ -158,6 +158,102 @@ TEST_CASE("Trailing newline stripped cleanly", "[parser][whitespace]") {
     CHECK(result.entry.pkt_len == 52);
 }
 
+// ── BSD syslog format tests ───────────────────────────────────────────────────
+
+// BSD syslog: <PRI>Mmm DD HH:MM:SS HOSTNAME MSG
+// PRI 134 = facility local0 (16*8) + severity info (6) — typical Mikrotik value.
+// These lines are what msmap receives directly from Mikrotik over UDP 514,
+// without any rsyslog reformatting.
+
+static constexpr std::string_view kBsdTcpLine =
+    "<134>Feb 27 08:14:23 router firewall,info FW_INPUT_NEW input: "
+    "in:ether1 out:(unknown 0), connection-state:new "
+    "src-mac bc:9a:8e:fb:12:f1, proto TCP (SYN), "
+    "185.220.101.47:54321->203.0.113.1:22, len 60";
+
+static constexpr std::string_view kBsdUdpLine =
+    "<134>Feb 27 08:14:26 router firewall,info FW_INPUT_NEW input: "
+    "in:ether1 out:(unknown 0), connection-state:new "
+    "src-mac bc:9a:8e:fb:12:f1, proto UDP, "
+    "8.8.8.8:5353->203.0.113.1:53, len 64";
+
+static constexpr std::string_view kBsdIcmpLine =
+    "<134>Feb 27 08:14:27 router firewall,info FW_INPUT_DROP input: "
+    "in:ether1 out:(unknown 0), connection-state:new "
+    "src-mac bc:9a:8e:fb:12:f1, proto ICMP, "
+    "1.1.1.1->203.0.113.1, len 84";
+
+// Single-digit day uses space-padding: "Jan  5" (two spaces before the digit).
+static constexpr std::string_view kBsdSingleDigitDay =
+    "<134>Jan  5 12:00:00 router firewall,info FW_INPUT_NEW input: "
+    "in:ether1 out:ether2, connection-state:new "
+    "proto TCP (ACK), 10.0.0.1:1234->10.0.0.2:80, len 52";
+
+TEST_CASE("BSD syslog TCP line parses correctly", "[parser][bsd][tcp]") {
+    const auto result = parse_log(kBsdTcpLine);
+    REQUIRE(result.ok());
+
+    // Year inferred from system clock; ts must be a plausible recent epoch.
+    CHECK(result.entry.ts > 0);
+    CHECK(result.entry.hostname   == "router");
+    CHECK(result.entry.topic      == "firewall");
+    CHECK(result.entry.level      == "info");
+    CHECK(result.entry.rule       == "FW_INPUT_NEW");
+    CHECK(result.entry.chain      == "input");
+    CHECK(result.entry.in_iface   == "ether1");
+    CHECK(result.entry.out_iface  == "(unknown 0)");
+    CHECK(result.entry.conn_state == "new");
+    CHECK(result.entry.proto      == "TCP");
+    CHECK(result.entry.tcp_flags  == "SYN");
+    CHECK(result.entry.src_ip     == "185.220.101.47");
+    CHECK(result.entry.src_port   == 54321);
+    CHECK(result.entry.dst_ip     == "203.0.113.1");
+    CHECK(result.entry.dst_port   == 22);
+    CHECK(result.entry.pkt_len    == 60);
+}
+
+TEST_CASE("BSD syslog UDP line parses correctly", "[parser][bsd][udp]") {
+    const auto result = parse_log(kBsdUdpLine);
+    REQUIRE(result.ok());
+
+    CHECK(result.entry.ts > 0);
+    CHECK(result.entry.proto     == "UDP");
+    CHECK(result.entry.tcp_flags.empty());
+    CHECK(result.entry.src_ip    == "8.8.8.8");
+    CHECK(result.entry.src_port  == 5353);
+    CHECK(result.entry.dst_ip    == "203.0.113.1");
+    CHECK(result.entry.dst_port  == 53);
+    CHECK(result.entry.pkt_len   == 64);
+}
+
+TEST_CASE("BSD syslog ICMP line parses correctly — no ports", "[parser][bsd][icmp]") {
+    const auto result = parse_log(kBsdIcmpLine);
+    REQUIRE(result.ok());
+
+    CHECK(result.entry.ts > 0);
+    CHECK(result.entry.proto     == "ICMP");
+    CHECK(result.entry.tcp_flags.empty());
+    CHECK(result.entry.src_ip    == "1.1.1.1");
+    CHECK(result.entry.src_port  == -1);
+    CHECK(result.entry.dst_ip    == "203.0.113.1");
+    CHECK(result.entry.dst_port  == -1);
+    CHECK(result.entry.pkt_len   == 84);
+}
+
+TEST_CASE("BSD syslog single-digit day (space-padded) parses correctly", "[parser][bsd]") {
+    const auto result = parse_log(kBsdSingleDigitDay);
+    REQUIRE(result.ok());
+
+    CHECK(result.entry.ts > 0);
+    CHECK(result.entry.proto     == "TCP");
+    CHECK(result.entry.tcp_flags == "ACK");
+    CHECK(result.entry.src_ip    == "10.0.0.1");
+    CHECK(result.entry.src_port  == 1234);
+    CHECK(result.entry.dst_ip    == "10.0.0.2");
+    CHECK(result.entry.dst_port  == 80);
+    CHECK(result.entry.pkt_len   == 52);
+}
+
 // ── Error-path tests ──────────────────────────────────────────────────────────
 
 TEST_CASE("Empty line returns error", "[parser][error]") {

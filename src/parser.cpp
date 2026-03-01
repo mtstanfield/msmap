@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cstddef>
@@ -30,6 +31,15 @@ public:
             return true;
         }
         return false;
+    }
+
+    /// Read exactly n characters (or fewer if src_ is exhausted).
+    std::string_view read_n(std::size_t n) noexcept {
+        const std::size_t start = pos_;
+        const std::size_t avail = src_.size() - pos_;
+        const std::size_t take  = (n < avail) ? n : avail;
+        pos_ += take;
+        return src_.substr(start, take);
     }
 
     /// Read chars up to (but not including) `delim`, then skip the delimiter.
@@ -158,6 +168,78 @@ private:
     return true;
 }
 
+/// Parse BSD syslog timestamp: "Mmm DD HH:MM:SS" (exactly 15 chars).
+/// Assumes UTC (router must be configured with timezone = UTC).
+/// Year is inferred from the system clock; if the parsed time would be more
+/// than 24 h in the future, the previous year is used (Dec → Jan rollover).
+[[nodiscard]] bool parse_bsd_timestamp(std::string_view ts,
+                                        std::int64_t& epoch) noexcept {
+    if (ts.size() != 15) { return false; }
+
+    // Month name (first 3 chars) → 1-based index
+    constexpr std::array<std::string_view, 12> months = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    int mon = 0;
+    {
+        int idx = 1;
+        for (const auto& m : months) {
+            if (ts.substr(0, 3) == m) { mon = idx; break; }
+            ++idx;
+        }
+    }
+    if (mon == 0) { return false; }
+
+    if (ts[3] != ' ') { return false; }
+
+    // Day: "DD" or " D" (space-padded single digit)
+    int mday = 0;
+    if (ts[4] == ' ') {
+        if (std::isdigit(static_cast<unsigned char>(ts[5])) == 0) { return false; }
+        mday = ts[5] - '0';
+    } else {
+        if (std::isdigit(static_cast<unsigned char>(ts[4])) == 0) { return false; }
+        if (std::isdigit(static_cast<unsigned char>(ts[5])) == 0) { return false; }
+        mday = (ts[4] - '0') * 10 + (ts[5] - '0');
+    }
+    if (mday < 1 || mday > 31) { return false; }
+
+    // "HH:MM:SS" at positions 6-14 — space at [6], colon at [9] and [12]
+    if (ts[6] != ' ' || ts[9] != ':' || ts[12] != ':') { return false; }
+    int hour{};
+    int min{};
+    int sec{};
+    if (!parse_field(ts, 7, 2, hour) ||
+        !parse_field(ts, 10, 2, min) ||
+        !parse_field(ts, 13, 2, sec)) { return false; }
+
+    // Infer year from UTC system clock.
+    const std::time_t now_t = std::time(nullptr);
+    std::tm now_utc{};
+    gmtime_r(&now_t, &now_utc);
+    const int cur_year = now_utc.tm_year + 1900;
+
+    const auto make_epoch = [&](int y) -> std::int64_t {
+        std::tm broken{};
+        broken.tm_year  = y - 1900;
+        broken.tm_mon   = mon - 1;
+        broken.tm_mday  = mday;
+        broken.tm_hour  = hour;
+        broken.tm_min   = min;
+        broken.tm_sec   = sec;
+        broken.tm_isdst = 0;
+        return static_cast<std::int64_t>(timegm(&broken));
+    };
+
+    const std::int64_t candidate = make_epoch(cur_year);
+    // If > 24 h in the future, assume Dec → Jan rollover and use previous year.
+    epoch = (candidate > static_cast<std::int64_t>(now_t) + 86400LL)
+                ? make_epoch(cur_year - 1)
+                : candidate;
+    return epoch != static_cast<std::int64_t>(-1);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 [[nodiscard]] bool sv_to_i32(std::string_view sv, std::int32_t& out) noexcept {
@@ -177,11 +259,26 @@ private:
 // They advance `tok` as they consume input.
 
 [[nodiscard]] std::string parse_header(Tok& tok, LogEntry& entry) {
-    const std::string_view ts_sv = tok.read_until(' ');
-    if (!parse_rfc3339(ts_sv, entry.ts)) {
-        std::string err = "bad timestamp: ";
-        err += ts_sv;
-        return err;
+    if (tok.consume("<")) {
+        // BSD syslog format: <PRI>Mmm DD HH:MM:SS HOSTNAME ...
+        // Strip the numeric priority and closing '>'.
+        tok.read_until('>');
+        // Timestamp is always exactly 15 chars: "Mmm DD HH:MM:SS"
+        const std::string_view ts_sv = tok.read_n(15);
+        if (!parse_bsd_timestamp(ts_sv, entry.ts)) {
+            std::string err = "bad BSD timestamp: ";
+            err += ts_sv;
+            return err;
+        }
+        if (!tok.consume(" ")) { return "expected space after BSD timestamp"; }
+    } else {
+        // RFC 3339 format (e.g. from rsyslog with %TIMESTAMP:::date-rfc3339%)
+        const std::string_view ts_sv = tok.read_until(' ');
+        if (!parse_rfc3339(ts_sv, entry.ts)) {
+            std::string err = "bad timestamp: ";
+            err += ts_sv;
+            return err;
+        }
     }
     entry.hostname = tok.read_until(' ');
     if (entry.hostname.empty()) { return "missing hostname"; }

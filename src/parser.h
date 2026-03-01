@@ -36,11 +36,21 @@ struct ParseResult {
     [[nodiscard]] bool ok() const noexcept { return error.empty(); }
 };
 
-/// Parse one log line produced by rsyslog with the MsmapFmt template.
-/// Wire format: RFC3339_TS ' ' HOSTNAME ' ' TOPIC ',' LEVEL ' '
-///              [RULE ' '] CHAIN ': in:' IFACE ' out:' IFACE
-///              ', connection-state:' STATE [' src-mac ' MAC ',']
-///              ' proto ' PROTO proto_variant ', len ' INT
+/// Parse one log line from Mikrotik.
+///
+/// Accepts two formats (auto-detected by the leading character):
+///
+///   BSD syslog  — sent directly from Mikrotik (native format):
+///     <PRI>Mmm DD HH:MM:SS HOSTNAME TOPIC,LEVEL [RULE] CHAIN: ...
+///     Timestamp treated as UTC; year inferred from system clock.
+///
+///   RFC 3339    — produced by rsyslog with %TIMESTAMP:::date-rfc3339%:
+///     YYYY-MM-DDTHH:MM:SS±HH:MM HOSTNAME TOPIC,LEVEL [RULE] CHAIN: ...
+///
+/// The Mikrotik body is identical for both:
+///   [RULE ' '] CHAIN ': in:' IFACE ' out:' IFACE
+///   ', connection-state:' STATE [' src-mac ' MAC ',']
+///   ' proto ' PROTO proto_variant ', len ' INT
 ///
 /// On failure, result.ok() is false and result.error describes the problem.
 [[nodiscard]] ParseResult parse_log(std::string_view line);
