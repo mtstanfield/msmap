@@ -125,6 +125,10 @@ RUN cmake -B build -G Ninja \
 # -----------------------------------------------------------------------------
 FROM gcr.io/distroless/cc-debian12:nonroot
 
+# Explicitly copy the CA bundle so HTTPS (AbuseIPDB API) works regardless of
+# what the distroless base image includes across version updates.
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
 COPY --from=builder /workspace/build/msmap /msmap
 
 EXPOSE 8080
