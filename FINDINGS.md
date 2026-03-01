@@ -337,3 +337,27 @@ ON connections(ts, src_ip, dst_ip, proto,
 ignored duplicates — the existing `rc != SQLITE_DONE` error check remains correct.
 `chain` and `rule` are intentionally excluded from the dedup key: the same physical
 packet logged by both INPUT and FORWARD rules is still a duplicate.
+
+---
+
+### FIND-017: Parser drops packets with numeric IP protocol numbers
+**Severity**: Medium
+**Status**:   Fixed (src/parser.cpp, src/parser.h, tests/test_parser.cpp)
+**File(s)**:  src/parser.cpp
+**Found**:    2026-03-01
+
+Mikrotik logs some IP-level protocols by number rather than name when it has no
+named alias.  Observed in production:
+
+```
+<30>Mar  1 21:43:50 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto 2, 192.168.1.254->224.0.0.1, len 36
+```
+
+Protocol 2 is IGMP (multicast group management).  The parser called `read_alpha()`
+which returns an empty string on a digit, hitting the `"missing protocol"` error path.
+
+**Resolution**: After `read_alpha()` returns empty, read until `','` and validate that
+all characters are digits.  Numeric protocols use the portless `IP->IP` format (no
+src/dst port, same as ICMP); `parse_portless_addrs()` is extracted as a shared helper
+called by both `parse_icmp()` and the numeric-protocol path.  The proto value is stored
+as the decimal string (e.g. `"2"`) in `LogEntry::proto` and the database.

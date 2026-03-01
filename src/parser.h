@@ -18,12 +18,12 @@ struct LogEntry {
     std::string  in_iface;     ///< e.g. "ether1"
     std::string  out_iface;    ///< e.g. "ether2" or "(unknown 0)"
     std::string  conn_state;   ///< "new" | "established" | "related" | "invalid"
-    std::string  proto;        ///< "TCP" | "UDP" | "ICMP"
+    std::string  proto;        ///< "TCP" | "UDP" | "ICMP" | numeric (e.g. "2" for IGMP)
     std::string  tcp_flags;    ///< e.g. "ACK", "SYN,ACK"; empty for non-TCP
     std::string  src_ip;
-    std::int32_t src_port{-1}; ///< -1 for ICMP
+    std::int32_t src_port{-1}; ///< -1 for ICMP and numeric protocols
     std::string  dst_ip;
-    std::int32_t dst_port{-1}; ///< -1 for ICMP
+    std::int32_t dst_port{-1}; ///< -1 for ICMP and numeric protocols
     std::int32_t pkt_len{0};
 };
 
@@ -52,6 +52,9 @@ struct ParseResult {
 ///   [RULE ' '] CHAIN ': in:' IFACE ' out:' IFACE
 ///   ', connection-state:' STATE [' src-mac ' MAC ',']
 ///   ' proto ' PROTO proto_variant [' NAT ' ...] ', len ' INT
+///
+/// PROTO is a named alias (TCP/UDP/ICMP) or a raw IP protocol number (e.g. "2"
+/// for IGMP).  Numbered protocols are parsed as portless (IP->IP, no ports).
 ///
 /// topic and level fields in LogEntry are always empty (not present in wire format).
 ///
