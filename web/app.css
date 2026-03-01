@@ -32,8 +32,11 @@ html, body {
 }
 
 #status-bar span { white-space: nowrap; }
-#stat-mapped { color: #58a6ff; }
-#stat-error  { color: #f85149; }
+#stat-mapped  { color: #58a6ff; }
+#stat-error   { color: #f85149; }
+#stat-spacer  { flex: 1; }
+#stat-repo    { color: #8b949e; text-decoration: none; white-space: nowrap; }
+#stat-repo:hover { color: #e6edf3; }
 
 /* ── Filter toggle button ─────────────────────────────────────────────────── */
 

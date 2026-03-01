@@ -159,8 +159,19 @@ MHD_Result send_response(MHD_Connection*    conn,
     if (resp == nullptr) {
         return MHD_NO;
     }
-    (void)MHD_add_response_header(resp, "Content-Type", content_type);
+    (void)MHD_add_response_header(resp, "Content-Type",              content_type);
     (void)MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+    (void)MHD_add_response_header(resp, "X-Content-Type-Options",    "nosniff");
+    (void)MHD_add_response_header(resp, "X-Frame-Options",           "SAMEORIGIN");
+    (void)MHD_add_response_header(resp, "Referrer-Policy",
+                                        "strict-origin-when-cross-origin");
+    // HTML: allow proxy/browser revalidation but not indefinite caching.
+    // All other responses (API, errors): never cache — live data changes.
+    const char* const cache =
+        (std::string_view{content_type}.starts_with("text/html"))
+            ? "no-cache"
+            : "no-store";
+    (void)MHD_add_response_header(resp, "Cache-Control", cache);
     const MHD_Result ret = MHD_queue_response(conn, status, resp);
     MHD_destroy_response(resp);
     return ret;
