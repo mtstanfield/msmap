@@ -9,6 +9,7 @@ VAR_NAME defaults to kIndexHtml.  All asset paths are resolved relative to
 the directory that contains template.html.
 """
 
+import datetime
 import os
 import sys
 
@@ -38,6 +39,7 @@ def bundle(template_path: str) -> str:
     html = _read(template_path)
     for token, rel in _PLACEHOLDERS:
         html = html.replace(token, _read(os.path.join(base, rel)))
+    html = html.replace('{{BUILD_DATE}}', datetime.date.today().isoformat())
     return html
 
 
