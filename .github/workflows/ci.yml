@@ -82,7 +82,12 @@ jobs:
 
       # Configure and generate index_html.h via the web_bundle target.
       # http.cpp #includes index_html.h, so clang-tidy requires it.
-      # Full binary compilation is not needed for lint.
+      # CMAKE_CXX_SCAN_FOR_MODULES=OFF: CMake 3.28+ scans C++20/23 sources for
+      # module imports by default, injecting @*.o.modmap response-file flags into
+      # compile_commands.json.  Those files are only created during a real
+      # compile; without a full build they are absent and clang-tidy errors out.
+      # The project uses no C++ modules (no 'import' statements), so scanning
+      # is unnecessary and safe to disable.
       - name: Configure and generate web bundle
         run: |
           docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
@@ -91,6 +96,7 @@ jobs:
               -DCMAKE_CXX_STANDARD=23 \
               -DCMAKE_CXX_EXTENSIONS=OFF \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
             && ninja -C build web_bundle"
 
       # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
