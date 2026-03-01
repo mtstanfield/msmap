@@ -86,43 +86,43 @@ struct ListenerFixture {
     }
 };
 
-// ── Canonical log lines (verbatim from scripts/smoke_test.sh) ─────────────────
+// ── Canonical log lines (real Mikrotik BSD syslog TAG format) ─────────────────
 
 // TCP SYN — well-known Tor exit node, inbound to port 22
 constexpr std::string_view kTcpSyn =
-    "2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto TCP (SYN), "
     "185.220.101.47:54321->203.0.113.1:22, len 60";
 
 // TCP ACK — generic scanner, inbound to port 80
 constexpr std::string_view kTcpAck =
-    "2026-02-27T08:14:25+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:25+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), "
     "172.234.31.140:65226->203.0.113.1:80, len 52";
 
 // UDP — Google DNS
 constexpr std::string_view kUdp =
-    "2026-02-27T08:14:26+00:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T08:14:26+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto UDP, "
     "8.8.8.8:5353->203.0.113.1:53, len 64";
 
 // ICMP — Cloudflare ping
 constexpr std::string_view kIcmp =
-    "2026-02-27T08:14:27+00:00 router firewall,info FW_INPUT_DROP input: "
+    "2026-02-27T08:14:27+00:00 router FW_INPUT_DROP: FW_INPUT_DROP input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto ICMP, "
     "1.1.1.1->203.0.113.1, len 84";
 
-// Same UTC moment as kTcpSyn but expressed with a +02:00 timezone offset.
-// Both should produce identical `ts` values after normalisation to UTC.
+// +02:00 variant of kTcpSyn — same UTC moment, different source IP so it is
+// a distinct row after dedup (used to verify timezone normalisation to UTC).
 constexpr std::string_view kTcpSynPlusTwoHours =
-    "2026-02-27T10:14:23+02:00 router firewall,info FW_INPUT_NEW input: "
+    "2026-02-27T10:14:23+02:00 router FW_INPUT_NEW: FW_INPUT_NEW input: "
     "in:ether1 out:(unknown 0), connection-state:new "
     "src-mac bc:9a:8e:fb:12:f1, proto TCP (SYN), "
-    "185.220.101.47:54321->203.0.113.1:22, len 60";
+    "185.220.101.48:54321->203.0.113.1:22, len 60";
 
 // Not a Mikrotik log line — parser should skip and log a WARN.
 constexpr std::string_view kInvalid = "not a valid Mikrotik firewall log line";
@@ -190,7 +190,8 @@ TEST_CASE("Integration: ICMP line — ports stored as NULL")
 TEST_CASE("Integration: non-UTC timezone normalised to UTC epoch")
 {
     ListenerFixture fix{kPort};
-    // Send the UTC line and its +02:00 equivalent as separate datagrams.
+    // kTcpSyn (UTC) and kTcpSynPlusTwoHours (+02:00) represent the same UTC
+    // instant but have different source IPs so they are distinct DB rows.
     send_lines(kPort, {kTcpSyn, kTcpSynPlusTwoHours});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});

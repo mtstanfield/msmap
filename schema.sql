@@ -34,6 +34,15 @@ CREATE INDEX IF NOT EXISTS idx_conn_src_ip  ON connections (src_ip);
 CREATE INDEX IF NOT EXISTS idx_conn_dst_port ON connections (dst_port);
 CREATE INDEX IF NOT EXISTS idx_conn_country ON connections (country);
 
+-- Duplicate suppression: same physical packet logged by multiple rules/targets
+-- produces identical (ts, src_ip, dst_ip, proto, ports) tuples.
+-- COALESCE(port, -1) makes NULL (ICMP) ports participate in the unique key.
+-- Requires SQLite >= 3.25.0 (Debian bookworm ships 3.39.x).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_conn_dedup
+ON connections(ts, src_ip, dst_ip, proto,
+               COALESCE(src_port, -1),
+               COALESCE(dst_port, -1));
+
 -- ── AbuseIPDB OSINT cache ──────────────────────────────────────────────────
 -- Keyed by IP. Refreshed by background thread when last_checked is stale.
 CREATE TABLE IF NOT EXISTS abuse_cache (

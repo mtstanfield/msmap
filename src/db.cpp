@@ -73,8 +73,17 @@ constexpr const char* kCreateIndexDstPort =
 constexpr const char* kCreateIndexCountry =
     "CREATE INDEX IF NOT EXISTS idx_country  ON connections(country)";
 
+// Expression index for duplicate suppression.
+// COALESCE(port, -1) makes NULL ports (ICMP) participate in the unique key.
+// SQLite expression indices require ≥ 3.25.0 (bookworm has 3.39.x).
+constexpr const char* kCreateIndexDedup = R"sql(
+CREATE UNIQUE INDEX IF NOT EXISTS ux_conn_dedup
+ON connections(ts, src_ip, dst_ip, proto,
+               COALESCE(src_port, -1),
+               COALESCE(dst_port, -1)))sql";
+
 constexpr const char* kInsertSql = R"sql(
-INSERT INTO connections(
+INSERT OR IGNORE INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
     chain, in_iface, rule, conn_state, pkt_len,
     country, lat, lon, asn, threat)
@@ -150,7 +159,8 @@ Database::Database(const std::string& path) noexcept
         !exec(kCreateIndexTs)             ||
         !exec(kCreateIndexSrcIp)          ||
         !exec(kCreateIndexDstPort)        ||
-        !exec(kCreateIndexCountry)) {
+        !exec(kCreateIndexCountry)        ||
+        !exec(kCreateIndexDedup)) {
         db_.reset(); // mark invalid
         return;
     }

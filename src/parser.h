@@ -41,16 +41,19 @@ struct ParseResult {
 /// Accepts two formats (auto-detected by the leading character):
 ///
 ///   BSD syslog  — sent directly from Mikrotik (native format):
-///     <PRI>Mmm DD HH:MM:SS HOSTNAME TOPIC,LEVEL [RULE] CHAIN: ...
+///     <PRI>Mmm DD HH:MM:SS HOSTNAME TAG: [RULE] CHAIN: ...
+///     TAG is the BSD syslog tag field (log-prefix + ':'), e.g. "FW_INPUT_NEW:".
 ///     Timestamp treated as UTC; year inferred from system clock.
 ///
 ///   RFC 3339    — produced by rsyslog with %TIMESTAMP:::date-rfc3339%:
-///     YYYY-MM-DDTHH:MM:SS±HH:MM HOSTNAME TOPIC,LEVEL [RULE] CHAIN: ...
+///     YYYY-MM-DDTHH:MM:SS±HH:MM HOSTNAME TAG: [RULE] CHAIN: ...
 ///
-/// The Mikrotik body is identical for both:
+/// The Mikrotik body is identical for both (TAG is always discarded):
 ///   [RULE ' '] CHAIN ': in:' IFACE ' out:' IFACE
 ///   ', connection-state:' STATE [' src-mac ' MAC ',']
-///   ' proto ' PROTO proto_variant ', len ' INT
+///   ' proto ' PROTO proto_variant [' NAT ' ...] ', len ' INT
+///
+/// topic and level fields in LogEntry are always empty (not present in wire format).
 ///
 /// On failure, result.ok() is false and result.error describes the problem.
 [[nodiscard]] ParseResult parse_log(std::string_view line);
