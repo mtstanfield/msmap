@@ -191,9 +191,12 @@ docker build -t msmap .
 - [ ] Distroless nonroot confirmed in CI
 
 ### Deploy
-- [ ] `docker-compose.yml`: msmap + nginx (TLS) + rsyslog + geoipupdate sidecar
-- [ ] GeoLite2 DB update: geoipupdate sidecar on shared volume (free MaxMind account)
+- [x] Env-var configuration: `MSMAP_DB_PATH`, `MSMAP_CITY_MMDB`, `MSMAP_ASN_MMDB`, `MSMAP_LISTEN_PORT`, `MSMAP_HTTP_PORT`, `ABUSEIPDB_API_KEY`; defaults suit a containerised deployment
+- [x] Dockerfile: `/data` (db) and `/var/lib/msmap/geoip` (mmdb) directories pre-created with correct ownership for `nonroot` uid 65532; volume-mounts overlay cleanly
+- [~] `docker-compose.yml`: N/A — deployment is via Unraid's Docker UI; volumes/env vars set there
+- [~] GeoLite2 DB update: geoipupdate sidecar already running on shared volume (free MaxMind account)
 - [ ] Documented rollback procedure (per FINDINGS.md process)
+- [ ] Auth: nginx/caddy reverse proxy in front for TLS + auth (not in binary)
 
 ---
 
