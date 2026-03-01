@@ -1,12 +1,12 @@
 name: CI
 
-# Run on every push to main and on pull requests targeting main.
-# The 'publish' job (image push) only runs on pushes to main, not on PRs.
+# Run on every push to master and on pull requests targeting master.
+# The 'publish' job (image push) only runs on pushes to master, not on PRs.
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # Minimal permissions at the workflow level; 'publish' overrides with packages:write.
 permissions:
@@ -80,9 +80,9 @@ jobs:
   publish:
     name: Publish Image
     needs: ci
-    # Only push images for commits that reach main; never for PRs
+    # Only push images for commits that reach master; never for PRs
     # (forks cannot access GITHUB_TOKEN secrets for the target repo).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
 
     permissions:
@@ -103,7 +103,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Generate image tags:
-      #   ghcr.io/mtstanfield/msmap:latest      (always, on main)
+      #   ghcr.io/mtstanfield/msmap:latest      (always, on master)
       #   ghcr.io/mtstanfield/msmap:sha-<short> (per-commit, for Unraid pinning)
       - name: Docker metadata
         id: meta
