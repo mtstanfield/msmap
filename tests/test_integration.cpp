@@ -79,7 +79,7 @@ struct ListenerFixture {
 
     explicit ListenerFixture(int port)
         : thread{[this, port](std::stop_token st) {
-              msmap::run_listener(port, db, geoip, nullptr, st);
+              msmap::run_listener(port, db, geoip, nullptr, {}, st);
           }}
     {
         REQUIRE(wait_ready(port));

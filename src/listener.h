@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <stop_token>
+#include <vector>
 
 namespace msmap {
 
@@ -25,7 +27,11 @@ class AbuseCache;
 ///
 /// `abuse` may be null — pass nullptr to disable OSINT enrichment
 /// (all threat columns will remain NULL).
+///
+/// `allow_ips` is a list of network-byte-order IPv4 addresses that are
+/// allowed to send datagrams. Empty = accept from any source.
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  const std::vector<std::uint32_t>& allow_ips = {},
                   const std::stop_token& stoken = {});
 
 } // namespace msmap

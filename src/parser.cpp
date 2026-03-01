@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <charconv>
@@ -384,26 +385,50 @@ private:
     return parse_ported_addrs(tok, entry);
 }
 
-[[nodiscard]] std::string parse_icmp(Tok& tok, LogEntry& entry) {
-    // ICMP: ", " then "IP->IP" (no ports).
-    if (!tok.consume(", ")) { return "expected ', ' after ICMP"; }
+/// Parse "IP->IP" with no ports — shared by ICMP and numeric IP protocols.
+/// Caller is responsible for having already consumed any prefix delimiter.
+[[nodiscard]] std::string parse_portless_addrs(Tok& tok, LogEntry& entry) {
     entry.src_ip = tok.read_until('-');
-    if (!tok.consume(">")) { return "expected '>' in ICMP src->dst"; }
+    if (!tok.consume(">")) { return "expected '>' in src->dst"; }
     entry.dst_ip = tok.read_until(',');
     // src_port / dst_port remain -1 (LogEntry defaults).
     return {};
 }
 
+[[nodiscard]] std::string parse_icmp(Tok& tok, LogEntry& entry) {
+    // ICMP: ", " then "IP->IP" (no ports).
+    if (!tok.consume(", ")) { return "expected ', ' after ICMP"; }
+    return parse_portless_addrs(tok, entry);
+}
+
 [[nodiscard]] std::string parse_proto_and_len(Tok& tok, LogEntry& entry) {
     if (!tok.consume("proto ")) { return "expected 'proto '"; }
     entry.proto = tok.read_alpha();
-    if (entry.proto.empty()) { return "missing protocol"; }
 
     std::string err;
-    if (entry.proto == "TCP")       { err = parse_tcp(tok, entry); }
-    else if (entry.proto == "UDP")  { err = parse_udp(tok, entry); }
-    else if (entry.proto == "ICMP") { err = parse_icmp(tok, entry); }
-    else {
+    if (entry.proto.empty()) {
+        // Numeric IP protocol number (e.g. 2=IGMP, 47=GRE, 50=ESP, 89=OSPF).
+        // Mikrotik uses numbers when it has no named alias for the protocol.
+        // Format: "N, IP->IP, len N" — portless like ICMP.
+        entry.proto = std::string(tok.read_until(','));
+        if (entry.proto.empty()) { return "missing protocol"; }
+        const bool all_digits = std::all_of(
+            entry.proto.begin(), entry.proto.end(),
+            [](unsigned char c) { return std::isdigit(c) != 0; });
+        if (!all_digits) {
+            std::string bad = "unsupported protocol: ";
+            bad += entry.proto;
+            return bad;
+        }
+        if (!tok.consume(" ")) { return "expected ' ' after numeric protocol"; }
+        err = parse_portless_addrs(tok, entry);
+    } else if (entry.proto == "TCP") {
+        err = parse_tcp(tok, entry);
+    } else if (entry.proto == "UDP") {
+        err = parse_udp(tok, entry);
+    } else if (entry.proto == "ICMP") {
+        err = parse_icmp(tok, entry);
+    } else {
         std::string bad = "unsupported protocol: ";
         bad += entry.proto;
         return bad;

@@ -72,6 +72,14 @@ static constexpr std::string_view kDnatLine =
     "108.89.70.182:54442->192.168.88.89:32400, "
     "NAT 108.89.70.182:54442->(108.89.67.16:3240->192.168.88.89:32400), len 52";
 
+// Numeric protocol — IGMP (IP protocol 2), portless IP->IP, no named alias in Mikrotik
+// Real wire line observed from live router on 2026-03-01.
+static constexpr std::string_view kIgmpLine =
+    "<30>Mar  1 21:43:50 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: "
+    "in:ether1 out:(unknown 0), connection-state:new "
+    "src-mac bc:9a:8e:fb:12:f1, proto 2, "
+    "192.168.1.254->224.0.0.1, len 36";
+
 // Mismatched TAG vs body rule — TAG is discarded, body rule wins
 static constexpr std::string_view kMismatchedTagLine =
     "2026-02-27T08:14:23+00:00 router FW_FWD_NEW: FW_INPUT_NEW input: "
@@ -192,6 +200,20 @@ TEST_CASE("DNAT forward: NAT annotation skipped, conn_state and len correct", "[
     CHECK(result.entry.dst_ip     == "192.168.88.89");
     CHECK(result.entry.dst_port   == 32400);
     CHECK(result.entry.pkt_len    == 52);
+}
+
+TEST_CASE("Numeric protocol (IGMP=2): portless IP->IP, no ports", "[parser][numeric_proto]") {
+    const auto result = parse_log(kIgmpLine);
+    REQUIRE(result.ok());
+
+    CHECK(result.entry.ts > 0);
+    CHECK(result.entry.proto      == "2");
+    CHECK(result.entry.tcp_flags.empty());
+    CHECK(result.entry.src_ip     == "192.168.1.254");
+    CHECK(result.entry.src_port   == -1);
+    CHECK(result.entry.dst_ip     == "224.0.0.1");
+    CHECK(result.entry.dst_port   == -1);
+    CHECK(result.entry.pkt_len    == 36);
 }
 
 TEST_CASE("Mismatched TAG and body rule — body rule wins", "[parser][tag]") {
