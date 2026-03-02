@@ -33,7 +33,7 @@ namespace {
 constexpr std::size_t kPruneInterval{10'000};
 
 // Rows older than this are deleted during a prune pass.
-constexpr std::int64_t kRetentionSecs{365LL * 24 * 3600};
+constexpr std::int64_t kRetentionSecs{30LL * 24 * 3600};
 
 // SQLITE_STATIC means the string is managed by the caller and is
 // guaranteed to remain valid for the lifetime of the sqlite3_bind call.

@@ -162,7 +162,7 @@ docker build -t msmap .
 ### Storage
 - [x] SQLite schema (see table above) + WAL mode pragma
 - [x] Indexes: `ts`, `src_ip`, `dst_port`, `country`
-- [x] Retention pruning (1 year): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
+- [x] Retention pruning (30 days): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
@@ -200,11 +200,3 @@ docker build -t msmap .
 - [~] GeoLite2 DB update: geoipupdate sidecar already running on shared volume (free MaxMind account)
 - [ ] Documented rollback procedure (per FINDINGS.md process)
 - [ ] Auth: nginx/caddy reverse proxy in front for TLS + auth (not in binary)
-
----
-
-## Open Questions
-1. OSINT: AbuseIPDB API key approach, or start with a static blocklist (e.g. Firehol)?
-2. Expected sustained log volume? (informs SQLite WAL + index tuning)
-3. Auth for the web UI: IP allowlist at nginx, or basic auth, or bearer token?
-4. IPv6: ATT gateway theoretically supports it but not configured — handle defensively in parser, revisit later

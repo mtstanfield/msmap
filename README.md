@@ -1,8 +1,8 @@
 # msmap – Mikrotik Firewall Log Viewer
 
 A lightweight, self-contained C++23 application that ingests Mikrotik firewall
-logs via rsyslog, enriches them with GeoIP and OSINT data, and serves a
-single-page web UI showing inbound connections on a world map.
+logs directly via syslog UDP, enriches them with GeoIP and OSINT data, and serves
+a single-page web UI showing inbound connections on a world map.
 
 Ships as a single binary in a distroless container. No runtime filesystem
 dependencies — all web assets are embedded at compile time.
@@ -16,14 +16,11 @@ guidelines throughout.
 
 ```
 Mikrotik router
-    │ syslog UDP 514
-    ▼
-rsyslog (reformats timestamp → RFC 3339, forwards to msmap)
-    │ TCP 5140
+    │ syslog UDP 514 (BSD syslog, direct)
     ▼
 msmap binary
     ├── parser        (hand-written tokenizer, fuzz-tested)
-    ├── SQLite DB     (WAL mode, 1-year retention)
+    ├── SQLite DB     (WAL mode, 30-day retention)
     ├── GeoIP         (libmaxminddb + local GeoLite2-City.mmdb)
     ├── OSINT cache   (AbuseIPDB results cached in SQLite)
     └── HTTP server   (libmicrohttpd, port 8080)
@@ -32,7 +29,7 @@ msmap binary
         browser (Leaflet.js map, vanilla JS, no framework)
 ```
 
-TLS termination and auth live outside the binary (nginx reverse proxy).
+TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 
 ---
 
@@ -48,6 +45,135 @@ TLS termination and auth live outside the binary (nginx reverse proxy).
 | OSINT       | AbuseIPDB (cached)               | SQLite cache with TTL, no live queries |
 | Frontend    | Leaflet.js + MarkerCluster       | Local copies, vanilla JS, no bundler   |
 | Runtime     | `distroless/cc-debian12:nonroot` | Semi-static binary, uid 65532          |
+
+---
+
+## Deployment
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MSMAP_DB_PATH` | `/data/msmap.db` | SQLite database path |
+| `MSMAP_CITY_MMDB` | `/var/lib/msmap/geoip/GeoLite2-City.mmdb` | GeoIP city database |
+| `MSMAP_ASN_MMDB` | `/var/lib/msmap/geoip/GeoLite2-ASN.mmdb` | GeoIP ASN database |
+| `MSMAP_LISTEN_PORT` | `5140` | UDP syslog ingest port |
+| `MSMAP_HTTP_PORT` | `8080` | Web UI / API port |
+| `MSMAP_INGEST_ALLOW` | _(empty — accept all)_ | Comma-separated IPv4 allowlist for ingest |
+| `ABUSEIPDB_API_KEY` | _(empty — disabled)_ | AbuseIPDB free-tier API key |
+
+### Volumes
+
+| Path | Purpose |
+|---|---|
+| `/data` | SQLite database — persist this across restarts |
+| `/var/lib/msmap/geoip` | MaxMind `.mmdb` files — optional, mount read-only |
+
+### docker run
+
+```bash
+docker run -d \
+  --name msmap \
+  --restart unless-stopped \
+  -p 5140:5140/udp \
+  -p 8080:8080 \
+  -v msmap-data:/data \
+  -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -e MSMAP_INGEST_ALLOW=192.168.88.1 \
+  ghcr.io/mtstanfield/msmap:latest
+```
+
+With AbuseIPDB threat scoring:
+
+```bash
+docker run -d \
+  --name msmap \
+  --restart unless-stopped \
+  -p 5140:5140/udp \
+  -p 8080:8080 \
+  -v msmap-data:/data \
+  -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -e MSMAP_INGEST_ALLOW=192.168.88.1 \
+  -e ABUSEIPDB_API_KEY=your_key_here \
+  ghcr.io/mtstanfield/msmap:latest
+```
+
+### docker-compose.yml
+
+```yaml
+services:
+  msmap:
+    image: ghcr.io/mtstanfield/msmap:latest
+    restart: unless-stopped
+    ports:
+      - "5140:5140/udp"
+      - "8080:8080"
+    volumes:
+      - msmap-data:/data
+      - /path/to/geoip:/var/lib/msmap/geoip:ro
+    environment:
+      MSMAP_INGEST_ALLOW: "192.168.88.1"
+      # ABUSEIPDB_API_KEY: "your_key_here"
+
+volumes:
+  msmap-data:
+```
+
+### GeoLite2 databases (optional, recommended)
+
+Download `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` from
+[MaxMind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)
+(free account required) and place them in the directory mounted at
+`/var/lib/msmap/geoip/`. msmap reloads changed `.mmdb` files automatically —
+no restart needed after a geoipupdate run.
+
+### Mikrotik router configuration
+
+In Winbox or WebFig → **System → Logging → Actions**, add a new action:
+
+| Field | Value |
+|---|---|
+| Name | `msmap` |
+| Type | `remote` |
+| Remote address | `<host running msmap>` |
+| Remote port | `5140` |
+| Src address | your router's LAN IP (e.g. `192.168.88.1`) |
+
+Then under **System → Logging**, add a rule:
+
+| Field | Value |
+|---|---|
+| Topics | `firewall` |
+| Action | `msmap` |
+
+Set `MSMAP_INGEST_ALLOW` to the router's LAN IP to reject syslog from
+unexpected sources.
+
+---
+
+## Log Format
+
+msmap listens on UDP 5140 and parses BSD syslog sent directly by Mikrotik:
+
+```
+<134>Mar  2 08:14:23 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
+```
+
+RFC 3339 format (produced by an rsyslog relay) is also accepted automatically:
+
+```
+2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: ...
+```
+
+**Protocol variants:**
+- TCP: `proto TCP (FLAGS), SRC:PORT->DST:PORT, len N`
+- UDP: `proto UDP, SRC:PORT->DST:PORT, len N` (no flags)
+- ICMP: `proto ICMP, SRC->DST, len N` (no ports)
+
+**Mikrotik router setup:**
+- NTP: enabled (Google NTP)
+- Timezone: UTC
+- Firewall `log-prefix` convention: `FW_<CHAIN>_<STATE>` (e.g. `FW_INPUT_NEW`, `FW_FWD_DROP`)
 
 ---
 
@@ -81,8 +207,8 @@ cmake -B build -G Ninja \
 ninja -C build msmap
 
 # Run static analysis
-ninja -C build clang-tidy   # or: run-clang-tidy -p build
-cppcheck --enable=all src/
+run-clang-tidy-18 -p build '/workspace/src/.*'
+cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 ```
 
 ### One-off commands (non-interactive)
@@ -101,57 +227,21 @@ docker run --rm -p 8080:8080 msmap
 
 ---
 
-## Log Format
-
-Mikrotik is configured to send syslog to rsyslog (UDP 514). rsyslog
-reformats the timestamp to RFC 3339 and forwards to msmap on TCP 5140.
-
-**Wire format received by msmap:**
-```
-2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
-```
-
-**Mikrotik router configuration:**
-- NTP: enabled (Google NTP)
-- Timezone: UTC
-- Firewall `log-prefix` convention: `FW_<CHAIN>_<STATE>` (e.g. `FW_INPUT_NEW`, `FW_FWD_DROP`)
-
-**rsyslog template** (`/etc/rsyslog.d/msmap.conf`):
-```
-template(name="MsmapFmt" type="string"
-    string="%TIMESTAMP:::date-rfc3339% %HOSTNAME% %msg%\n")
-
-input(type="imudp" port="514")
-
-if $fromhost-ip == "YOUR.ROUTER.IP" then {
-    action(type="omfwd" target="127.0.0.1" port="5140"
-           protocol="tcp" template="MsmapFmt")
-    stop
-}
-```
-
-**Protocol variants:**
-- TCP: `proto TCP (FLAGS), SRC:PORT->DST:PORT, len N`
-- UDP: `proto UDP, SRC:PORT->DST:PORT, len N` (no flags)
-- ICMP: `proto ICMP, SRC->DST, len N` (no ports)
-
----
-
 ## Project Structure
 
 ```
 .
 ├── Dockerfile              # Multi-stage: dev → builder → distroless:nonroot
 ├── CMakeLists.txt          # Build system (cmake 3.29+, Ninja, clang-18)
-├── PLAN.md                 # Detailed feature plan and todo list
+├── PLAN.md                 # Feature plan and todo list
 ├── CLAUDE.md               # Instructions for Claude Code
 ├── FINDINGS.md             # Issues log for remediation tracking
-├── rsyslog.conf            # rsyslog forwarding config for Mikrotik logs
+├── rsyslog.conf            # Optional rsyslog forwarding config (reference only)
 ├── schema.sql              # SQLite schema (reference copy; applied in db.cpp)
 ├── src/
 │   ├── main.cpp            # Entry point, signal handling, startup
-│   ├── listener.cpp/.h     # TCP listener on port 5140
-│   ├── parser.cpp/.h       # Hand-written RFC 3339 + Mikrotik log tokenizer
+│   ├── listener.cpp/.h     # UDP listener on port 5140
+│   ├── parser.cpp/.h       # Hand-written BSD syslog + RFC 3339 tokenizer
 │   ├── db.cpp/.h           # SQLite WAL database, schema, queries
 │   ├── geoip.cpp/.h        # MaxMind GeoLite2 enrichment
 │   ├── abuse_cache.cpp/.h  # AbuseIPDB cache (SQLite-backed, background refresh)
@@ -169,7 +259,7 @@ if $fromhost-ip == "YOUR.ROUTER.IP" then {
 │   ├── test_geoip.cpp
 │   ├── test_http.cpp
 │   ├── test_abuse_cache.cpp
-│   └── test_integration.cpp  # End-to-end: TCP socket → DB → query
+│   └── test_integration.cpp  # End-to-end: UDP socket → DB → query
 ├── cmake/
 │   ├── CompilerWarnings.cmake
 │   ├── Sanitizers.cmake

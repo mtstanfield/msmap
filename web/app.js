@@ -131,7 +131,7 @@ document.getElementById('f-apply').addEventListener('click', () => {
 });
 
 document.getElementById('f-clear').addEventListener('click', () => {
-    fTime.value      = '86400';
+    fTime.value      = '2592000';
     fDedup.checked   = true;
     fProto.value     = '';
     fIp.value        = '';
