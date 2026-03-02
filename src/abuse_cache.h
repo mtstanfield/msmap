@@ -110,8 +110,19 @@ private:
     /// Sets `request_made` to true if an HTTP request reached AbuseIPDB
     /// (regardless of HTTP status), so the caller only decrements the rate
     /// counter when a real API call was issued (not on curl/network failures).
+    /// Sets `quota_exhausted` to true specifically on HTTP 429 so the caller
+    /// can zero rate_remaining_ immediately instead of decrementing by one.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     std::optional<AbuseResult>  fetch_abuse(const std::string& ip,
-                                             bool& request_made) noexcept;
+                                             bool& request_made,
+                                             bool& quota_exhausted) noexcept;
+
+    /// Update rate counter, in_flight set, and SQLite cache after a fetch.
+    /// Extracted from worker() to keep its cognitive complexity in bounds.
+    void apply_fetch_result(const std::string&               ip,
+                            const std::optional<AbuseResult>& result,
+                            bool                              request_made,
+                            bool                              quota_exhausted) noexcept;
 
     // ── Configuration ────────────────────────────────────────────────────────
     std::string db_path_;

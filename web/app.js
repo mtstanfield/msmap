@@ -509,6 +509,12 @@ async function poll() {
                     entry.marker.setPopupContent(buildPopup(r, entry.count));
                 }
                 if (r.ts > lastTs) { lastTs = r.ts; }
+                // Fire arc for repeat connections from known IPs — each row is a
+                // live incoming packet regardless of whether the IP is already mapped.
+                if (!isInitialLoad && homePt && fArcs.checked && arcsFired < MAX_ARCS_POLL) {
+                    fireArc(r.lat, r.lon, markerColor(r.threat));
+                    arcsFired++;
+                }
                 continue;
             }
 
