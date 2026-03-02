@@ -103,6 +103,17 @@ docker run -d \
 
 ```yaml
 services:
+  geoipupdate:
+    image: maxmindinc/geoipupdate:latest
+    restart: unless-stopped
+    volumes:
+      - geoip-data:/var/lib/geoipupdate
+    environment:
+      GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID}
+      GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY}
+      GEOIPUPDATE_EDITION_IDS: GeoLite2-City GeoLite2-ASN
+      GEOIPUPDATE_FREQUENCY: 24
+
   msmap:
     image: ghcr.io/mtstanfield/msmap:latest
     restart: unless-stopped
@@ -111,7 +122,7 @@ services:
       - "8080:8080"
     volumes:
       - msmap-data:/data
-      - /path/to/geoip:/var/lib/msmap/geoip:ro
+      - geoip-data:/var/lib/msmap/geoip:ro
     environment:
       MSMAP_INGEST_ALLOW: "192.168.88.1"
       # ABUSEIPDB_API_KEY: "your_key_here"
@@ -119,6 +130,7 @@ services:
 
 volumes:
   msmap-data:
+  geoip-data:
 ```
 
 ### GeoLite2 databases (optional, recommended)
@@ -269,8 +281,17 @@ ninja -C build msmap
 
 # Run static analysis
 run-clang-tidy-18 -p build '/workspace/src/.*'
-cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+    cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+
+### Fuzzer (libFuzzer on syslog parser)
+
+Run interactively:
+
+```bash
+docker run -it --rm -v "${PWD}:/workspace" msmap-dev ninja -C build fuzz_parser
 ```
+
+Generates `build/corpus/` (seed crashes/hangs) and `build/fuzz_cov.html` (coverage report).
 
 ### One-off commands (non-interactive)
 
