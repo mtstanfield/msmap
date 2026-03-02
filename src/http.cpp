@@ -57,8 +57,12 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         out += "\"country\":";    json::append_string_or_null(out, row.country);  out += ',';
         out += "\"lat\":";        json::append_double_or_null(out, row.lat);       out += ',';
         out += "\"lon\":";        json::append_double_or_null(out, row.lon);       out += ',';
-        out += "\"asn\":";        json::append_string_or_null(out, row.asn);      out += ',';
-        out += "\"threat\":";     json::append_int_or_null(out, row.threat);
+        out += "\"asn\":";        json::append_string_or_null(out, row.asn);       out += ',';
+        out += "\"threat\":";     json::append_int_or_null(out, row.threat);       out += ',';
+        out += "\"usage_type\":"; json::append_string_or_null(out, row.usage_type); out += ',';
+        out += "\"is_tor\":";
+        if (row.is_tor.has_value()) { out += (*row.is_tor ? "true" : "false"); }
+        else                        { out += "null"; }
         out += '}';
     }
 

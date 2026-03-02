@@ -66,10 +66,12 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
 
     const ParseResult result = parse_log(data);
     if (result.ok()) {
-        const GeoIpResult        geo    = geoip.lookup(result.entry.src_ip);
-        const std::optional<int> threat =
-            (abuse != nullptr) ? abuse->lookup(result.entry.src_ip)
-                               : std::optional<int>{std::nullopt};
+        const GeoIpResult        geo       = geoip.lookup(result.entry.src_ip);
+        const std::optional<int> threat = [&]() noexcept -> std::optional<int> {
+            if (abuse == nullptr) { return std::nullopt; }
+            const auto hit = abuse->lookup(result.entry.src_ip);
+            return hit ? std::optional<int>{hit->score} : std::nullopt;
+        }();
         (void)db.insert(result.entry, geo, threat);
         if (abuse != nullptr) {
             abuse->submit(result.entry.src_ip);

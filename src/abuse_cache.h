@@ -22,6 +22,13 @@ inline constexpr std::int64_t kCacheTtlSecs{24LL * 3600};
 /// AbuseIPDB free-tier daily quota.
 inline constexpr int kDailyQuota{1000};
 
+/// Fields extracted from an AbuseIPDB /api/v2/check response.
+struct AbuseResult {
+    int         score{0};         ///< abuseConfidenceScore (0–100)
+    std::string usage_type;       ///< usageType; empty string if not present
+    bool        is_tor{false};    ///< isTor
+};
+
 // ── AbuseCache ────────────────────────────────────────────────────────────────
 
 /// Manages the `abuse_cache` SQLite table and a background worker thread
@@ -59,25 +66,25 @@ public:
     [[nodiscard]] bool valid() const noexcept { return db_ != nullptr; }
 
     /// Fast synchronous cache lookup.
-    /// Returns the cached score (0-100) if present and not expired (TTL = kCacheTtlSecs).
+    /// Returns the cached AbuseResult if present and not expired (TTL = kCacheTtlSecs).
     /// Returns nullopt on a cache miss or a stale entry.
     /// Thread-safe; never calls the API.
-    [[nodiscard]] std::optional<int> lookup(const std::string& ip) const noexcept;
+    [[nodiscard]] std::optional<AbuseResult> lookup(const std::string& ip) const noexcept;
 
     /// Enqueue `ip` for background resolution if not already cached/queued.
     /// Non-blocking. Safe to call from the listener hot path.
     /// No-op when api_key_ is empty or the object is invalid.
     void submit(const std::string& ip) noexcept;
 
-    /// Upsert a score into the cache table.
+    /// Upsert a result into the cache table.
     /// Called by the background worker after a successful API fetch.
     /// Also exposed for testing (cache_store + lookup round-trip).
-    bool cache_store(const std::string& ip, int score) noexcept;
+    bool cache_store(const std::string& ip, const AbuseResult& result) noexcept;
 
-    /// UPDATE connections SET threat=score WHERE src_ip=ip AND threat IS NULL.
+    /// UPDATE connections SET threat, usage_type, is_tor WHERE src_ip=ip AND usage_type IS NULL.
     /// Backfills rows that were inserted before the background fetch completed.
     /// Called by the background worker after cache_store().
-    void update_connections_threat(const std::string& ip, int score) noexcept;
+    void update_connections_abuse(const std::string& ip, const AbuseResult& result) noexcept;
 
     // ── Exposed for tests ────────────────────────────────────────────────────
 
@@ -89,9 +96,9 @@ public:
     bool rate_limit_reset_if_new_day() noexcept;
 
 private:
-    bool               open() noexcept;
-    void               worker() noexcept;
-    std::optional<int> fetch_score(const std::string& ip) noexcept;
+    bool                        open() noexcept;
+    void                        worker() noexcept;
+    std::optional<AbuseResult>  fetch_abuse(const std::string& ip) noexcept;
 
     // ── Configuration ────────────────────────────────────────────────────────
     std::string db_path_;
@@ -103,9 +110,9 @@ private:
     // the worker thread. db_mutex_ is never held across a network call.
     mutable std::mutex                           db_mutex_;
     std::unique_ptr<sqlite3,      SqliteCloser>  db_;
-    std::unique_ptr<sqlite3_stmt, StmtFinalizer> lookup_stmt_;       // SELECT score,last_checked WHERE ip=?
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> lookup_stmt_;       // SELECT score,last_checked,usage_type,is_tor WHERE ip=?
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> upsert_stmt_;       // INSERT OR REPLACE INTO abuse_cache
-    std::unique_ptr<sqlite3_stmt, StmtFinalizer> update_conn_stmt_;  // UPDATE connections SET threat=?
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> update_conn_stmt_;  // UPDATE connections SET threat,usage_type,is_tor
 
     // ── Background worker ────────────────────────────────────────────────────
     mutable std::mutex              queue_mutex_;

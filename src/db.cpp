@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS connections (
     lat        REAL,
     lon        REAL,
     asn        TEXT,
-    threat     INTEGER
+    threat     INTEGER,
+    usage_type TEXT,
+    is_tor     INTEGER
 ))sql";
 
 constexpr const char* kCreateIndexTs =
@@ -86,8 +88,8 @@ constexpr const char* kInsertSql = R"sql(
 INSERT OR IGNORE INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
     chain, in_iface, rule, conn_state, pkt_len,
-    country, lat, lon, asn, threat)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    country, lat, lon, asn, threat, usage_type, is_tor)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
@@ -129,6 +131,15 @@ std::optional<double> col_opt_double(sqlite3_stmt* stmt, int col) noexcept
         return std::nullopt;
     }
     return sqlite3_column_double(stmt, col);
+}
+
+/// Read an INTEGER column as bool (0 = false, non-zero = true); returns nullopt for SQL NULL.
+std::optional<bool> col_opt_bool(sqlite3_stmt* stmt, int col) noexcept
+{
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {
+        return std::nullopt;
+    }
+    return sqlite3_column_int(stmt, col) != 0;
 }
 
 } // anonymous namespace
@@ -268,6 +279,11 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
         (void)sqlite3_bind_null(stmt, 17);
     }
 
+    // usage_type and is_tor are always NULL at insert time; the AbuseCache
+    // background worker backfills them via update_connections_abuse().
+    (void)sqlite3_bind_null(stmt, 18);
+    (void)sqlite3_bind_null(stmt, 19);
+
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
 
@@ -334,7 +350,7 @@ Database::query_connections(const QueryFilters& f) const noexcept
     std::string sql =
         "SELECT id, ts, src_ip, src_port, dst_ip, dst_port, "
         "proto, tcp_flags, chain, in_iface, rule, conn_state, pkt_len, "
-        "country, lat, lon, asn, threat "
+        "country, lat, lon, asn, threat, usage_type, is_tor "
         "FROM connections";
 
     std::string where;
@@ -419,6 +435,8 @@ Database::query_connections(const QueryFilters& f) const noexcept
         row.lon        = col_opt_double(stmt.get(),       15);
         row.asn        = col_text(stmt.get(),             16);
         row.threat     = col_opt_int(stmt.get(),          17);
+        row.usage_type = col_text(stmt.get(),             18);
+        row.is_tor     = col_opt_bool(stmt.get(),         19);
         rows.push_back(std::move(row));
     }
     return rows;

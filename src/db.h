@@ -49,6 +49,8 @@ struct ConnectionRow {
     std::optional<double> lon;          // nullopt when no GeoIP
     std::string        asn;             // empty string when no GeoIP
     std::optional<int> threat;          // nullopt = not yet enriched
+    std::string        usage_type;      // AbuseIPDB usageType; empty when not enriched
+    std::optional<bool> is_tor;         // AbuseIPDB isTor; nullopt when not enriched
 };
 
 // ── Query filter type ─────────────────────────────────────────────────────────

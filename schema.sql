@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS connections (
     lat         REAL,
     lon         REAL,
     asn         TEXT,
-    -- OSINT enrichment (filled from abuse_cache by enrichment thread)
-    threat      INTEGER                     -- AbuseIPDB confidence score 0-100
+    -- OSINT enrichment (filled from abuse_cache by background worker)
+    threat      INTEGER,                    -- AbuseIPDB confidence score 0-100; NULL until enriched
+    usage_type  TEXT,                       -- AbuseIPDB usageType (e.g. "Data Center/Web Hosting/Transit"); NULL until enriched
+    is_tor      INTEGER                     -- AbuseIPDB isTor: 1=true, 0=false; NULL until enriched
 );
 
 CREATE INDEX IF NOT EXISTS idx_conn_ts      ON connections (ts);
@@ -44,11 +46,13 @@ ON connections(ts, src_ip, dst_ip, proto,
                COALESCE(dst_port, -1));
 
 -- ── AbuseIPDB OSINT cache ──────────────────────────────────────────────────
--- Keyed by IP. Refreshed by background thread when last_checked is stale.
+-- Keyed by IP. Refreshed by background thread when last_checked is stale (>24h).
 CREATE TABLE IF NOT EXISTS abuse_cache (
     ip            TEXT    PRIMARY KEY,
-    score         INTEGER NOT NULL,         -- 0-100
-    last_checked  INTEGER NOT NULL          -- Unix epoch, UTC
+    score         INTEGER NOT NULL,                   -- confidence score 0-100
+    usage_type    TEXT    NOT NULL DEFAULT '',        -- AbuseIPDB usageType string
+    is_tor        INTEGER NOT NULL DEFAULT 0,         -- 1=true, 0=false
+    last_checked  INTEGER NOT NULL                    -- Unix epoch, UTC
 );
 
 -- ── Retention view ──────────────────────────────────────────────────────────

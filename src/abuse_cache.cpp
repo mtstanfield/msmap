@@ -23,19 +23,24 @@ constexpr const char* kCreateAbuseCacheTable = R"sql(
 CREATE TABLE IF NOT EXISTS abuse_cache (
     ip           TEXT    PRIMARY KEY,
     score        INTEGER NOT NULL,
+    usage_type   TEXT    NOT NULL DEFAULT '',
+    is_tor       INTEGER NOT NULL DEFAULT 0,
     last_checked INTEGER NOT NULL
 ))sql";
 
 constexpr const char* kLookupSql =
-    "SELECT score, last_checked FROM abuse_cache WHERE ip = ?";
+    "SELECT score, last_checked, usage_type, is_tor FROM abuse_cache WHERE ip = ?";
 
 constexpr const char* kUpsertSql =
-    "INSERT OR REPLACE INTO abuse_cache(ip, score, last_checked) VALUES(?, ?, ?)";
+    "INSERT OR REPLACE INTO abuse_cache(ip, score, usage_type, is_tor, last_checked)"
+    " VALUES(?, ?, ?, ?, ?)";
 
-// Only patch rows where threat IS NULL — avoids overwriting scores that were
-// already stored at insert time (listener may cache-hit after the worker runs).
+// Patch rows where usage_type IS NULL — covers both freshly-inserted rows and rows
+// where threat was set at insert time but the new fields were not yet available.
 constexpr const char* kUpdateConnSql =
-    "UPDATE connections SET threat = ? WHERE src_ip = ? AND threat IS NULL";
+    "UPDATE connections"
+    " SET threat = ?, usage_type = ?, is_tor = ?"
+    " WHERE src_ip = ? AND usage_type IS NULL";
 
 constexpr const char* kAbuseIpdbEndpoint =
     "https://api.abuseipdb.com/api/v2/check";
@@ -52,23 +57,47 @@ std::size_t curl_write_cb(const char* ptr, std::size_t /*size*/,
 
 // ── Minimal JSON extractor ────────────────────────────────────────────────────
 
-/// Find "abuseConfidenceScore": N in the API response.
-/// Returns nullopt if the key is absent or the value is not a valid integer.
-std::optional<int> extract_score(const std::string& json) noexcept
+/// Extract abuseConfidenceScore, usageType, and isTor from the AbuseIPDB response.
+/// Returns nullopt if the score key is absent or its value is not a valid integer.
+std::optional<AbuseResult> extract_abuse(const std::string& json) noexcept
 {
-    constexpr std::string_view key{"\"abuseConfidenceScore\":"};
-    const auto pos = json.find(key);
-    if (pos == std::string::npos) {
+    // ── score (required) ──────────────────────────────────────────────────────
+    constexpr std::string_view k_score_key{"\"abuseConfidenceScore\":"};
+    const auto score_pos = json.find(k_score_key);
+    if (score_pos == std::string::npos) {
         return std::nullopt;
     }
-    const char* p = json.c_str() + pos + key.size();
+    const char* p = json.c_str() + score_pos + k_score_key.size();
     while (*p == ' ' || *p == '\t') { ++p; }
     char* end = nullptr;
-    const long val = std::strtol(p, &end, 10);
-    if (end == p || val < 0 || val > 100) {
+    const long score_val = std::strtol(p, &end, 10);
+    if (end == p || score_val < 0 || score_val > 100) {
         return std::nullopt;
     }
-    return static_cast<int>(val);
+
+    AbuseResult result;
+    result.score = static_cast<int>(score_val);
+
+    // ── usageType (optional string) ───────────────────────────────────────────
+    constexpr std::string_view k_usage_key{R"("usageType":")"};
+    const auto usage_pos = json.find(k_usage_key);
+    if (usage_pos != std::string::npos) {
+        const char* start = json.c_str() + usage_pos + k_usage_key.size();
+        const char* q = start;
+        while (*q != '\0' && *q != '"') { ++q; }
+        result.usage_type.assign(start, static_cast<std::size_t>(q - start));
+    }
+
+    // ── isTor (optional boolean) ──────────────────────────────────────────────
+    constexpr std::string_view k_tor_key{"\"isTor\":"};
+    const auto tor_pos = json.find(k_tor_key);
+    if (tor_pos != std::string::npos) {
+        const char* tv = json.c_str() + tor_pos + k_tor_key.size();
+        while (*tv == ' ' || *tv == '\t') { ++tv; }
+        result.is_tor = (*tv == 't'); // "true" starts with 't'
+    }
+
+    return result;
 }
 
 // ── Rate-limit day helper ─────────────────────────────────────────────────────
@@ -177,7 +206,7 @@ bool AbuseCache::open() noexcept
 
 // ── lookup() ─────────────────────────────────────────────────────────────────
 
-std::optional<int> AbuseCache::lookup(const std::string& ip) const noexcept
+std::optional<AbuseResult> AbuseCache::lookup(const std::string& ip) const noexcept
 {
     if (!db_) { return std::nullopt; }
 
@@ -186,13 +215,22 @@ std::optional<int> AbuseCache::lookup(const std::string& ip) const noexcept
     sqlite3_stmt* const stmt = lookup_stmt_.get();
     (void)sqlite3_bind_text(stmt, 1, ip.c_str(), -1, kStaticText);
 
-    std::optional<int> result{std::nullopt};
+    std::optional<AbuseResult> result{std::nullopt};
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         const int          score        = sqlite3_column_int(stmt,   0);
         const std::int64_t last_checked = sqlite3_column_int64(stmt, 1);
         const auto         now          = static_cast<std::int64_t>(std::time(nullptr));
         if (now - last_checked < kCacheTtlSecs) {
-            result = score;
+            AbuseResult hit;
+            hit.score      = score;
+            const auto* ut = sqlite3_column_text(stmt, 2);
+            if (ut != nullptr) {
+                hit.usage_type.assign(
+                    reinterpret_cast<const char*>(ut), // NOLINT(*-reinterpret-cast)
+                    static_cast<std::size_t>(sqlite3_column_bytes(stmt, 2)));
+            }
+            hit.is_tor = sqlite3_column_int(stmt, 3) != 0;
+            result     = std::move(hit);
         }
         // Stale: return nullopt — submit() will re-queue for refresh.
     }
@@ -218,7 +256,8 @@ void AbuseCache::submit(const std::string& ip) noexcept
 
 // ── cache_store() ────────────────────────────────────────────────────────────
 
-bool AbuseCache::cache_store(const std::string& ip, int score) noexcept
+bool AbuseCache::cache_store(const std::string& ip,
+                             const AbuseResult& result) noexcept
 {
     if (!db_) { return false; }
 
@@ -227,9 +266,11 @@ bool AbuseCache::cache_store(const std::string& ip, int score) noexcept
     sqlite3_stmt* const stmt = upsert_stmt_.get();
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
 
-    (void)sqlite3_bind_text( stmt, 1, ip.c_str(), -1, kStaticText);
-    (void)sqlite3_bind_int(  stmt, 2, score);
-    (void)sqlite3_bind_int64(stmt, 3, now);
+    (void)sqlite3_bind_text( stmt, 1, ip.c_str(),              -1, kStaticText);
+    (void)sqlite3_bind_int(  stmt, 2, result.score);
+    (void)sqlite3_bind_text( stmt, 3, result.usage_type.c_str(), -1, kStaticText);
+    (void)sqlite3_bind_int(  stmt, 4, result.is_tor ? 1 : 0);
+    (void)sqlite3_bind_int64(stmt, 5, now);
 
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
@@ -242,18 +283,20 @@ bool AbuseCache::cache_store(const std::string& ip, int score) noexcept
     return true;
 }
 
-// ── update_connections_threat() ──────────────────────────────────────────────
+// ── update_connections_abuse() ───────────────────────────────────────────────
 
-void AbuseCache::update_connections_threat(const std::string& ip,
-                                           int                score) noexcept
+void AbuseCache::update_connections_abuse(const std::string& ip,
+                                          const AbuseResult& result) noexcept
 {
     if (!db_ || !update_conn_stmt_) { return; }
 
     const std::lock_guard<std::mutex> lock{db_mutex_};
 
     sqlite3_stmt* const stmt = update_conn_stmt_.get();
-    (void)sqlite3_bind_int( stmt, 1, score);
-    (void)sqlite3_bind_text(stmt, 2, ip.c_str(), -1, kStaticText);
+    (void)sqlite3_bind_int(  stmt, 1, result.score);
+    (void)sqlite3_bind_text( stmt, 2, result.usage_type.c_str(), -1, kStaticText);
+    (void)sqlite3_bind_int(  stmt, 3, result.is_tor ? 1 : 0);
+    (void)sqlite3_bind_text( stmt, 4, ip.c_str(), -1, kStaticText);
 
     (void)sqlite3_step(stmt);
     const int patched = sqlite3_changes(db_.get());
@@ -261,7 +304,10 @@ void AbuseCache::update_connections_threat(const std::string& ip,
 
     if (patched > 0) {
         std::clog << "[INFO] AbuseCache: patched " << patched
-                  << " row(s) for " << ip << " threat=" << score << '\n';
+                  << " row(s) for " << ip
+                  << " threat=" << result.score
+                  << " usage=" << result.usage_type
+                  << " tor=" << result.is_tor << '\n';
     }
 }
 
@@ -328,7 +374,7 @@ void AbuseCache::worker() noexcept
         }
 
         // Fetch from AbuseIPDB (network call — no mutex held).
-        const auto score = fetch_score(ip);
+        const auto result = fetch_abuse(ip);
 
         {
             const std::lock_guard<std::mutex> lock{queue_mutex_};
@@ -336,9 +382,9 @@ void AbuseCache::worker() noexcept
             in_flight_.erase(ip);
         }
 
-        if (score.has_value()) {
-            if (cache_store(ip, *score)) {
-                update_connections_threat(ip, *score);
+        if (result.has_value()) {
+            if (cache_store(ip, *result)) {
+                update_connections_abuse(ip, *result);
             }
         } else {
             std::clog << "[WARN] AbuseCache: fetch failed for " << ip << '\n';
@@ -346,9 +392,9 @@ void AbuseCache::worker() noexcept
     }
 }
 
-// ── fetch_score() ────────────────────────────────────────────────────────────
+// ── fetch_abuse() ────────────────────────────────────────────────────────────
 
-std::optional<int> AbuseCache::fetch_score(const std::string& ip) noexcept
+std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip) noexcept
 {
     CURL* const curl = curl_easy_init();
     if (curl == nullptr) {
@@ -396,7 +442,7 @@ std::optional<int> AbuseCache::fetch_score(const std::string& ip) noexcept
         return std::nullopt;
     }
 
-    return extract_score(body);
+    return extract_abuse(body);
 }
 
 } // namespace msmap

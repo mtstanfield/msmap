@@ -110,7 +110,9 @@ proto_variant (ICMP)    :=                  ', ' IP '->' IP
 | `lat`        | REAL NULL      |                                |
 | `lon`        | REAL NULL      |                                |
 | `asn`        | TEXT NULL      |                                |
-| `threat`     | INTEGER NULL   | AbuseIPDB score 0-100          |
+| `threat`     | INTEGER NULL   | AbuseIPDB confidence score 0-100; NULL until enriched |
+| `usage_type` | TEXT NULL      | AbuseIPDB usageType; NULL until enriched |
+| `is_tor`     | INTEGER NULL   | AbuseIPDB isTor (0/1); NULL until enriched |
 
 ---
 
@@ -166,16 +168,19 @@ docker build -t msmap .
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
-- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `last_checked`); background refresh
+- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `usage_type`, `is_tor`, `last_checked`); background refresh; `usageType` and `isTor` backfilled into `connections` via background worker
 
 ### Web UI
 - [x] libmicrohttpd HTTP server on port 8080
 - [x] Asset embedding: `web/bundle.py` CMake step inlines Leaflet+MarkerCluster+app JS/CSS
       into a single `constexpr std::string_view` header; no xxd, no filesystem deps
 - [x] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
-- [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by protocol/threat
-      (CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
-- [x] Filter/time-range panel: protocol, src IP, dst port, country, limit; Enter-key support
+- [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by threat score
+      (5-level: grey=unknown, green=0, amber=1-33, orange=34-66, red=67-100;
+      CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
+- [x] Filter/time-range panel: time range (15 min–24 h), protocol, src IP, dst port,
+      country; client-side enrichment toggles: Unique IPs, Tor exits, Datacenter,
+      Residential; always requests max 25 000 rows from API
 - [~] Raw query UI: out of scope — filter panel covers the use case
 - [x] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
 
@@ -184,7 +189,7 @@ docker build -t msmap .
 - [x] Sanitizer builds: ASan + UBSan + -fno-sanitize-recover=all enabled by default in Debug builds
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
-- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 60 tests passing
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 78 tests passing
 - [x] Integration test: full ingest → query pipeline (UDP socket → listener → parser → DB → query, 7 cases)
 
 ### Security
