@@ -61,6 +61,7 @@ TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 | `MSMAP_HTTP_PORT` | `8080` | Web UI / API port |
 | `MSMAP_INGEST_ALLOW` | _(empty — accept all)_ | Comma-separated IPv4 allowlist for ingest |
 | `ABUSEIPDB_API_KEY` | _(empty — disabled)_ | AbuseIPDB free-tier API key |
+| `MSMAP_HOME_HOST` | _(empty — disabled)_ | Hostname or IPv4 address of your public-facing host; resolved at startup via GeoIP to place a home marker and enable arc animation |
 
 ### Volumes
 
@@ -114,6 +115,7 @@ services:
     environment:
       MSMAP_INGEST_ALLOW: "192.168.88.1"
       # ABUSEIPDB_API_KEY: "your_key_here"
+      # MSMAP_HOME_HOST: "your.public.hostname.or.ip"
 
 volumes:
   msmap-data:
@@ -169,9 +171,30 @@ plotted as clustered markers; click any marker to open a detail popup.
 | Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
 | Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
 | Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
+| Arc animation | Toggle arc animation on/off (requires `MSMAP_HOME_HOST`) |
 
 The Tor/datacenter/residential toggles are OR-combined when multiple are active.
 When none are checked all connections are shown regardless of enrichment status.
+
+### Arc animation
+
+When `MSMAP_HOME_HOST` is set, msmap resolves the hostname to an IPv4 address at
+startup, GeoIP-locates it, and serves the coordinates via `GET /api/home`.  The
+browser then:
+
+1. Places a hollow blue ring marker at the home location (always visible,
+   outside the cluster layer).
+2. For each new source IP added to the map, draws an animated bezier arc from
+   that IP toward home — colored to match the threat level of the source.  The
+   arc line draws itself over 1.2 s (`stroke-dashoffset` CSS transition), with a
+   dot tracking the head; a pulse ring fires on arrival.  The assembly fades out
+   and is removed after ~1.7 s total.
+3. Rate-limits arcs to 15 per poll batch to avoid visual overload.
+4. Clears stale arcs on map zoom (layer coordinates rescale on zoom).
+
+If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
+`[WARN]` is logged at startup and the feature is silently disabled — the toggle
+is still present in the filter panel but has no effect.
 
 ### Connection popup
 

@@ -10,6 +10,7 @@ html, body {
 #map {
     position: fixed;
     inset: 0 0 28px 0; /* leave room for status bar */
+    background: #242424; /* match CartoDB Dark Matter tile background */
 }
 
 /* ── Status bar ───────────────────────────────────────────────────────────── */
@@ -199,6 +200,37 @@ html, body {
 .leaflet-popup-tip         { background: #161b22; }
 .leaflet-popup-close-button        { color: #8b949e !important; }
 .leaflet-popup-close-button:hover  { color: #e6edf3 !important; }
+
+/* ── Arc animation – arrival pulse ring ──────────────────────────────────── */
+
+@keyframes arc-arrive {
+    from { transform: scale(1); opacity: 0.8; }
+    to   { transform: scale(4); opacity: 0;   }
+}
+
+.arc-arrive-ring {
+    animation:        arc-arrive 0.45s ease-out forwards;
+    transform-box:    fill-box;    /* SVG: relative to own bounding box */
+    transform-origin: center;
+}
+
+/* ── Home marker tooltip ──────────────────────────────────────────────────── */
+
+.leaflet-tooltip {
+    background:    #161b22;
+    border:        1px solid #30363d;
+    border-radius: 4px;
+    color:         #58a6ff;
+    font-size:     11px;
+    font-weight:   600;
+    padding:       3px 8px;
+    box-shadow:    none;
+    white-space:   nowrap;
+}
+
+.leaflet-tooltip-top::before {
+    border-top-color: #30363d;
+}
 
 /* ── New-marker ripple animation ─────────────────────────────────────────── */
 
