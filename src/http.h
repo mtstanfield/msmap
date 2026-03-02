@@ -1,5 +1,7 @@
 #pragma once
 
+#include "home_resolver.h"
+
 #include <cstdint>
 #include <memory>
 
@@ -10,19 +12,11 @@ namespace msmap {
 
 class Database;
 
-/// Home location resolved from MSMAP_HOME_HOST at startup.
-/// Passed to HttpServer and served via GET /api/home.
-struct HomePoint {
-    bool   valid{false};
-    double lat{0.0};
-    double lon{0.0};
-};
-
 /// Context bundle passed to the MHD request callback as `cls`.
 /// Groups the two pieces of state the callback needs.
 struct HandlerCtx {
-    Database* db;
-    HomePoint home;
+    Database*            db;
+    const HomeResolver*  home_resolver;  // null when MSMAP_HOME_HOST is unset
 };
 
 /// Custom deleter: calls MHD_stop_daemon, which joins the internal polling
@@ -47,7 +41,11 @@ struct MhdDaemonCloser {
 ///   GET /                  — full map UI (HTML)
 class HttpServer {
 public:
-    HttpServer(std::uint16_t port, Database& db, const HomePoint& home) noexcept;
+    /// `home_resolver` may be null when MSMAP_HOME_HOST is not configured;
+    /// /api/home will return 404 in that case.
+    HttpServer(std::uint16_t       port,
+               Database&           db,
+               const HomeResolver* home_resolver) noexcept;
 
     // Destructor defined in http.cpp (stops MHD daemon, joins thread).
     ~HttpServer() noexcept;
@@ -62,11 +60,10 @@ public:
 
 private:
     // Declaration order matches initialisation order (C++ standard):
-    //   db_ and home_ are initialised first, then ctx_ (which points into them),
+    //   db_ is initialised first, then ctx_ (which points into it),
     //   then daemon_ last so MHD_stop_daemon runs before anything else is destroyed.
-    Database& db_;
-    HomePoint home_;
-    HandlerCtx ctx_;
+    Database&           db_;
+    HandlerCtx          ctx_;
     std::unique_ptr<MHD_Daemon, MhdDaemonCloser> daemon_;
 };
 

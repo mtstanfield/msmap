@@ -3,13 +3,12 @@
 #include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
+#include "home_resolver.h"
 #include "http.h"
 #include "listener.h"
 
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
 
 #include <array>
 #include <cstdint>
@@ -119,40 +118,18 @@ int main() {
     // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
     msmap::GeoIp geoip{city_path, asn_path};
 
-    // Resolve MSMAP_HOME_HOST (hostname or IP) → lat/lon for the arc animation.
-    // On any failure, home_pt.valid stays false and the feature is silently disabled.
-    msmap::HomePoint home_pt;
+    // Resolve MSMAP_HOME_HOST → lat/lon for the arc animation.  HomeResolver
+    // performs the initial lookup synchronously then re-checks every 30 minutes
+    // in a background thread.  When home_host is empty the resolver is not
+    // constructed and HttpServer receives a null pointer — /api/home returns 404.
+    std::unique_ptr<msmap::HomeResolver> home_resolver;
     if (!home_host.empty()) {
-        addrinfo hints{};
-        hints.ai_family   = AF_INET;      // IPv4 — MaxMind is primarily IPv4
-        hints.ai_socktype = SOCK_STREAM;
-        addrinfo* res     = nullptr;
-        const int err     = getaddrinfo(home_host.c_str(), nullptr, &hints, &res);
-        if (err != 0) {
-            std::clog << "[WARN] MSMAP_HOME_HOST: getaddrinfo('" << home_host
-                      << "'): " << gai_strerror(err)
-                      << " — arc animation disabled\n";
-        } else {
-            std::array<char, INET_ADDRSTRLEN> ip_buf{};
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-            const auto* sa4 = reinterpret_cast<const sockaddr_in*>(res->ai_addr);
-            inet_ntop(AF_INET, &sa4->sin_addr, ip_buf.data(), INET_ADDRSTRLEN);
-            freeaddrinfo(res);
-
-            const std::string resolved{ip_buf.data()};
-            std::clog << "[INFO] home host  : " << home_host
-                      << " -> " << resolved << '\n';
-
-            const msmap::GeoIpResult geo = geoip.lookup(resolved);
-            if (!geo.found()) {
-                std::clog << "[WARN] MSMAP_HOME_HOST: GeoIP lookup failed for "
-                          << resolved << " — arc animation disabled\n";
-            } else {
-                home_pt = {true, geo.lat, geo.lon};
-                std::clog << "[INFO] home geo   : "
-                          << geo.lat << ", " << geo.lon << '\n';
-            }
+        home_resolver = std::make_unique<msmap::HomeResolver>(home_host, geoip);
+        const msmap::HomePoint hp = home_resolver->get();
+        if (hp.valid) {
+            std::clog << "[INFO] home geo   : " << hp.lat << ", " << hp.lon << '\n';
         }
+        // Resolution failure warnings are emitted inside HomeResolver.
     }
 
     // AbuseIPDB OSINT enrichment — optional; disabled when key is unset.
@@ -166,7 +143,8 @@ int main() {
     msmap::AbuseCache* const abuse_ptr = abuse.valid() ? &abuse : nullptr;
 
     // HTTP server starts its own internal thread; run_listener blocks below.
-    msmap::HttpServer const http{static_cast<std::uint16_t>(http_port), db, home_pt};
+    msmap::HttpServer const http{static_cast<std::uint16_t>(http_port), db,
+                                 home_resolver.get()};
     if (!http.valid()) {
         std::clog << "[FATAL] HTTP server failed to start on port "
                   << http_port << '\n';
