@@ -408,12 +408,12 @@ function fireArc(srcLat, srcLon, color) {
                             ' ' + dst.x + ' ' + dst.y);
     path.setAttribute('fill',           'none');
     path.setAttribute('stroke',         color);
-    path.setAttribute('stroke-width',   '1.5');
+    path.setAttribute('stroke-width',   '2');
     path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-opacity', '0.85');
+    path.setAttribute('stroke-opacity', '0.9');
 
     const dot = document.createElementNS(NS, 'circle');
-    dot.setAttribute('r',    '2.5');
+    dot.setAttribute('r',    '3');
     dot.setAttribute('fill', color);
     dot.setAttribute('cx',   String(src.x));
     dot.setAttribute('cy',   String(src.y));
@@ -449,7 +449,7 @@ function fireArc(srcLat, srcLon, color) {
         ring.setAttribute('r',            '4');
         ring.setAttribute('fill',         'none');
         ring.setAttribute('stroke',       color);
-        ring.setAttribute('stroke-width', '1.5');
+        ring.setAttribute('stroke-width', '2');
         ring.classList.add('arc-arrive-ring');
         svg.appendChild(ring);
         // Fade out the whole arc assembly.
