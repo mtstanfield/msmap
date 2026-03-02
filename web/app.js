@@ -304,15 +304,36 @@ function setError(msg) {
 
 // ── Home point & arc animation ───────────────────────────────────────────────
 
-/// Fetch the home point from /api/home.  Sets homePt on success; leaves it
-/// null when the endpoint returns 404 (MSMAP_HOME_HOST not configured) or on
-/// any network error.  Called once at boot before the first poll.
+/// Fetch the home point from /api/home.  Updates homePt and repositions the
+/// home marker if the coordinates have changed (the backend re-resolves the
+/// hostname every 30 minutes).  Returns true when homePt is now valid.
+/// Safe to call on every poll cycle — the backend response is tiny.
 async function fetchHome() {
     try {
         const resp = await fetch('/api/home');
-        if (!resp.ok) { return; }   // 404 = feature not configured
-        homePt = await resp.json();
-    } catch (_) { /* network error — leave homePt null */ }
+        if (!resp.ok) {
+            // 404 = feature not configured or initial resolution failed.
+            homePt = null;
+            if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            return;
+        }
+        const fresh = await resp.json();
+        if (!fresh || fresh.lat === undefined) { return; }
+
+        const changed = !homePt ||
+                        homePt.lat !== fresh.lat ||
+                        homePt.lon !== fresh.lon;
+        if (changed) {
+            homePt = fresh;
+            // Re-place the home marker at the new coordinates.
+            if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            addHomeMarker();
+            // Re-enable the arc toggle if it was disabled due to missing home.
+            if (!fArcs.disabled) { return; }
+            fArcs.disabled = false;
+            fArcs.checked  = true;
+        }
+    } catch (_) { /* network error — keep previous homePt */ }
 }
 
 /// Place a distinctive ring marker at the home location.  No-op when called
@@ -444,6 +465,7 @@ lmap.on('zoomstart', () => {
 
 async function poll() {
     arcsFired = 0;
+    await fetchHome();   // re-check for IP changes; no-op if unchanged
     try {
         const resp = await fetch('/api/connections' + buildQueryString());
 

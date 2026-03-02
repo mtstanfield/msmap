@@ -207,16 +207,21 @@ MHD_Result handle_request(void*            cls,
     }
 
     if (url_sv == "/api/home") {
-        if (!ctx->home.valid) {
+        if (ctx->home_resolver == nullptr) {
+            return send_response(conn, MHD_HTTP_NOT_FOUND,
+                                 "application/json", "null");
+        }
+        const HomePoint hp = ctx->home_resolver->get();
+        if (!hp.valid) {
             return send_response(conn, MHD_HTTP_NOT_FOUND,
                                  "application/json", "null");
         }
         std::string body;
         body.reserve(48);
         body += "{\"lat\":";
-        json::append_double_or_null(body, std::optional<double>{ctx->home.lat});
+        json::append_double_or_null(body, std::optional<double>{hp.lat});
         body += ",\"lon\":";
-        json::append_double_or_null(body, std::optional<double>{ctx->home.lon});
+        json::append_double_or_null(body, std::optional<double>{hp.lon});
         body += '}';
         return send_response(conn, MHD_HTTP_OK, "application/json", body);
     }
@@ -235,12 +240,14 @@ MHD_Result handle_request(void*            cls,
 
 // ── HttpServer implementation ──────────────────────────────────────────────────
 
-HttpServer::HttpServer(std::uint16_t port, Database& db, const HomePoint& home) noexcept
-    : db_(db), home_(home), ctx_{&db_, home_}
+HttpServer::HttpServer(std::uint16_t       port,
+                       Database&           db,
+                       const HomeResolver* home_resolver) noexcept
+    : db_(db), ctx_{&db_, home_resolver}
 {
     // Pass &ctx_ as cls so handle_request can reach both the database and the
-    // home point.  ctx_ is a member so its address is stable for the daemon's
-    // lifetime.
+    // home resolver.  ctx_ is a member so its address is stable for the
+    // daemon's lifetime.
     // MHD_USE_INTERNAL_POLLING_THREAD: MHD manages its own thread.
     // MHD_USE_ERROR_LOG: MHD forwards error messages to stderr.
     MHD_Daemon* const raw = MHD_start_daemon(

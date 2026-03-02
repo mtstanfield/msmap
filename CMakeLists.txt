@@ -124,6 +124,7 @@ add_executable(msmap
     src/main.cpp
     src/db.cpp
     src/geoip.cpp
+    src/home_resolver.cpp
     src/http.cpp
     src/listener.cpp
     src/parser.cpp
