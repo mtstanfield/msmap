@@ -167,8 +167,8 @@ plotted as clustered markers; click any marker to open a detail popup.
 | Country | 2-letter ISO code (requires GeoIP) |
 | Unique IPs | Deduplicate — show only the most recent connection per source IP |
 | Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
-| Datacenter | Show only datacenter / hosting IPs (requires AbuseIPDB) |
-| Residential | Show only residential ISP IPs (requires AbuseIPDB) |
+| Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
+| Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
 
 The Tor/datacenter/residential toggles are OR-combined when multiple are active.
 When none are checked all connections are shown regardless of enrichment status.
@@ -180,7 +180,7 @@ Clicking a marker shows:
 - Timestamp, source IP:port, destination IP:port, protocol, TCP flags
 - Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
 - **Threat score** — AbuseIPDB abuse confidence 0–100
-- **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `ISP/Residential`
+- **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** — `yes` (highlighted) or `no`
 
 The OSINT fields appear once the background worker has resolved the IP against

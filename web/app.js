@@ -218,6 +218,14 @@ function escapeHtml(s) {
 /// Client-side enrichment filters (Tor / datacenter / residential).
 /// Returns true if the row should be shown, false if it should be hidden.
 /// When no toggles are active, all rows pass.  Multiple active toggles = OR.
+///
+/// AbuseIPDB usageType values (complete list from API docs):
+///   Commercial, Organization, Government, Military,
+///   University/College/School, Library, Search Engine Spider, Reserved,
+///   Content Delivery Network,        ← datacenter
+///   Data Center/Web Hosting/Transit, ← datacenter
+///   Fixed Line ISP,                  ← residential
+///   Mobile ISP                       ← residential
 function passesFilters(r) {
     const torActive  = fTor.checked;
     const dcActive   = fDatacenter.checked;
@@ -225,8 +233,8 @@ function passesFilters(r) {
     if (!torActive && !dcActive && !resActive) { return true; }
     if (torActive  && r.is_tor === true)  { return true; }
     const ut = r.usage_type ? r.usage_type.toLowerCase() : '';
-    if (dcActive   && ut.includes('data center'))  { return true; }
-    if (resActive  && ut.includes('residential'))  { return true; }
+    if (dcActive   && (ut.includes('data center') || ut.includes('content delivery network'))) { return true; }
+    if (resActive  && (ut.includes('fixed line isp') || ut.includes('mobile isp')))            { return true; }
     return false;
 }
 
