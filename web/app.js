@@ -6,7 +6,6 @@
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const GOOD_COLOR  = '#3fb950';     // green — all non-high-threat markers
 const REFRESH_MS  = 30000;         // poll interval
 const MAX_MARKERS = 5000;          // cap to keep rendering fast
 
@@ -176,10 +175,12 @@ function fmtPort(p) {
     return (p !== null && p !== undefined) ? ':' + p : '';
 }
 
-function protoClass(proto) {
-    const key = 'proto-' + String(proto || '').toLowerCase();
-    return (key === 'proto-tcp' || key === 'proto-udp' || key === 'proto-icmp')
-        ? key : 'proto-other';
+function markerColor(threat) {
+    if (threat === null || threat === undefined) { return '#8b949e'; }
+    if (threat === 0)   { return '#3fb950'; }
+    if (threat <= 33)   { return '#d29922'; }
+    if (threat <= 66)   { return '#f0883e'; }
+    return '#f85149';
 }
 
 function threatClass(score) {
@@ -211,9 +212,7 @@ function buildPopup(r, hitCount) {
         '<span class="ip">' + escapeHtml(r.dst_ip) + fmtPort(r.dst_port) + '</span>',
         '<br>',
         hitCount > 1 ? '<span class="label">hits </span>' + hitCount + '<br>' : '',
-        '<span class="' + protoClass(r.proto) + '">' + escapeHtml(r.proto || '?') + '</span>',
-        r.tcp_flags ? ' (' + escapeHtml(r.tcp_flags) + ')' : '',
-        '<br>',
+        '<span class="label">proto </span>' + escapeHtml(r.proto || '?') + (r.tcp_flags ? ' (' + escapeHtml(r.tcp_flags) + ')' : '') + '<br>',
         '<span class="label">time </span>' + fmtTs(r.ts) + '<br>',
         '<span class="label">rule </span>' + escapeHtml(r.rule) + '<br>',
         r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
@@ -277,9 +276,13 @@ async function poll() {
                     && dedupMap.has(r.src_ip)) {
                 const entry = dedupMap.get(r.src_ip);
                 entry.count++;
-                // Escalate color on confirmed high-threat (never downgrade).
-                if (r.threat !== null && r.threat !== undefined && r.threat >= 67) {
-                    entry.marker.setStyle({ color: '#f85149', fillColor: '#f85149' });
+                // Escalate color whenever a higher threat score arrives (never downgrade).
+                const curThreat = entry.marker.options.threat;
+                const newIsHigher = r.threat !== null && r.threat !== undefined &&
+                    (curThreat === null || curThreat === undefined || r.threat > curThreat);
+                if (newIsHigher) {
+                    const c = markerColor(r.threat);
+                    entry.marker.setStyle({ color: c, fillColor: c });
                     entry.marker.options.threat = r.threat;
                 }
                 // Refresh popup details only when this row is more recent.
@@ -294,9 +297,7 @@ async function poll() {
             // New marker path (both modes).
             if (mappedCount >= MAX_MARKERS) { break; }
             if (r.lat !== null && r.lon !== null) {
-                const color = (r.threat !== null && r.threat !== undefined && r.threat >= 67)
-                    ? '#f85149'
-                    : GOOD_COLOR;
+                const color = markerColor(r.threat);
                 const m = L.circleMarker([r.lat, r.lon], {
                     radius:      5,
                     color:       color,

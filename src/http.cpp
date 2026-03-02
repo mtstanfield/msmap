@@ -159,9 +159,8 @@ MHD_Result send_response(MHD_Connection*    conn,
     if (resp == nullptr) {
         return MHD_NO;
     }
-    (void)MHD_add_response_header(resp, "Content-Type",              content_type);
-    (void)MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
-    (void)MHD_add_response_header(resp, "X-Content-Type-Options",    "nosniff");
+    (void)MHD_add_response_header(resp, "Content-Type",           content_type);
+    (void)MHD_add_response_header(resp, "X-Content-Type-Options", "nosniff");
     (void)MHD_add_response_header(resp, "X-Frame-Options",           "SAMEORIGIN");
     (void)MHD_add_response_header(resp, "Referrer-Policy",
                                         "strict-origin-when-cross-origin");
