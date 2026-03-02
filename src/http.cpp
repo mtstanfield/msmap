@@ -178,7 +178,7 @@ MHD_Result send_response(MHD_Connection*    conn,
 // ── MHD access-handler callback ───────────────────────────────────────────────
 
 /// Called by MHD for every incoming HTTP request.
-/// `cls` is a `Database*` set in HttpServer's constructor.
+/// `cls` is a `HandlerCtx*` set in HttpServer's constructor.
 MHD_Result handle_request(void*            cls,
                            MHD_Connection*  conn,
                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) — MHD callback
@@ -189,7 +189,7 @@ MHD_Result handle_request(void*            cls,
                            [[maybe_unused]] size_t*      upload_data_size,
                            [[maybe_unused]] void**       con_cls)
 {
-    auto* db = static_cast<Database*>(cls);
+    auto* ctx = static_cast<HandlerCtx*>(cls);
 
     const std::string_view method_sv{method};
     if (method_sv != "GET") {
@@ -201,9 +201,24 @@ MHD_Result handle_request(void*            cls,
 
     if (url_sv == "/api/connections") {
         const QueryFilters filters  = parse_filters(conn);
-        const auto         rows     = db->query_connections(filters);
+        const auto         rows     = ctx->db->query_connections(filters);
         return send_response(conn, MHD_HTTP_OK,
                              "application/json", connections_to_json(rows));
+    }
+
+    if (url_sv == "/api/home") {
+        if (!ctx->home.valid) {
+            return send_response(conn, MHD_HTTP_NOT_FOUND,
+                                 "application/json", "null");
+        }
+        std::string body;
+        body.reserve(48);
+        body += "{\"lat\":";
+        json::append_double_or_null(body, std::optional<double>{ctx->home.lat});
+        body += ",\"lon\":";
+        json::append_double_or_null(body, std::optional<double>{ctx->home.lon});
+        body += '}';
+        return send_response(conn, MHD_HTTP_OK, "application/json", body);
     }
 
     if (url_sv == "/" || url_sv == "/index.html") {
@@ -220,10 +235,12 @@ MHD_Result handle_request(void*            cls,
 
 // ── HttpServer implementation ──────────────────────────────────────────────────
 
-HttpServer::HttpServer(std::uint16_t port, Database& db) noexcept
-    : db_(db)
+HttpServer::HttpServer(std::uint16_t port, Database& db, const HomePoint& home) noexcept
+    : db_(db), home_(home), ctx_{&db_, home_}
 {
-    // Pass &db_ (Database*) as cls so handle_request can reach it.
+    // Pass &ctx_ as cls so handle_request can reach both the database and the
+    // home point.  ctx_ is a member so its address is stable for the daemon's
+    // lifetime.
     // MHD_USE_INTERNAL_POLLING_THREAD: MHD manages its own thread.
     // MHD_USE_ERROR_LOG: MHD forwards error messages to stderr.
     MHD_Daemon* const raw = MHD_start_daemon(
@@ -231,7 +248,7 @@ HttpServer::HttpServer(std::uint16_t port, Database& db) noexcept
         static_cast<unsigned int>(MHD_USE_ERROR_LOG),
         port,
         nullptr, nullptr,         // no access-policy callback
-        handle_request, &db_,     // request handler + cls
+        handle_request, &ctx_,    // request handler + cls
         MHD_OPTION_END);
 
     if (raw == nullptr) {

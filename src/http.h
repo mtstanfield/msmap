@@ -10,6 +10,21 @@ namespace msmap {
 
 class Database;
 
+/// Home location resolved from MSMAP_HOME_HOST at startup.
+/// Passed to HttpServer and served via GET /api/home.
+struct HomePoint {
+    bool   valid{false};
+    double lat{0.0};
+    double lon{0.0};
+};
+
+/// Context bundle passed to the MHD request callback as `cls`.
+/// Groups the two pieces of state the callback needs.
+struct HandlerCtx {
+    Database* db;
+    HomePoint home;
+};
+
 /// Custom deleter: calls MHD_stop_daemon, which joins the internal polling
 /// thread before returning.  Declared here; defined in http.cpp where the
 /// full microhttpd.h is included.
@@ -28,10 +43,11 @@ struct MhdDaemonCloser {
 ///                             since=<epoch>  until=<epoch>  ip=<addr>
 ///                             country=<CC>   proto=<TCP|UDP|ICMP>
 ///                             port=<n>       limit=<n>  (default 25 000, max 25 000)
-///   GET /                  — placeholder HTML (full map UI added later)
+///   GET /api/home          — JSON {lat,lon} if MSMAP_HOME_HOST is set, else 404
+///   GET /                  — full map UI (HTML)
 class HttpServer {
 public:
-    HttpServer(std::uint16_t port, Database& db) noexcept;
+    HttpServer(std::uint16_t port, Database& db, const HomePoint& home) noexcept;
 
     // Destructor defined in http.cpp (stops MHD daemon, joins thread).
     ~HttpServer() noexcept;
@@ -45,9 +61,12 @@ public:
     [[nodiscard]] bool valid() const noexcept { return daemon_ != nullptr; }
 
 private:
-    // db_ must be declared before daemon_ so that the daemon is destroyed
-    // (MHD_stop_daemon called) before db_ could become a dangling reference.
+    // Declaration order matches initialisation order (C++ standard):
+    //   db_ and home_ are initialised first, then ctx_ (which points into them),
+    //   then daemon_ last so MHD_stop_daemon runs before anything else is destroyed.
     Database& db_;
+    HomePoint home_;
+    HandlerCtx ctx_;
     std::unique_ptr<MHD_Daemon, MhdDaemonCloser> daemon_;
 };
 

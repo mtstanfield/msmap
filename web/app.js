@@ -9,6 +9,10 @@
 const REFRESH_MS  = 30000;         // poll interval
 const MAX_MARKERS = 20000;         // cap to keep rendering fast
 
+const ARC_DRAW_MS   = 1200;        // ms for the arc line to draw
+const ARC_FADE_MS   =  500;        // ms for arc to fade out after arriving
+const MAX_ARCS_POLL =   15;        // max arcs fired per poll batch (visual sanity)
+
 // ── Filter persistence ───────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'msmap_filters';
@@ -21,6 +25,7 @@ function saveFilters() {
             tor:         fTor.checked,
             datacenter:  fDatacenter.checked,
             residential: fResidential.checked,
+            arcs:        fArcs.checked,
             proto:       fProto.value,
             ip:          fIp.value,
             port:        fPort.value,
@@ -39,6 +44,7 @@ function loadFilters() {
         if (s.tor         !== undefined) { fTor.checked        = s.tor; }
         if (s.datacenter  !== undefined) { fDatacenter.checked = s.datacenter; }
         if (s.residential !== undefined) { fResidential.checked = s.residential; }
+        if (s.arcs        !== undefined) { fArcs.checked        = s.arcs; }
         if (s.proto       !== undefined) { fProto.value        = s.proto; }
         if (s.ip          !== undefined) { fIp.value           = s.ip; }
         if (s.port        !== undefined) { fPort.value         = s.port; }
@@ -118,6 +124,7 @@ const fCountry      = document.getElementById('f-country');
 const fTor          = document.getElementById('f-tor');
 const fDatacenter   = document.getElementById('f-datacenter');
 const fResidential  = document.getElementById('f-residential');
+const fArcs         = document.getElementById('f-arcs');
 
 // ── Filter panel ─────────────────────────────────────────────────────────────
 
@@ -141,6 +148,7 @@ document.getElementById('f-clear').addEventListener('click', () => {
     fTor.checked         = false;
     fDatacenter.checked  = false;
     fResidential.checked = false;
+    fArcs.checked        = true;
     fProto.value         = '';
     fIp.value            = '';
     fPort.value          = '';
@@ -167,9 +175,14 @@ let mappedCount  = 0;
 let lastTs       = 0;
 let sincePreset  = 0;
 let isInitialLoad = true;  // suppresses ripple animation during startup batch
+let arcsFired    = 0;      // rate-limiter reset each poll cycle
 
 // src_ip → { count, latestTs, marker } — populated only when fDedup.checked.
 const dedupMap = new Map();
+
+// Home point from /api/home — null when MSMAP_HOME_HOST is not configured.
+let homePt     = null;
+let homeMarker = null;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -289,9 +302,148 @@ function setError(msg) {
     statError.style.display = msg ? '' : 'none';
 }
 
+// ── Home point & arc animation ───────────────────────────────────────────────
+
+/// Fetch the home point from /api/home.  Sets homePt on success; leaves it
+/// null when the endpoint returns 404 (MSMAP_HOME_HOST not configured) or on
+/// any network error.  Called once at boot before the first poll.
+async function fetchHome() {
+    try {
+        const resp = await fetch('/api/home');
+        if (!resp.ok) { return; }   // 404 = feature not configured
+        homePt = await resp.json();
+    } catch (_) { /* network error — leave homePt null */ }
+}
+
+/// Place a distinctive ring marker at the home location.  No-op when called
+/// before fetchHome resolves or when the feature is disabled.
+function addHomeMarker() {
+    if (!homePt || homeMarker) { return; }
+    homeMarker = L.circleMarker([homePt.lat, homePt.lon], {
+        radius:      7,
+        color:       '#58a6ff',
+        fillColor:   '#58a6ff',
+        fillOpacity: 0.15,
+        weight:      2,
+        interactive: true,
+    });
+    homeMarker.bindTooltip('Home', { direction: 'top', offset: [0, -8] });
+    homeMarker.addTo(lmap);  // outside cluster — always visible
+}
+
+/// Draw a bezier arc from [srcLat, srcLon] toward the home point, coloured
+/// `color`.  The arc is drawn as an SVG path in the Leaflet overlay pane via
+/// the stroke-dashoffset trick.  A dot tracks the head; an arrival pulse ring
+/// fires when it reaches the home point.  The whole assembly fades out and is
+/// removed after ARC_DRAW_MS + ARC_FADE_MS.
+function fireArc(srcLat, srcLon, color) {
+    if (!homePt) { return; }
+
+    const src = lmap.latLngToLayerPoint([srcLat, srcLon]);
+    const dst = lmap.latLngToLayerPoint([homePt.lat, homePt.lon]);
+
+    const dx    = dst.x - src.x;
+    const dy    = dst.y - src.y;
+    const chord = Math.sqrt(dx * dx + dy * dy) || 1;
+    const mx    = (src.x + dst.x) / 2;
+    const my    = (src.y + dst.y) / 2;
+
+    // Perpendicular unit vector that points upward (negative y) on screen.
+    // For chord vector (dx, dy) the two perpendiculars are (-dy, dx) and
+    // (dy, -dx).  We choose whichever has a negative y-component so the arc
+    // always bows north on the Mercator projection.
+    let nx;
+    let ny;
+    if (Math.abs(dx) < 1) {
+        // Nearly vertical chord — perpendicular is purely horizontal;
+        // force upward instead.
+        nx = 0; ny = -1;
+    } else if (dx > 0) {
+        // (dy, -dx)/chord  →  y = -dx/chord < 0  ✓
+        nx = dy / chord;  ny = -dx / chord;
+    } else {
+        // (-dy, dx)/chord  →  y = dx/chord < 0 (dx < 0)  ✓
+        nx = -dy / chord; ny =  dx / chord;
+    }
+    const offset = Math.min(chord * 0.4, 350);
+    const cpx = mx + nx * offset;
+    const cpy = my + ny * offset;
+
+    // Build the SVG assembly in Leaflet's overlay pane.
+    const NS  = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.classList.add('msmap-arc');
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible';
+
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', 'M ' + src.x + ' ' + src.y +
+                            ' Q ' + cpx + ' ' + cpy +
+                            ' ' + dst.x + ' ' + dst.y);
+    path.setAttribute('fill',           'none');
+    path.setAttribute('stroke',         color);
+    path.setAttribute('stroke-width',   '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-opacity', '0.85');
+
+    const dot = document.createElementNS(NS, 'circle');
+    dot.setAttribute('r',    '2.5');
+    dot.setAttribute('fill', color);
+    dot.setAttribute('cx',   String(src.x));
+    dot.setAttribute('cy',   String(src.y));
+
+    svg.appendChild(path);
+    svg.appendChild(dot);
+    lmap.getPanes().overlayPane.appendChild(svg);
+
+    // Stroke-dashoffset draw: start hidden (offset = total length) then
+    // transition to 0 so the path appears to draw itself.
+    const totalLen = path.getTotalLength();
+    path.style.strokeDasharray  = String(totalLen);
+    path.style.strokeDashoffset = String(totalLen);
+    void path.getBoundingClientRect(); // force reflow before transitioning
+    path.style.transition       = 'stroke-dashoffset ' + ARC_DRAW_MS + 'ms ease-in';
+    path.style.strokeDashoffset = '0';
+
+    // Animate the dot along the arc path head.
+    const t0 = performance.now();
+    function step(now) {
+        const frac = Math.min((now - t0) / ARC_DRAW_MS, 1.0);
+        const pt   = path.getPointAtLength(frac * totalLen);
+        dot.setAttribute('cx', String(pt.x));
+        dot.setAttribute('cy', String(pt.y));
+        if (frac < 1.0) {
+            requestAnimationFrame(step);
+            return;
+        }
+        // Arrival: small pulse ring that expands and fades at the home point.
+        const ring = document.createElementNS(NS, 'circle');
+        ring.setAttribute('cx',           String(dst.x));
+        ring.setAttribute('cy',           String(dst.y));
+        ring.setAttribute('r',            '4');
+        ring.setAttribute('fill',         'none');
+        ring.setAttribute('stroke',       color);
+        ring.setAttribute('stroke-width', '1.5');
+        ring.classList.add('arc-arrive-ring');
+        svg.appendChild(ring);
+        // Fade out the whole arc assembly.
+        svg.style.transition = 'opacity ' + ARC_FADE_MS + 'ms ease-out';
+        svg.style.opacity = '0';
+        setTimeout(() => { svg.remove(); }, ARC_FADE_MS + 50);
+    }
+    requestAnimationFrame(step);
+}
+
+// Remove stale arc SVGs when the zoom level changes (layer coordinates rescale).
+lmap.on('zoomstart', () => {
+    lmap.getPanes().overlayPane
+        .querySelectorAll('svg.msmap-arc')
+        .forEach((el) => { el.remove(); });
+});
+
 // ── Polling ──────────────────────────────────────────────────────────────────
 
 async function poll() {
+    arcsFired = 0;
     try {
         const resp = await fetch('/api/connections' + buildQueryString());
 
@@ -354,6 +506,10 @@ async function poll() {
                         el.addEventListener('animationend',
                             () => el.classList.remove('marker-new'), { once: true });
                     });
+                    if (homePt && fArcs.checked && arcsFired < MAX_ARCS_POLL) {
+                        fireArc(r.lat, r.lon, color);
+                        arcsFired++;
+                    }
                 }
                 mappedCount++;
                 if (fDedup.checked) {
@@ -389,7 +545,28 @@ function resetAndFetch() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
-loadFilters();                // restore before computeSincePreset reads fTime
-computeSincePreset();
-setTimeout(poll, 0);          // defer first fetch past initial map paint
-setInterval(poll, REFRESH_MS);
+// Fetch the home point before first poll so the marker and arcs are ready.
+// /api/home is a tiny local call; the latency is negligible.
+fetchHome().then(() => {
+    addHomeMarker();
+    loadFilters();              // restore before computeSincePreset reads fTime
+    computeSincePreset();
+
+    // Arc toggle: disabled (and unchecked) when home is not configured.
+    // When home IS configured, default to on for first-time users; respect any
+    // previously saved preference.
+    if (!homePt) {
+        fArcs.checked  = false;
+        fArcs.disabled = true;
+    } else {
+        let hasSavedPref = false;
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            hasSavedPref = raw !== null && JSON.parse(raw).arcs !== undefined;
+        } catch (_) { /* ignore */ }
+        if (!hasSavedPref) { fArcs.checked = true; }
+    }
+
+    setTimeout(poll, 0);        // defer first fetch past initial map paint
+    setInterval(poll, REFRESH_MS);
+});
