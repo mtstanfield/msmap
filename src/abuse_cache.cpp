@@ -424,31 +424,55 @@ void AbuseCache::worker() noexcept
         // Fetch from AbuseIPDB (network call — no mutex held).
         // request_made is set true only when curl connected and sent the
         // HTTP request; pure network failures don't consume API quota.
-        bool request_made = false;
-        const auto result = fetch_abuse(ip, request_made);
+        bool request_made    = false;
+        bool quota_exhausted = false;
+        const auto result = fetch_abuse(ip, request_made, quota_exhausted);
+        apply_fetch_result(ip, result, request_made, quota_exhausted);
+    }
+}
 
-        {
-            const std::lock_guard<std::mutex> lock{queue_mutex_};
-            if (request_made) { --rate_remaining_; }
-            in_flight_.erase(ip);
-        }
+// ── apply_fetch_result() ─────────────────────────────────────────────────────
 
-        if (result.has_value()) {
-            if (cache_store(ip, *result)) {
-                update_connections_abuse(ip, *result);
-            }
-        } else {
-            std::clog << "[WARN] AbuseCache: fetch failed for " << ip << '\n';
+void AbuseCache::apply_fetch_result(const std::string&                ip,
+                                    const std::optional<AbuseResult>& result,
+                                    bool                               request_made,
+                                    bool                               quota_exhausted) noexcept
+{
+    {
+        const std::lock_guard<std::mutex> lock{queue_mutex_};
+        if (quota_exhausted) {
+            // 429: server confirms quota gone.  Zero counter immediately so
+            // the next worker() iteration enters wait_for_quota_reset instead
+            // of firing another request.  Re-queue the IP so it is processed
+            // once the daily quota resets at midnight.
+            rate_remaining_ = 0;
+            if (!stop_) { queue_.insert(ip); }
+        } else if (request_made) {
+            --rate_remaining_;
         }
+        in_flight_.erase(ip);
+    }
+
+    if (result.has_value()) {
+        if (cache_store(ip, *result)) {
+            update_connections_abuse(ip, *result);
+        }
+    } else if (quota_exhausted) {
+        std::clog << "[WARN] AbuseCache: 429 from AbuseIPDB for " << ip
+                  << " — quota exhausted; re-queued for midnight reset\n";
+    } else if (request_made) {
+        std::clog << "[WARN] AbuseCache: fetch failed for " << ip << '\n';
     }
 }
 
 // ── fetch_abuse() ────────────────────────────────────────────────────────────
 
 std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
-                                                    bool& request_made) noexcept
+                                                    bool& request_made,    // NOLINT(bugprone-easily-swappable-parameters)
+                                                    bool& quota_exhausted) noexcept
 {
-    request_made = false;
+    request_made    = false;
+    quota_exhausted = false;
 
     CURL* const curl = curl_easy_init();
     if (curl == nullptr) {
@@ -496,6 +520,13 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
 
     long http_code{0};
     (void)curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    if (http_code == 429) {
+        // Daily quota exhausted server-side.  Signal the worker to zero
+        // rate_remaining_ immediately so it stops firing requests rather
+        // than waiting for our local counter to count down to zero.
+        quota_exhausted = true;
+        return std::nullopt;
+    }
     if (http_code != 200) {
         std::clog << "[WARN] AbuseCache: HTTP " << http_code
                   << " for " << ip << '\n';
