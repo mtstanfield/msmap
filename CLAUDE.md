@@ -91,12 +91,18 @@ See `README.md` for full architecture and `PLAN.md` for the feature todo list.
 
 ## Log Format (confirmed)
 
-Mikrotik router → rsyslog (UDP 514) → msmap (TCP 5140).
+Mikrotik router → msmap (UDP 5140, direct — no rsyslog required).
 
-rsyslog reformats BSD timestamp to RFC 3339 before forwarding. msmap sees:
+msmap parses BSD syslog sent directly by the router:
 
 ```
-2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
+<134>Mar  2 08:14:23 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
+```
+
+RFC 3339 format (rsyslog relay) is also accepted via auto-detection:
+
+```
+2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: ...
 ```
 
 **Protocol variants:**
@@ -104,9 +110,9 @@ rsyslog reformats BSD timestamp to RFC 3339 before forwarding. msmap sees:
 - UDP: `proto UDP, IP:PORT->IP:PORT, len N`
 - ICMP: `proto ICMP, IP->IP, len N`
 
-**Parser approach**: hand-written linear tokenizer (not regex). Two phases:
-1. RFC 3339 header strip (timestamp, hostname)
-2. Mikrotik body: topic/level → optional rule name → chain keyword → key:value pairs → proto line
+**Parser approach**: hand-written linear tokenizer (not regex). Auto-detects BSD
+vs RFC 3339 header, then parses Mikrotik body: TAG → optional rule name →
+chain keyword → key:value pairs → proto line.
 
 **Mikrotik router config (already applied):**
 - NTP enabled (Google NTP servers)
@@ -132,5 +138,5 @@ rsyslog reformats BSD timestamp to RFC 3339 before forwarding. msmap sees:
 - Review `FINDINGS.md` before starting each new feature
 - Timestamps stored as UTC Unix epoch (int64); browser converts to local timezone
 - All SQL via parameterized queries — no string concatenation ever
-- All web assets embedded in binary via `xxd -i` CMake step
+- All web assets embedded in binary via `web/bundle.py` CMake step
 - No CDN, no external JS, no npm, no bundler
