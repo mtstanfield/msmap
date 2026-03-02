@@ -118,7 +118,6 @@ private:
     void insert_to_cache(const ConnectionRow& row) noexcept;
     void prune_cache() noexcept;
     [[nodiscard]] std::vector<ConnectionRow> query_cache(const QueryFilters& f) const noexcept;
-    void load_cache_from_db() noexcept;
 
     // mutex_ serialises all SQLite calls from the listener thread (insert)
     // and the HTTP thread (query_connections).  Declared mutable so that
