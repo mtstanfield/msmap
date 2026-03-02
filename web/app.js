@@ -226,6 +226,11 @@ function buildPopup(r, hitCount) {
               + '<span class="' + threatClass(r.threat) + '">'
               + threatLabel(r.threat) + '</span><br>'
             : '',
+        r.usage_type ? '<span class="label">usage </span>' + escapeHtml(r.usage_type) + '<br>' : '',
+        (r.is_tor !== null && r.is_tor !== undefined)
+            ? '<span class="label">tor </span>'
+              + (r.is_tor ? '<span class="threat-high">yes</span>' : 'no') + '<br>'
+            : '',
         '<span class="label">len </span>' + r.pkt_len + ' B',
         '</div>',
     ];
