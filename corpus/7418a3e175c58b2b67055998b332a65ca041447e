@@ -1,0 +1,1 @@
+<134>Mar  2 08:14:23 k FW\0rule: FW_INPUT_NEW input: in:ether1 out:(unkno0n w), connection-state:new src-mac bc:9a:82:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
