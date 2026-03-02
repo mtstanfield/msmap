@@ -337,6 +337,25 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     return false;
 }
 
+// ── wait_for_quota_reset() ───────────────────────────────────────────────────
+
+void AbuseCache::wait_for_quota_reset(
+    std::unique_lock<std::mutex>& lock) noexcept
+{
+    std::clog << "[INFO] AbuseCache: daily quota reached; "
+                 "polling for midnight reset (15-min intervals)\n";
+    while (!stop_) {
+        queue_cv_.wait_for(lock, std::chrono::minutes(15),
+                           [this]() noexcept { return stop_; });
+        // If stop_ was set, the while condition exits on the next check.
+        // rate_limit_reset_if_new_day() is harmless to call during shutdown.
+        if (rate_limit_reset_if_new_day()) {
+            std::clog << "[INFO] AbuseCache: quota reset; resuming\n";
+            break;
+        }
+    }
+}
+
 // ── worker() ────────────────────────────────────────────────────────────────
 
 void AbuseCache::worker() noexcept
@@ -366,19 +385,14 @@ void AbuseCache::worker() noexcept
             rate_limit_reset_if_new_day();
             if (rate_remaining_ <= 0) {
                 // Re-queue (if not shutting down) so the IP is processed
-                // after midnight when quota resets.
+                // once quota resets.
                 if (!stop_) { queue_.insert(ip); }
                 in_flight_.erase(ip);
 
                 if (!stop_) {
-                    const auto now  = static_cast<std::int64_t>(std::time(nullptr));
-                    // Seconds until next UTC midnight + 5 s margin.
-                    const auto wake = (now / 86400LL + 1LL) * 86400LL + 5LL;
-                    std::clog << "[INFO] AbuseCache: daily quota reached; ~"
-                              << (wake - now) / 3600 << "h until reset\n";
-                    // Releases lock while sleeping; wakes on stop_ or midnight.
-                    queue_cv_.wait_for(lock, std::chrono::seconds(wake - now),
-                                       [this]() noexcept { return stop_; });
+                    // Poll every 15 min until UTC day rolls over.
+                    // Extracted to keep worker() cognitive complexity in check.
+                    wait_for_quota_reset(lock);
                 }
                 continue;
             }
@@ -392,11 +406,14 @@ void AbuseCache::worker() noexcept
         }
 
         // Fetch from AbuseIPDB (network call — no mutex held).
-        const auto result = fetch_abuse(ip);
+        // request_made is set true only when curl connected and sent the
+        // HTTP request; pure network failures don't consume API quota.
+        bool request_made = false;
+        const auto result = fetch_abuse(ip, request_made);
 
         {
             const std::lock_guard<std::mutex> lock{queue_mutex_};
-            --rate_remaining_;
+            if (request_made) { --rate_remaining_; }
             in_flight_.erase(ip);
         }
 
@@ -412,8 +429,11 @@ void AbuseCache::worker() noexcept
 
 // ── fetch_abuse() ────────────────────────────────────────────────────────────
 
-std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip) noexcept
+std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
+                                                    bool& request_made) noexcept
 {
+    request_made = false;
+
     CURL* const curl = curl_easy_init();
     if (curl == nullptr) {
         std::clog << "[WARN] AbuseCache: curl_easy_init failed\n";
@@ -447,10 +467,16 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip) noexce
 
     const CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
+        // Pure network/curl failure — no HTTP request reached AbuseIPDB,
+        // so this should not count against the daily quota.
         std::clog << "[WARN] AbuseCache: curl: "
                   << curl_easy_strerror(res) << '\n';
         return std::nullopt;
     }
+
+    // An HTTP response was received; the API call counts against quota
+    // regardless of the status code.
+    request_made = true;
 
     long http_code{0};
     (void)curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);

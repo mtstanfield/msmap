@@ -16,10 +16,10 @@ struct sqlite3_stmt;
 
 namespace msmap {
 
-/// Cache TTL: re-query AbuseIPDB after this many seconds (3 days).
-/// Threat scores change slowly; staleness over a few days is acceptable
-/// and dramatically reduces daily API quota consumption.
-inline constexpr std::int64_t kCacheTtlSecs{3LL * 24LL * 3600LL};
+/// Cache TTL: re-query AbuseIPDB after this many seconds (30 days).
+/// Threat scores change slowly; the AbuseIPDB free tier allows 1000 checks/day,
+/// so a long TTL is essential to preserve quota for new IPs.
+inline constexpr std::int64_t kCacheTtlSecs{30LL * 24LL * 3600LL};
 
 /// AbuseIPDB free-tier daily quota.
 inline constexpr int kDailyQuota{1000};
@@ -100,7 +100,18 @@ public:
 private:
     bool                        open() noexcept;
     void                        worker() noexcept;
-    std::optional<AbuseResult>  fetch_abuse(const std::string& ip) noexcept;
+
+    /// Sleep in 15-minute intervals until rate_limit_reset_if_new_day() returns
+    /// true or stop_ is set.  Caller must hold queue_mutex_ via `lock`;
+    /// the lock is released and reacquired during each wait_for() interval.
+    void                        wait_for_quota_reset(
+                                    std::unique_lock<std::mutex>& lock) noexcept;
+
+    /// Sets `request_made` to true if an HTTP request reached AbuseIPDB
+    /// (regardless of HTTP status), so the caller only decrements the rate
+    /// counter when a real API call was issued (not on curl/network failures).
+    std::optional<AbuseResult>  fetch_abuse(const std::string& ip,
+                                             bool& request_made) noexcept;
 
     // ── Configuration ────────────────────────────────────────────────────────
     std::string db_path_;
