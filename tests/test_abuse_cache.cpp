@@ -94,9 +94,9 @@ TEST_CASE("AbuseCache: cache_store zero score round-trips")
 
 // ── TTL constant ─────────────────────────────────────────────────────────────
 
-TEST_CASE("AbuseCache: kCacheTtlSecs is 24 hours")
+TEST_CASE("AbuseCache: kCacheTtlSecs is 72 hours")
 {
-    CHECK(msmap::kCacheTtlSecs == 24 * 3600);
+    CHECK(msmap::kCacheTtlSecs == 3 * 24 * 3600);
 }
 
 // ── submit(): no-op without API key ──────────────────────────────────────────

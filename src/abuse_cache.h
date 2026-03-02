@@ -16,8 +16,10 @@ struct sqlite3_stmt;
 
 namespace msmap {
 
-/// Cache TTL: re-query AbuseIPDB after this many seconds.
-inline constexpr std::int64_t kCacheTtlSecs{24LL * 3600};
+/// Cache TTL: re-query AbuseIPDB after this many seconds (3 days).
+/// Threat scores change slowly; staleness over a few days is acceptable
+/// and dramatically reduces daily API quota consumption.
+inline constexpr std::int64_t kCacheTtlSecs{3LL * 24LL * 3600LL};
 
 /// AbuseIPDB free-tier daily quota.
 inline constexpr int kDailyQuota{1000};

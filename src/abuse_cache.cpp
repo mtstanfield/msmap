@@ -4,6 +4,7 @@
 #include <sqlite3.h>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -244,6 +245,11 @@ void AbuseCache::submit(const std::string& ip) noexcept
 {
     if (api_key_.empty() || !db_) { return; }
 
+    // Fast cache check — skip the queue entirely for fresh entries.
+    // This is the primary quota guard: an IP cached within the TTL window
+    // is never re-queued regardless of how many packets we see from it.
+    if (lookup(ip).has_value()) { return; }
+
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
         if (queue_.contains(ip) || in_flight_.contains(ip)) {
@@ -356,12 +362,24 @@ void AbuseCache::worker() noexcept
 
         // Check and reset daily rate limit.
         {
-            const std::lock_guard<std::mutex> lock{queue_mutex_};
+            std::unique_lock<std::mutex> lock{queue_mutex_};
             rate_limit_reset_if_new_day();
             if (rate_remaining_ <= 0) {
-                std::clog << "[WARN] AbuseCache: daily quota exhausted; "
-                             "skipping " << ip << '\n';
+                // Re-queue (if not shutting down) so the IP is processed
+                // after midnight when quota resets.
+                if (!stop_) { queue_.insert(ip); }
                 in_flight_.erase(ip);
+
+                if (!stop_) {
+                    const auto now  = static_cast<std::int64_t>(std::time(nullptr));
+                    // Seconds until next UTC midnight + 5 s margin.
+                    const auto wake = (now / 86400LL + 1LL) * 86400LL + 5LL;
+                    std::clog << "[INFO] AbuseCache: daily quota reached; ~"
+                              << (wake - now) / 3600 << "h until reset\n";
+                    // Releases lock while sleeping; wakes on stop_ or midnight.
+                    queue_cv_.wait_for(lock, std::chrono::seconds(wake - now),
+                                       [this]() noexcept { return stop_; });
+                }
                 continue;
             }
         }
