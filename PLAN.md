@@ -164,7 +164,8 @@ docker build -t msmap .
 ### Storage
 - [x] SQLite schema (see table above) + WAL mode pragma
 - [x] Indexes: `ts`, `src_ip`, `dst_port`, `country`
-- [x] Retention pruning (30 days): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
+- [x] Retention pruning (24h): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
+- [x] In-memory cache (24h, max 300k rows): serves recent queries, falls back to DB
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns

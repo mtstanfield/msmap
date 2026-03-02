@@ -251,3 +251,20 @@ TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
     const auto rows = db.query_connections(msmap::QueryFilters{});
     CHECK(rows.size() == 2);
 }
+
+TEST_CASE("cache_hit: query serves from cache when available")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    const auto entry = make_tcp_entry();
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    msmap::QueryFilters filters;
+    filters.limit = 1;
+    const auto rows = db.query_connections(filters);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows.at(0).ts == entry.ts);
+    CHECK(rows.at(0).src_ip == entry.src_ip);
+    CHECK(rows.at(0).proto == entry.proto);
+}
