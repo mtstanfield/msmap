@@ -42,7 +42,7 @@ TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 | HTTP server | `libmicrohttpd` (GNU LGPL)       | Embedded, no framework overhead        |
 | Database    | SQLite (WAL mode)                | Single file, parameterized queries only|
 | GeoIP       | `libmaxminddb` + GeoLite2-City   | Local `.mmdb`, no external calls       |
-| OSINT       | AbuseIPDB (cached)               | SQLite cache with TTL, no live queries |
+| OSINT       | AbuseIPDB (cached)               | Score, usageType, isTor; 30-day SQLite cache; 1000 checks/day (free tier) |
 | Frontend    | Leaflet.js + MarkerCluster       | Local copies, vanilla JS, no bundler   |
 | Runtime     | `distroless/cc-debian12:nonroot` | Semi-static binary, uid 65532          |
 
@@ -148,6 +148,44 @@ Then under **System → Logging**, add a rule:
 
 Set `MSMAP_INGEST_ALLOW` to the router's LAN IP to reject syslog from
 unexpected sources.
+
+---
+
+## Web UI
+
+The UI is a single-page Leaflet.js map served at port 8080. Connections are
+plotted as clustered markers; click any marker to open a detail popup.
+
+### Filter panel
+
+| Filter | Description |
+|---|---|
+| Time range | Last 15 min / 1 h / 6 h / 24 h |
+| Protocol | All / TCP / UDP / ICMP |
+| Source IP | Exact source IP match |
+| Dst Port | Exact destination port match |
+| Country | 2-letter ISO code (requires GeoIP) |
+| Unique IPs | Deduplicate — show only the most recent connection per source IP |
+| Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
+| Datacenter | Show only datacenter / hosting IPs (requires AbuseIPDB) |
+| Residential | Show only residential ISP IPs (requires AbuseIPDB) |
+
+The Tor/datacenter/residential toggles are OR-combined when multiple are active.
+When none are checked all connections are shown regardless of enrichment status.
+
+### Connection popup
+
+Clicking a marker shows:
+
+- Timestamp, source IP:port, destination IP:port, protocol, TCP flags
+- Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
+- **Threat score** — AbuseIPDB abuse confidence 0–100
+- **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `ISP/Residential`
+- **Tor exit** — `yes` (highlighted) or `no`
+
+The OSINT fields appear once the background worker has resolved the IP against
+AbuseIPDB. Results are cached for 30 days; an API key is not required to view
+previously cached data.
 
 ---
 
