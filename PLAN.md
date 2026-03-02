@@ -159,7 +159,7 @@ docker build -t msmap .
 - [~] rsyslog config: N/A — msmap now listens directly on UDP; rsyslog not required
 - [x] msmap UDP listener on 5140 (0.0.0.0 — accepts from LAN and loopback)
 - [x] Log parser: hand-written linear tokenizer; auto-detects BSD and RFC 3339 formats
-- [ ] Fuzz the parser with libFuzzer
+- [x] Fuzz the parser with libFuzzer
 
 ### Storage
 - [x] SQLite schema (see table above) + WAL mode pragma

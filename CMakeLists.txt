@@ -269,4 +269,13 @@ if(MSMAP_ENABLE_TESTS)
     catch_discover_tests(test_integration
         PROPERTIES
             ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+
+  # libFuzzer parser fuzz
+  add_executable(fuzz_parser src/fuzz_parser.cpp src/parser.cpp)
+  target_compile_features(fuzz_parser PRIVATE cxx_std_23)
+  target_include_directories(fuzz_parser PRIVATE src)
+  msmap_set_warnings(fuzz_parser)
+  msmap_enable_sanitizers(fuzz_parser)
+  target_compile_options(fuzz_parser PRIVATE -fsanitize=fuzzer)
+  target_link_options(fuzz_parser PRIVATE -fsanitize=fuzzer)
 endif()
