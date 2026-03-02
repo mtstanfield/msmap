@@ -268,3 +268,30 @@ TEST_CASE("cache_hit: query serves from cache when available")
     CHECK(rows.at(0).src_ip == entry.src_ip);
     CHECK(rows.at(0).proto == entry.proto);
 }
+
+TEST_CASE("cache_preload: historical data loaded from DB to cache on startup")
+{
+    const std::string db_path = "preload_test.db";
+    {
+        msmap::Database db{db_path};
+        REQUIRE(db.valid());
+
+        // Insert historical data (simulate past inserts)
+        auto entry = make_tcp_entry();
+        entry.ts = static_cast<std::int64_t>(std::time(nullptr)) - 3600;  // 1h ago
+        REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+        entry.ts += 1800;  // 30min later
+        REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    }
+
+    // Restart DB (new instance)
+    msmap::Database db2{db_path};
+    REQUIRE(db2.valid());
+
+    // Query should serve from preloaded cache
+    msmap::QueryFilters filters;
+    filters.limit = 10;
+    const auto rows = db2.query_connections(filters);
+    REQUIRE(rows.size() == 2);
+    CHECK(rows.at(0).ts > rows.at(1).ts);  // ts DESC
+}

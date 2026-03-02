@@ -194,6 +194,9 @@ Database::Database(const std::string& path) noexcept
         return;
     }
     prune_stmt_.reset(raw_stmt);
+
+    // Preload recent 24h from DB to cache for fast UI queries.
+    load_cache_from_db();
 }
 
 // Defined here (not inline in db.h) so the unique_ptr destructors are
@@ -357,6 +360,19 @@ void Database::prune_cache() noexcept {
   }
   if (recent_cache_.size() > kMaxCacheSize) {
     recent_cache_.resize(kMaxCacheSize);
+  }
+}
+
+void Database::load_cache_from_db() noexcept {
+  QueryFilters f;
+  f.since = static_cast<std::int64_t>(std::time(nullptr)) - kCacheRetentionSecs;
+  f.limit = kMaxCacheSize;
+  auto rows = query_connections(f);  // DB query (cache bypassed)
+  {
+    const std::lock_guard lock{cache_mutex_};
+    recent_cache_.clear();
+    recent_cache_.reserve(rows.size());
+    std::ranges::copy(std::ranges::reverse_view(rows), std::back_inserter(recent_cache_));
   }
 }
 
