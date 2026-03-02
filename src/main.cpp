@@ -143,6 +143,10 @@ int main() {
     msmap::AbuseCache* const abuse_ptr = abuse.valid() ? &abuse : nullptr;
 
     // HTTP server starts its own internal thread; run_listener blocks below.
+    // Declaration order is load-bearing: C++ destroys locals in reverse order,
+    // so `http` (HttpServer) is destroyed before `home_resolver` and `db`.
+    // HttpServer's destructor calls MHD_stop_daemon which joins its thread
+    // before returning — ensuring no handler can dereference a stale pointer.
     msmap::HttpServer const http{static_cast<std::uint16_t>(http_port), db,
                                  home_resolver.get()};
     if (!http.valid()) {

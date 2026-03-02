@@ -60,15 +60,19 @@ private:
     /// Background thread entry point.  Sleeps kRecheckSecs between cycles.
     void worker() noexcept;
 
-    std::string    hostname_;
-    const GeoIp&   geoip_;
+    // hostname_ and geoip_ are read-only after construction.  The worker
+    // thread reads both outside the mutex — this is safe only because they
+    // never change.  Do not add any code that modifies hostname_ after init.
+    std::string   hostname_;
+    const GeoIp&  geoip_;
 
     mutable std::mutex      mutex_;
     std::condition_variable cv_;
     HomePoint               result_;   // protected by mutex_
     bool                    stop_{false};
-    std::string             last_ip_;  // last successfully resolved IP (for change detection)
     std::thread             worker_thread_;
+    // Destruction order: worker_thread_ must be last so the thread is joined
+    // before any other member (mutex_, cv_, result_) is destroyed.
 };
 
 } // namespace msmap

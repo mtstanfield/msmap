@@ -139,6 +139,7 @@ private:
     // Accessed only under queue_mutex_.
     int          rate_remaining_{kDailyQuota};
     std::int64_t rate_reset_day_{0};              // epoch_day() at last reset
+    bool         quota_warned_{false};            // suppress repeated log lines
 
 };
 

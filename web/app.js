@@ -72,6 +72,7 @@ L.tileLayer(
         subdomains:        'abcd',
         maxZoom:           19,
         noWrap:            true,       // don't repeat tiles outside ±180°
+        bounds:            [[-90, -180], [90, 180]], // suppress requests for out-of-range tile indices
         updateWhenIdle:    false,      // load tiles continuously while panning
         updateWhenZooming: false,      // skip tile loads during zoom animation
         keepBuffer:        4,          // pre-render 4 tile-widths beyond viewport
@@ -312,12 +313,18 @@ async function fetchHome() {
         const resp = await fetch('/api/home');
         if (!resp.ok) {
             // 404 = feature not configured or initial resolution failed.
-            homePt = null;
-            if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            // Transient errors (5xx) keep the previous homePt to avoid
+            // disrupting the arc toggle during a brief server hiccup.
+            if (resp.status === 404) {
+                homePt = null;
+                if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            }
             return;
         }
         const fresh = await resp.json();
-        if (!fresh || fresh.lat === undefined) { return; }
+        if (!fresh ||
+            !Number.isFinite(fresh.lat) ||
+            !Number.isFinite(fresh.lon)) { return; }
 
         const changed = !homePt ||
                         homePt.lat !== fresh.lat ||
@@ -401,12 +408,12 @@ function fireArc(srcLat, srcLon, color) {
                             ' ' + dst.x + ' ' + dst.y);
     path.setAttribute('fill',           'none');
     path.setAttribute('stroke',         color);
-    path.setAttribute('stroke-width',   '1.5');
+    path.setAttribute('stroke-width',   '2');
     path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-opacity', '0.85');
+    path.setAttribute('stroke-opacity', '0.9');
 
     const dot = document.createElementNS(NS, 'circle');
-    dot.setAttribute('r',    '2.5');
+    dot.setAttribute('r',    '3');
     dot.setAttribute('fill', color);
     dot.setAttribute('cx',   String(src.x));
     dot.setAttribute('cy',   String(src.y));
@@ -442,7 +449,7 @@ function fireArc(srcLat, srcLon, color) {
         ring.setAttribute('r',            '4');
         ring.setAttribute('fill',         'none');
         ring.setAttribute('stroke',       color);
-        ring.setAttribute('stroke-width', '1.5');
+        ring.setAttribute('stroke-width', '2');
         ring.classList.add('arc-arrive-ring');
         svg.appendChild(ring);
         // Fade out the whole arc assembly.
