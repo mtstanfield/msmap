@@ -72,7 +72,7 @@ L.tileLayer(
         subdomains:        'abcd',
         maxZoom:           19,
         noWrap:            true,       // don't repeat tiles outside ±180°
-        updateWhenIdle:    true,       // load tiles only after pan/zoom settles
+        updateWhenIdle:    false,      // load tiles continuously while panning
         updateWhenZooming: false,      // skip tile loads during zoom animation
         keepBuffer:        4,          // pre-render 4 tile-widths beyond viewport
         crossOrigin:       'anonymous', // allow HTTP cache sharing across tabs
