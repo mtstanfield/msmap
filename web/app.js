@@ -397,10 +397,17 @@ function fireArc(srcLat, srcLon, color) {
     const cpy = my + ny * offset;
 
     // Build the SVG assembly in Leaflet's overlay pane.
+    // The overlayPane has no explicit CSS size (position:absolute; z-index only),
+    // so width/height percentages resolve to 0.  Mirror what Leaflet's own SVG
+    // renderer does: set explicit pixel dimensions via setAttribute so that
+    // overflow:visible can extend the rendering beyond the SVG viewport.
     const NS  = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
+    const mapSz = lmap.getSize();
+    svg.setAttribute('width',  String(mapSz.x));
+    svg.setAttribute('height', String(mapSz.y));
     svg.classList.add('msmap-arc');
-    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible';
+    svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible';
 
     const path = document.createElementNS(NS, 'path');
     path.setAttribute('d', 'M ' + src.x + ' ' + src.y +
