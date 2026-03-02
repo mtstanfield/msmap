@@ -145,11 +145,7 @@ TEST_CASE("Integration: TCP line parsed and stored correctly")
     CHECK(r.dst_port   == 22);
     CHECK(r.proto      == "TCP");
     CHECK(r.tcp_flags  == "SYN");
-    CHECK(r.chain      == "input");
-    CHECK(r.conn_state == "new");
-    CHECK(r.pkt_len    == 60);
     CHECK(r.rule       == "FW_INPUT_NEW");
-    CHECK(r.in_iface   == "ether1");
     // GeoIP absent → geo columns empty / nullopt
     CHECK(r.country.empty());
     CHECK(!r.lat.has_value());

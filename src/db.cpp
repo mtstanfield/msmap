@@ -52,11 +52,7 @@ CREATE TABLE IF NOT EXISTS connections (
     dst_port   INTEGER,
     proto      TEXT    NOT NULL,
     tcp_flags  TEXT,
-    chain      TEXT    NOT NULL,
-    in_iface   TEXT    NOT NULL,
     rule       TEXT    NOT NULL DEFAULT '',
-    conn_state TEXT    NOT NULL,
-    pkt_len    INTEGER NOT NULL,
     country    TEXT,
     lat        REAL,
     lon        REAL,
@@ -87,9 +83,8 @@ ON connections(ts, src_ip, dst_ip, proto,
 constexpr const char* kInsertSql = R"sql(
 INSERT OR IGNORE INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
-    chain, in_iface, rule, conn_state, pkt_len,
-    country, lat, lon, asn, threat, usage_type, is_tor)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    rule, country, lat, lon, asn, threat, usage_type, is_tor)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
@@ -223,7 +218,7 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
 
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
-    // Bind all seventeen parameters (1-indexed).
+    // Bind all fifteen parameters (1-indexed).
     (void)sqlite3_bind_int64(stmt,  1, entry.ts);
     (void)sqlite3_bind_text( stmt,  2, entry.src_ip.c_str(), -1, kStaticText);
 
@@ -249,40 +244,36 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
         (void)sqlite3_bind_null(stmt, 7);
     }
 
-    (void)sqlite3_bind_text(stmt,  8, entry.chain.c_str(),      -1, kStaticText);
-    (void)sqlite3_bind_text(stmt,  9, entry.in_iface.c_str(),   -1, kStaticText);
-    (void)sqlite3_bind_text(stmt, 10, entry.rule.c_str(),       -1, kStaticText);
-    (void)sqlite3_bind_text(stmt, 11, entry.conn_state.c_str(), -1, kStaticText);
-    (void)sqlite3_bind_int( stmt, 12, entry.pkt_len);
+    (void)sqlite3_bind_text(stmt, 8, entry.rule.c_str(), -1, kStaticText);
 
     // GeoIP enrichment — NULL when not resolved.
     if (geo.found()) {
-        (void)sqlite3_bind_text(  stmt, 13, geo.country.c_str(), -1, kStaticText);
-        (void)sqlite3_bind_double(stmt, 14, geo.lat);
-        (void)sqlite3_bind_double(stmt, 15, geo.lon);
+        (void)sqlite3_bind_text(  stmt,  9, geo.country.c_str(), -1, kStaticText);
+        (void)sqlite3_bind_double(stmt, 10, geo.lat);
+        (void)sqlite3_bind_double(stmt, 11, geo.lon);
     } else {
-        (void)sqlite3_bind_null(stmt, 13);
-        (void)sqlite3_bind_null(stmt, 14);
-        (void)sqlite3_bind_null(stmt, 15);
+        (void)sqlite3_bind_null(stmt,  9);
+        (void)sqlite3_bind_null(stmt, 10);
+        (void)sqlite3_bind_null(stmt, 11);
     }
 
     if (!geo.asn.empty()) {
-        (void)sqlite3_bind_text(stmt, 16, geo.asn.c_str(), -1, kStaticText);
+        (void)sqlite3_bind_text(stmt, 12, geo.asn.c_str(), -1, kStaticText);
     } else {
-        (void)sqlite3_bind_null(stmt, 16);
+        (void)sqlite3_bind_null(stmt, 12);
     }
 
     // AbuseIPDB threat score — NULL when not yet enriched.
     if (threat.has_value()) {
-        (void)sqlite3_bind_int(stmt, 17, *threat);
+        (void)sqlite3_bind_int(stmt, 13, *threat);
     } else {
-        (void)sqlite3_bind_null(stmt, 17);
+        (void)sqlite3_bind_null(stmt, 13);
     }
 
     // usage_type and is_tor are always NULL at insert time; the AbuseCache
     // background worker backfills them via update_connections_abuse().
-    (void)sqlite3_bind_null(stmt, 18);
-    (void)sqlite3_bind_null(stmt, 19);
+    (void)sqlite3_bind_null(stmt, 14);
+    (void)sqlite3_bind_null(stmt, 15);
 
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
@@ -348,8 +339,8 @@ Database::query_connections(const QueryFilters& f) const noexcept
     const bool has_port    = f.dst_port > 0;
 
     std::string sql =
-        "SELECT id, ts, src_ip, src_port, dst_ip, dst_port, "
-        "proto, tcp_flags, chain, in_iface, rule, conn_state, pkt_len, "
+        "SELECT ts, src_ip, src_port, dst_ip, dst_port, "
+        "proto, tcp_flags, rule, "
         "country, lat, lon, asn, threat, usage_type, is_tor "
         "FROM connections";
 
@@ -417,26 +408,21 @@ Database::query_connections(const QueryFilters& f) const noexcept
     std::vector<ConnectionRow> rows;
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
         ConnectionRow row;
-        row.id         = sqlite3_column_int64(stmt.get(),  0);
-        row.ts         = sqlite3_column_int64(stmt.get(),  1);
-        row.src_ip     = col_text(stmt.get(),              2);
-        row.src_port   = col_opt_int(stmt.get(),           3);
-        row.dst_ip     = col_text(stmt.get(),              4);
-        row.dst_port   = col_opt_int(stmt.get(),           5);
-        row.proto      = col_text(stmt.get(),              6);
-        row.tcp_flags  = col_text(stmt.get(),              7);
-        row.chain      = col_text(stmt.get(),              8);
-        row.in_iface   = col_text(stmt.get(),              9);
-        row.rule       = col_text(stmt.get(),             10);
-        row.conn_state = col_text(stmt.get(),             11);
-        row.pkt_len    = sqlite3_column_int(stmt.get(),   12);
-        row.country    = col_text(stmt.get(),             13);
-        row.lat        = col_opt_double(stmt.get(),       14);
-        row.lon        = col_opt_double(stmt.get(),       15);
-        row.asn        = col_text(stmt.get(),             16);
-        row.threat     = col_opt_int(stmt.get(),          17);
-        row.usage_type = col_text(stmt.get(),             18);
-        row.is_tor     = col_opt_bool(stmt.get(),         19);
+        row.ts         = sqlite3_column_int64(stmt.get(),  0);
+        row.src_ip     = col_text(stmt.get(),              1);
+        row.src_port   = col_opt_int(stmt.get(),           2);
+        row.dst_ip     = col_text(stmt.get(),              3);
+        row.dst_port   = col_opt_int(stmt.get(),           4);
+        row.proto      = col_text(stmt.get(),              5);
+        row.tcp_flags  = col_text(stmt.get(),              6);
+        row.rule       = col_text(stmt.get(),              7);
+        row.country    = col_text(stmt.get(),              8);
+        row.lat        = col_opt_double(stmt.get(),        9);
+        row.lon        = col_opt_double(stmt.get(),       10);
+        row.asn        = col_text(stmt.get(),             11);
+        row.threat     = col_opt_int(stmt.get(),          12);
+        row.usage_type = col_text(stmt.get(),             13);
+        row.is_tor     = col_opt_bool(stmt.get(),         14);
         rows.push_back(std::move(row));
     }
     return rows;

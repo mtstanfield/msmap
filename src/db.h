@@ -31,19 +31,14 @@ struct StmtFinalizer  { void operator()(sqlite3_stmt* p) const noexcept; };
 /// One row returned by Database::query_connections().
 /// Nullable DB columns map to std::optional / empty std::string.
 struct ConnectionRow {
-    std::int64_t id{};
-    std::int64_t ts{};
+    std::int64_t       ts{};
     std::string        src_ip;
     std::optional<int> src_port;        // nullopt for ICMP
     std::string        dst_ip;
     std::optional<int> dst_port;        // nullopt for ICMP
     std::string        proto;
     std::string        tcp_flags;       // empty string when not TCP
-    std::string        chain;
-    std::string        in_iface;
     std::string        rule;
-    std::string        conn_state;
-    int                pkt_len{0};
     std::string        country;         // empty string when no GeoIP
     std::optional<double> lat;          // nullopt when no GeoIP
     std::optional<double> lon;          // nullopt when no GeoIP

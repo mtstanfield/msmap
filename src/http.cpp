@@ -41,7 +41,6 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         first = false;
 
         out += '{';
-        out += "\"id\":";         out += std::to_string(row.id);       out += ',';
         out += "\"ts\":";         out += std::to_string(row.ts);       out += ',';
         out += "\"src_ip\":";     json::append_string(out, row.src_ip);           out += ',';
         out += "\"src_port\":";   json::append_int_or_null(out, row.src_port);    out += ',';
@@ -49,11 +48,7 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         out += "\"dst_port\":";   json::append_int_or_null(out, row.dst_port);    out += ',';
         out += "\"proto\":";      json::append_string(out, row.proto);            out += ',';
         out += "\"tcp_flags\":";  json::append_string_or_null(out, row.tcp_flags); out += ',';
-        out += "\"chain\":";      json::append_string(out, row.chain);            out += ',';
-        out += "\"in_iface\":";   json::append_string(out, row.in_iface);         out += ',';
         out += "\"rule\":";       json::append_string(out, row.rule);             out += ',';
-        out += "\"conn_state\":"; json::append_string(out, row.conn_state);       out += ',';
-        out += "\"pkt_len\":";    out += std::to_string(row.pkt_len);             out += ',';
         out += "\"country\":";    json::append_string_or_null(out, row.country);  out += ',';
         out += "\"lat\":";        json::append_double_or_null(out, row.lat);       out += ',';
         out += "\"lon\":";        json::append_double_or_null(out, row.lon);       out += ',';

@@ -241,7 +241,7 @@ function passesFilters(r) {
 function buildPopup(r, hitCount) {
     const rows = [
         '<div class="popup-row">',
-        '<span class="ip">' + escapeHtml(r.src_ip) + '</span>',
+        '<span class="ip">' + escapeHtml(r.src_ip) + fmtPort(r.src_port) + '</span>',
         ' &rarr; ',
         '<span class="ip">' + escapeHtml(r.dst_ip) + fmtPort(r.dst_port) + '</span>',
         '<br>',
