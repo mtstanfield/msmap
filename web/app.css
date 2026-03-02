@@ -205,6 +205,20 @@ html, body {
 .leaflet-popup-close-button        { color: #8b949e !important; }
 .leaflet-popup-close-button:hover  { color: #e6edf3 !important; }
 
+/* ── New-marker ripple animation ─────────────────────────────────────────── */
+
+@keyframes marker-ripple {
+    0%   { transform: scale(1);   opacity: 1;   }
+    60%  { transform: scale(3);   opacity: 0.3; }
+    100% { transform: scale(1);   opacity: 1;   }
+}
+
+.marker-new {
+    animation:        marker-ripple 0.7s ease-out;
+    transform-box:    fill-box;    /* SVG: transform-origin relative to own bbox */
+    transform-origin: center;
+}
+
 /* ── MarkerCluster colours (threat-ratio based) ───────────────────────────── */
 
 .marker-cluster-threat-safe      { background-color: rgba( 63, 185,  80, 0.3); }

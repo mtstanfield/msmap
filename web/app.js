@@ -152,10 +152,11 @@ fDedup.addEventListener('change', () => { resetAndFetch(); });
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-let totalSeen   = 0;
-let mappedCount = 0;
-let lastTs      = 0;
-let sincePreset = 0;
+let totalSeen    = 0;
+let mappedCount  = 0;
+let lastTs       = 0;
+let sincePreset  = 0;
+let isInitialLoad = true;  // suppresses ripple animation during startup batch
 
 // src_ip → { count, latestTs, marker } — populated only when fDedup.checked.
 const dedupMap = new Map();
@@ -194,21 +195,29 @@ function threatLabel(score) {
     return 'score ' + score + '%';
 }
 
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 function buildPopup(r, hitCount) {
     const rows = [
         '<div class="popup-row">',
-        '<span class="ip">' + r.src_ip + '</span>',
+        '<span class="ip">' + escapeHtml(r.src_ip) + '</span>',
         ' &rarr; ',
-        '<span class="ip">' + r.dst_ip + fmtPort(r.dst_port) + '</span>',
+        '<span class="ip">' + escapeHtml(r.dst_ip) + fmtPort(r.dst_port) + '</span>',
         '<br>',
         hitCount > 1 ? '<span class="label">hits </span>' + hitCount + '<br>' : '',
-        '<span class="' + protoClass(r.proto) + '">' + (r.proto || '?') + '</span>',
-        r.tcp_flags ? ' (' + r.tcp_flags + ')' : '',
+        '<span class="' + protoClass(r.proto) + '">' + escapeHtml(r.proto || '?') + '</span>',
+        r.tcp_flags ? ' (' + escapeHtml(r.tcp_flags) + ')' : '',
         '<br>',
         '<span class="label">time </span>' + fmtTs(r.ts) + '<br>',
-        '<span class="label">rule </span>' + r.rule + '<br>',
-        r.country ? '<span class="label">country </span>' + r.country + '<br>' : '',
-        r.asn     ? '<span class="label">asn </span>' + r.asn + '<br>'     : '',
+        '<span class="label">rule </span>' + escapeHtml(r.rule) + '<br>',
+        r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
+        r.asn     ? '<span class="label">asn </span>' + escapeHtml(r.asn) + '<br>'     : '',
         (r.lat !== null && r.lat !== undefined && r.lon !== null && r.lon !== undefined)
             ? '<span class="label">geo </span>' +
               r.lat.toFixed(4) + ', ' + r.lon.toFixed(4) + '<br>'
@@ -298,6 +307,15 @@ async function poll() {
                 });
                 m.bindPopup(buildPopup(r, 1), { maxWidth: 340 });
                 cluster.addLayer(m);
+                if (!isInitialLoad) {
+                    m.once('add', () => {
+                        const el = m.getElement(); // SVG <path>; null in canvas fallback
+                        if (!el) { return; }
+                        el.classList.add('marker-new');
+                        el.addEventListener('animationend',
+                            () => el.classList.remove('marker-new'), { once: true });
+                    });
+                }
                 mappedCount++;
                 if (fDedup.checked) {
                     dedupMap.set(r.src_ip, { count: 1, latestTs: r.ts, marker: m });
@@ -309,6 +327,7 @@ async function poll() {
         statMapped.textContent = mappedCount.toLocaleString() + ' mapped';
         statTotal.textContent  = totalSeen.toLocaleString() + ' total';
         statTime.textContent   = 'updated ' + new Date().toLocaleTimeString();
+        isInitialLoad = false;
 
     } catch (err) {
         setError(err.message);
