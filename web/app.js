@@ -136,7 +136,7 @@ document.getElementById('f-clear').addEventListener('click', () => {
     fIp.value        = '';
     fPort.value      = '';
     fCountry.value   = '';
-    fLimit.value     = '1000';
+    fLimit.value     = '10000';
     resetAndFetch();
 });
 
