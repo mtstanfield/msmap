@@ -61,7 +61,7 @@ struct QueryFilters {
     std::string  country;       // exact match;  empty = any
     std::string  proto;         // exact match;  empty = any
     int          dst_port{0};   // exact match;  0 = any
-    int          limit{1000};   // row cap (enforced max: 10 000)
+    int          limit{25000};  // row cap (enforced max: 25 000)
 };
 
 // ── Database class ────────────────────────────────────────────────────────────

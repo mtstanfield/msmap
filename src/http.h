@@ -27,7 +27,7 @@ struct MhdDaemonCloser {
 ///   GET /api/connections   — JSON array, filterable via query parameters:
 ///                             since=<epoch>  until=<epoch>  ip=<addr>
 ///                             country=<CC>   proto=<TCP|UDP|ICMP>
-///                             port=<n>       limit=<n>  (default 1000, max 10 000)
+///                             port=<n>       limit=<n>  (default 25 000, max 25 000)
 ///   GET /                  — placeholder HTML (full map UI added later)
 class HttpServer {
 public:

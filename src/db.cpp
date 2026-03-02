@@ -394,7 +394,7 @@ Database::query_connections(const QueryFilters& f) const noexcept
         (void)sqlite3_bind_int(stmt.get(), idx++, f.dst_port);
     }
 
-    const int cap = (f.limit > 0 && f.limit <= 10000) ? f.limit : 1000;
+    const int cap = (f.limit > 0 && f.limit <= 25000) ? f.limit : 25000;
     (void)sqlite3_bind_int(stmt.get(), idx, cap);
 
     // Collect result rows.

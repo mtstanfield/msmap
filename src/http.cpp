@@ -127,11 +127,11 @@ QueryFilters parse_filters(MHD_Connection* conn)
         }
     }
 
-    // Row limit: cap at the documented maximum of 10 000.
+    // Row limit: cap at the documented maximum of 25 000.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
     if (v != nullptr) {
         const int n = static_cast<int>(std::strtol(v, nullptr, 10));
-        if (n > 0 && n <= 10000) {
+        if (n > 0 && n <= 25000) {
             f.limit = n;
         }
     }

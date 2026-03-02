@@ -7,7 +7,7 @@
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const REFRESH_MS  = 30000;         // poll interval
-const MAX_MARKERS = 5000;          // cap to keep rendering fast
+const MAX_MARKERS = 20000;         // cap to keep rendering fast
 
 // ── Filter persistence ───────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ document.getElementById('f-clear').addEventListener('click', () => {
     fIp.value        = '';
     fPort.value      = '';
     fCountry.value   = '';
-    fLimit.value     = '10000';
+    fLimit.value     = '25000';
     resetAndFetch();
 });
 
