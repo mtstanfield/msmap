@@ -72,6 +72,7 @@ L.tileLayer(
         subdomains:        'abcd',
         maxZoom:           19,
         noWrap:            true,       // don't repeat tiles outside ±180°
+        bounds:            [[-90, -180], [90, 180]], // suppress requests for out-of-range tile indices
         updateWhenIdle:    false,      // load tiles continuously while panning
         updateWhenZooming: false,      // skip tile loads during zoom animation
         keepBuffer:        4,          // pre-render 4 tile-widths beyond viewport
