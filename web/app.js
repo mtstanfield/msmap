@@ -75,7 +75,6 @@ L.tileLayer(
         updateWhenIdle:    false,      // load tiles continuously while panning
         updateWhenZooming: false,      // skip tile loads during zoom animation
         keepBuffer:        4,          // pre-render 4 tile-widths beyond viewport
-        crossOrigin:       'anonymous', // allow HTTP cache sharing across tabs
     }
 ).addTo(lmap);
 

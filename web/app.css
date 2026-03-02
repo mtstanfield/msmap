@@ -10,7 +10,7 @@ html, body {
 #map {
     position: fixed;
     inset: 0 0 28px 0; /* leave room for status bar */
-    background: #242424; /* match CartoDB Dark Matter tile background */
+    background: #262626; /* match CartoDB Dark Matter tile background */
 }
 
 /* ── Status bar ───────────────────────────────────────────────────────────── */
