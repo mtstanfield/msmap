@@ -1,14 +1,12 @@
 #include "db.h"
 #include "geoip.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <ctime>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <ranges>
 #include <sqlite3.h>
 #include <string>
 #include <vector>
@@ -35,7 +33,7 @@ namespace {
 constexpr std::size_t kPruneInterval{10'000};
 
 // Rows older than this are deleted during a prune pass.
-constexpr std::int64_t kRetentionSecs{86400};
+constexpr std::int64_t kRetentionSecs{30LL * 24 * 3600};
 
 // SQLITE_STATIC means the string is managed by the caller and is
 // guaranteed to remain valid for the lifetime of the sqlite3_bind call.
@@ -218,24 +216,6 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
 {
     const std::lock_guard<std::mutex> lock{mutex_};
 
-    // Construct row for cache before bind (reuse fields).
-    ConnectionRow row;
-    row.ts = entry.ts;
-    row.src_ip = entry.src_ip;
-    row.src_port = entry.src_port >= 0 ? std::optional<int>(entry.src_port) : std::nullopt;
-    row.dst_ip = entry.dst_ip;
-    row.dst_port = entry.dst_port >= 0 ? std::optional<int>(entry.dst_port) : std::nullopt;
-    row.proto = entry.proto;
-    row.tcp_flags = entry.tcp_flags;
-    row.rule = entry.rule;
-    if (geo.found()) {
-      row.country = geo.country;
-      row.lat = geo.lat;
-      row.lon = geo.lon;
-      row.asn = geo.asn;
-    }
-    row.threat = threat;
-
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
     // Bind all fifteen parameters (1-indexed).
@@ -307,9 +287,6 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
     if (insert_count_ % kPruneInterval == 0) {
         prune_old(); // runs under the mutex already held by insert()
     }
-
-    insert_to_cache(row);  // Cache sync post-DB
-
     return true;
 }
 
@@ -325,12 +302,12 @@ int Database::prune_unlocked(std::int64_t cutoff_ts) noexcept
 void Database::prune_old() noexcept
 {
     // Called from insert() which already holds mutex_ — do NOT re-acquire here.
-    prune_cache();
     const auto now    = static_cast<std::int64_t>(std::time(nullptr));
     const auto cutoff = now - kRetentionSecs;
     const int deleted = prune_unlocked(cutoff);
     if (deleted > 0) {
-        std::clog << "[INFO] pruned " << deleted << " rows older than 24h\n";
+        std::clog << "[INFO] pruned " << deleted
+                  << " rows older than 1 year\n";
     }
 }
 
@@ -340,47 +317,7 @@ int Database::prune_older_than(std::int64_t cutoff_ts) noexcept
         return 0;
     }
     const std::lock_guard<std::mutex> lock{mutex_};
-    prune_cache();
     return prune_unlocked(cutoff_ts);
-}
-
-void Database::insert_to_cache(const ConnectionRow& row) noexcept {
-  const std::lock_guard lock{cache_mutex_};
-  recent_cache_.insert(recent_cache_.begin(), row);
-  prune_cache();
-}
-
-void Database::prune_cache() noexcept {
-  const auto cutoff = static_cast<std::int64_t>(std::time(nullptr)) - kCacheRetentionSecs;
-  while (!recent_cache_.empty() && recent_cache_.back().ts < cutoff) {
-    recent_cache_.pop_back();
-  }
-  if (recent_cache_.size() > kMaxCacheSize) {
-    recent_cache_.resize(kMaxCacheSize);
-  }
-}
-
-[[nodiscard]] std::vector<ConnectionRow> Database::query_cache(const QueryFilters& f) const noexcept {
-  const std::lock_guard lock{cache_mutex_};
-  if (recent_cache_.empty()) {
-    return {};
-  }
-  std::vector<ConnectionRow> rows;
-  for (const auto& row : std::ranges::reverse_view(recent_cache_)) {
-    if (row.ts < f.since) {
-      break;
-    }
-    if ((f.src_ip.empty() || row.src_ip == f.src_ip) &&
-        (f.country.empty() || row.country == f.country) &&
-        (f.proto.empty() || row.proto == f.proto) &&
-        (f.dst_port <= 0 || row.dst_port == f.dst_port)) {
-      rows.emplace_back(row);
-      if (rows.size() == static_cast<size_t>(f.limit)) {
-        break;
-      }
-    }
-  }
-  return rows;
 }
 
 std::vector<ConnectionRow>
@@ -388,14 +325,6 @@ Database::query_connections(const QueryFilters& f) const noexcept
 {
     if (!db_) {
         return {};
-    }
-
-    // Try in-memory cache first (recent 24h, ts DESC).
-    {
-      auto rows = query_cache(f);
-      if (!rows.empty()) {
-        return rows;
-      }
     }
 
     const std::lock_guard<std::mutex> lock{mutex_};
