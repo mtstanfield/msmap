@@ -152,10 +152,11 @@ fDedup.addEventListener('change', () => { resetAndFetch(); });
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-let totalSeen   = 0;
-let mappedCount = 0;
-let lastTs      = 0;
-let sincePreset = 0;
+let totalSeen    = 0;
+let mappedCount  = 0;
+let lastTs       = 0;
+let sincePreset  = 0;
+let isInitialLoad = true;  // suppresses ripple animation during startup batch
 
 // src_ip → { count, latestTs, marker } — populated only when fDedup.checked.
 const dedupMap = new Map();
@@ -306,6 +307,15 @@ async function poll() {
                 });
                 m.bindPopup(buildPopup(r, 1), { maxWidth: 340 });
                 cluster.addLayer(m);
+                if (!isInitialLoad) {
+                    m.once('add', () => {
+                        const el = m.getElement(); // SVG <path>; null in canvas fallback
+                        if (!el) { return; }
+                        el.classList.add('marker-new');
+                        el.addEventListener('animationend',
+                            () => el.classList.remove('marker-new'), { once: true });
+                    });
+                }
                 mappedCount++;
                 if (fDedup.checked) {
                     dedupMap.set(r.src_ip, { count: 1, latestTs: r.ts, marker: m });
@@ -317,6 +327,7 @@ async function poll() {
         statMapped.textContent = mappedCount.toLocaleString() + ' mapped';
         statTotal.textContent  = totalSeen.toLocaleString() + ' total';
         statTime.textContent   = 'updated ' + new Date().toLocaleTimeString();
+        isInitialLoad = false;
 
     } catch (err) {
         setError(err.message);
