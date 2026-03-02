@@ -257,7 +257,6 @@ function buildPopup(r, hitCount) {
             ? '<span class="label">tor </span>'
               + (r.is_tor ? '<span class="threat-high">yes</span>' : 'no') + '<br>'
             : '',
-        '<span class="label">len </span>' + r.pkt_len + ' B',
         '</div>',
     ];
     return rows.join('');
