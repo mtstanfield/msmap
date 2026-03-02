@@ -16,13 +16,15 @@ const STORAGE_KEY = 'msmap_filters';
 function saveFilters() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            time:    fTime.value,
-            dedup:   fDedup.checked,
-            proto:   fProto.value,
-            ip:      fIp.value,
-            port:    fPort.value,
-            country: fCountry.value,
-            limit:   fLimit.value,
+            time:        fTime.value,
+            dedup:       fDedup.checked,
+            tor:         fTor.checked,
+            datacenter:  fDatacenter.checked,
+            residential: fResidential.checked,
+            proto:       fProto.value,
+            ip:          fIp.value,
+            port:        fPort.value,
+            country:     fCountry.value,
         }));
     } catch (_) { /* private/storage-full — silently ignore */ }
 }
@@ -32,13 +34,15 @@ function loadFilters() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) { return; }
         const s = JSON.parse(raw);
-        if (s.time    !== undefined) { fTime.value    = s.time; }
-        if (s.dedup   !== undefined) { fDedup.checked = s.dedup; }
-        if (s.proto   !== undefined) { fProto.value   = s.proto; }
-        if (s.ip      !== undefined) { fIp.value      = s.ip; }
-        if (s.port    !== undefined) { fPort.value    = s.port; }
-        if (s.country !== undefined) { fCountry.value = s.country; }
-        if (s.limit   !== undefined) { fLimit.value   = s.limit; }
+        if (s.time        !== undefined) { fTime.value        = s.time; }
+        if (s.dedup       !== undefined) { fDedup.checked      = s.dedup; }
+        if (s.tor         !== undefined) { fTor.checked        = s.tor; }
+        if (s.datacenter  !== undefined) { fDatacenter.checked = s.datacenter; }
+        if (s.residential !== undefined) { fResidential.checked = s.residential; }
+        if (s.proto       !== undefined) { fProto.value        = s.proto; }
+        if (s.ip          !== undefined) { fIp.value           = s.ip; }
+        if (s.port        !== undefined) { fPort.value         = s.port; }
+        if (s.country     !== undefined) { fCountry.value      = s.country; }
     } catch (_) { /* corrupted storage — silently ignore */ }
 }
 
@@ -111,7 +115,9 @@ const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
-const fLimit        = document.getElementById('f-limit');
+const fTor          = document.getElementById('f-tor');
+const fDatacenter   = document.getElementById('f-datacenter');
+const fResidential  = document.getElementById('f-residential');
 
 // ── Filter panel ─────────────────────────────────────────────────────────────
 
@@ -130,20 +136,25 @@ document.getElementById('f-apply').addEventListener('click', () => {
 });
 
 document.getElementById('f-clear').addEventListener('click', () => {
-    fTime.value      = '2592000';
-    fDedup.checked   = true;
-    fProto.value     = '';
-    fIp.value        = '';
-    fPort.value      = '';
-    fCountry.value   = '';
-    fLimit.value     = '25000';
+    fTime.value          = '900';
+    fDedup.checked       = true;
+    fTor.checked         = false;
+    fDatacenter.checked  = false;
+    fResidential.checked = false;
+    fProto.value         = '';
+    fIp.value            = '';
+    fPort.value          = '';
+    fCountry.value       = '';
     resetAndFetch();
 });
 
-fDedup.addEventListener('change', () => { resetAndFetch(); });
+fDedup.addEventListener('change',       () => { resetAndFetch(); });
+fTor.addEventListener('change',         () => { resetAndFetch(); });
+fDatacenter.addEventListener('change',  () => { resetAndFetch(); });
+fResidential.addEventListener('change', () => { resetAndFetch(); });
 
 // Also apply when Enter is pressed in any text/number input.
-[fIp, fPort, fCountry, fLimit].forEach((el) => {
+[fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { resetAndFetch(); }
     });
@@ -204,6 +215,21 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
+/// Client-side enrichment filters (Tor / datacenter / residential).
+/// Returns true if the row should be shown, false if it should be hidden.
+/// When no toggles are active, all rows pass.  Multiple active toggles = OR.
+function passesFilters(r) {
+    const torActive  = fTor.checked;
+    const dcActive   = fDatacenter.checked;
+    const resActive  = fResidential.checked;
+    if (!torActive && !dcActive && !resActive) { return true; }
+    if (torActive  && r.is_tor === true)  { return true; }
+    const ut = r.usage_type ? r.usage_type.toLowerCase() : '';
+    if (dcActive   && ut.includes('data center'))  { return true; }
+    if (resActive  && ut.includes('residential'))  { return true; }
+    return false;
+}
+
 function buildPopup(r, hitCount) {
     const rows = [
         '<div class="popup-row">',
@@ -246,8 +272,7 @@ function buildQueryString() {
     if (fIp.value.trim())     { params.set('ip',      fIp.value.trim()); }
     if (fPort.value)          { params.set('port',    fPort.value); }
     if (fCountry.value.trim()) { params.set('country', fCountry.value.trim().toUpperCase()); }
-    const lim = parseInt(fLimit.value, 10);
-    if (lim > 0)              { params.set('limit',   String(lim)); }
+    params.set('limit', '25000');
     const qs = params.toString();
     return qs ? '?' + qs : '';
 }
@@ -271,9 +296,10 @@ async function poll() {
         const rows = await resp.json();
         setError('');
 
-        totalSeen += rows.length;
-
         for (const r of rows) {
+            if (!passesFilters(r)) { continue; }
+            totalSeen++;
+
             // Dedup mode: merge into existing marker when this IP is already mapped.
             // Rows arrive newest-first (ORDER BY ts DESC), so the first occurrence
             // in a batch is already the most recent — only update popup when newer.
