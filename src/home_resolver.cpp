@@ -76,9 +76,6 @@ HomePoint HomeResolver::resolve_once() const noexcept
 
     const std::string resolved{ip_buf.data()};
 
-    // Log if the IP changed since last resolution (change detection is done
-    // by comparing last_ip_ in worker(); on the initial call last_ip_ is
-    // empty so the caller always logs the first result).
     const GeoIpResult geo = geoip_.lookup(resolved);
     if (!geo.found()) {
         std::clog << "[WARN] HomeResolver: GeoIP lookup failed for "

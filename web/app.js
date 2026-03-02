@@ -312,12 +312,18 @@ async function fetchHome() {
         const resp = await fetch('/api/home');
         if (!resp.ok) {
             // 404 = feature not configured or initial resolution failed.
-            homePt = null;
-            if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            // Transient errors (5xx) keep the previous homePt to avoid
+            // disrupting the arc toggle during a brief server hiccup.
+            if (resp.status === 404) {
+                homePt = null;
+                if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            }
             return;
         }
         const fresh = await resp.json();
-        if (!fresh || fresh.lat === undefined) { return; }
+        if (!fresh ||
+            !Number.isFinite(fresh.lat) ||
+            !Number.isFinite(fresh.lon)) { return; }
 
         const changed = !homePt ||
                         homePt.lat !== fresh.lat ||
