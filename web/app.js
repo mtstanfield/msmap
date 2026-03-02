@@ -199,7 +199,7 @@ function fmtPort(p) {
 }
 
 function markerColor(threat) {
-    if (threat === null || threat === undefined) { return '#8b949e'; }
+    if (threat === null || threat === undefined) { return '#adbac7'; }
     if (threat === 0)   { return '#3fb950'; }
     if (threat <= 33)   { return '#d29922'; }
     if (threat <= 66)   { return '#f0883e'; }
