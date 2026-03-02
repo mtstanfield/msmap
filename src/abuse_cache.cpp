@@ -252,6 +252,10 @@ void AbuseCache::submit(const std::string& ip) noexcept
 
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
+        // Check for UTC day rollover first so that if the worker is idle (queue
+        // empty, no IP to re-queue into wait_for_quota_reset), the reset is still
+        // detected on the next incoming packet rather than never.
+        rate_limit_reset_if_new_day();
         // Suppress new submissions when today's quota is exhausted.  IPs that
         // were already in the queue before quota ran out are still processed by
         // the worker once the daily counter resets at midnight.
