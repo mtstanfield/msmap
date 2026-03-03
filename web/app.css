@@ -278,10 +278,30 @@ html, body {
 }
 
 .legend-note {
-    margin-top: 6px;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 8px;
+    align-items: start;
     color: #8b949e;
     font-size: 11px;
-    line-height: 1.45;
+    line-height: 1.4;
+}
+
+.legend-notes {
+    display: grid;
+    gap: 6px;
+}
+
+.legend-note-label {
+    color: #c9d1d9;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.legend-note-value {
+    color: #8b949e;
 }
 
 .filter-label {
@@ -644,6 +664,40 @@ html, body {
 .marker-cluster-threat-high  div { background-color: rgba(248,  81,  73, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
 
 @media (max-width: 900px) {
+    #filter-panel {
+        width: 188px;
+        max-height: calc(100vh - 102px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #filter-legend {
+        margin-top: 6px;
+        padding: 7px 8px;
+    }
+
+    .legend-title {
+        margin-top: 7px;
+        margin-bottom: 5px;
+    }
+
+    .legend-row {
+        gap: 7px;
+        margin-bottom: 4px;
+        font-size: 11px;
+    }
+
+    .legend-note {
+        grid-template-columns: 38px 1fr;
+        gap: 6px;
+        font-size: 10px;
+        line-height: 1.35;
+    }
+
+    .legend-note-label {
+        font-size: 9px;
+    }
+
     #status-bar {
         flex-wrap: wrap;
         align-items: flex-start;
