@@ -834,11 +834,11 @@ async function fetchHome() {
 function addHomeMarker() {
     if (!homePt || homeMarker) { return; }
     homeMarker = L.circleMarker([homePt.lat, homePt.lon], {
-        radius:      7,
+        radius:      8,
         color:       '#58a6ff',
         fillColor:   '#58a6ff',
-        fillOpacity: 0.15,
-        weight:      2,
+        fillOpacity: 0.10,
+        weight:      2.5,
         interactive: true,
     });
     homeMarker.bindTooltip('Home', { direction: 'top', offset: [0, -8] });

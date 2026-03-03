@@ -45,8 +45,9 @@
         <input id="f-ip" type="text" placeholder="1.2.3.4" maxlength="45"
                autocomplete="off" spellcheck="false">
 
-        <label class="filter-label" for="f-port">Dst Port</label>
-        <input id="f-port" type="number" placeholder="any" min="1" max="65535">
+        <label class="filter-label" for="f-port">Destination Port</label>
+        <input id="f-port" type="text" placeholder="any" maxlength="5" inputmode="numeric"
+               autocomplete="off" spellcheck="false">
 
         <label class="filter-label" for="f-country">Country</label>
         <input id="f-country" type="text" placeholder="US" maxlength="2"
@@ -67,6 +68,10 @@
             <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
             <div class="legend-title">Notes</div>
             <div class="legend-notes">
+                <div class="legend-note">
+                    <span class="legend-note-label">Home</span>
+                    <span class="legend-note-value">Blue circle marks the configured home location.</span>
+                </div>
                 <div class="legend-note">
                     <span class="legend-note-label">Ripple</span>
                     <span class="legend-note-value">First seen in this browser session.</span>
