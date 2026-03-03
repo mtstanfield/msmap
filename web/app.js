@@ -785,12 +785,10 @@ function buildLinkouts(srcIp) {
     ).join('') + '</div>';
 }
 
-function buildSummaryItem(label, value, wide = false) {
+function buildSummaryItem(label, value) {
     if (value === null || value === undefined || value === '') { return ''; }
     return [
-        '<div class="popup-meta-item',
-        wide ? ' popup-meta-item-wide' : '',
-        '">',
+        '<div class="popup-meta-item">',
         '<span class="popup-meta-label">', label, '</span>',
         '<span class="popup-meta-value">', value, '</span>',
         '</div>',
@@ -803,7 +801,7 @@ function buildAggregateSummary(r) {
         buildSummaryItem('Country', r.country ? escapeHtml(r.country) : ''),
         buildSummaryItem('First', buildResponsiveTimestamp(r.first_ts)),
         buildSummaryItem('Last', buildResponsiveTimestamp(r.last_ts)),
-        buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : '', true),
+        buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : ''),
     ].filter(Boolean).join('');
     const intel = buildIntelBadges(r);
     const usage = r.usage_type
