@@ -267,7 +267,6 @@ from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Unique IPs | Retained for compatibility; the map feed is aggregate-per-source-IP by default |
 | Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
 | Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
 | Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
@@ -284,13 +283,17 @@ browser then:
 
 1. Places a hollow blue ring marker at the home location (always visible,
    outside the cluster layer).
-2. For each new source IP added to the map, draws an animated bezier arc from
-   that IP toward home — colored to match the threat level of the source.  The
-   arc line draws itself over 1.2 s (`stroke-dashoffset` CSS transition), with a
-   dot tracking the head; a pulse ring fires on arrival.  The assembly fades out
-   and is removed after ~1.7 s total.
+2. For each newly active source IP in a poll batch, draws an animated bezier arc
+   from that IP toward home — colored to match the threat level of the source.
+   The arc line draws itself over 1.2 s (`stroke-dashoffset` CSS transition),
+   with a dot tracking the head; a pulse ring fires on arrival. The assembly
+   fades out and is removed after ~1.7 s total.
 3. Rate-limits arcs to 15 per poll batch to avoid visual overload.
 4. Clears stale arcs on map zoom (layer coordinates rescale on zoom).
+
+Marker circles also apply a one-shot ripple animation the first time a source IP
+appears in the current browser session. The ripple does not replay on later
+polls for the same IP.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and the feature is silently disabled — the toggle
@@ -306,7 +309,13 @@ Clicking a marker shows:
 - **Threat score** — latest and/or maximum AbuseIPDB abuse confidence 0–100
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** — `yes` (highlighted) or `no`
-- Recent raw events loaded on demand from `GET /api/detail`
+- A condensed recent-event viewer loaded on demand from `GET /api/detail`
+- Arrow controls to step older/newer through the raw-event history for that
+  aggregate source IP marker
+
+The popup shows the newest raw event first and lazy-loads older pages only when
+the user walks past the oldest loaded entry. It no longer dumps the full first
+page of raw rows into the popup.
 
 The OSINT fields appear once the background worker has resolved the IP against
 AbuseIPDB. Results are cached for 30 days; an API key is not required to view

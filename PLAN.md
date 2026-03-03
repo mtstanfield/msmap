@@ -164,7 +164,7 @@ docker build -t msmap .
 ### Storage
 - [x] SQLite schema (see table above) + WAL mode pragma
 - [x] Indexes: `ts`, `src_ip`, `dst_port`, `country`
-- [x] Retention pruning (30 days): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
+- [x] Retention pruning (24 hours): triggered on insert every 10 000 rows; public `prune_older_than()` for testing/maintenance
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
@@ -174,13 +174,18 @@ docker build -t msmap .
 - [x] libmicrohttpd HTTP server on port 8080
 - [x] Asset embedding: `web/bundle.py` CMake step inlines Leaflet+MarkerCluster+app JS/CSS
       into a single `constexpr std::string_view` header; no xxd, no filesystem deps
-- [x] REST API: `GET /api/connections` (JSON, filterable by ts range/ip/country/port/proto)
+- [x] REST API: aggregate `GET /api/map`, lazy raw drilldown `GET /api/detail`, and
+      optional home marker `GET /api/home`
 - [x] Map view: Leaflet + MarkerCluster, circle markers colour-coded by threat score
       (5-level: grey=unknown, green=0, amber=1-33, orange=34-66, red=67-100;
       CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
 - [x] Filter/time-range panel: time range (15 min–24 h), protocol, src IP, dst port,
-      country; client-side enrichment toggles: Unique IPs, Tor exits, Datacenter,
-      Residential; always requests max 25 000 rows from API
+      country; client-side enrichment toggles: Tor exits, Datacenter, Residential,
+      Arc animation; map polls aggregate markers instead of capped raw rows
+- [x] Marker popup: aggregate summary plus condensed raw-event history viewer with
+      older/newer navigation and lazy paging
+- [x] Marker motion: one-shot ripple for source IPs first seen in the current
+      browser session; optional home-directed arc animation when configured
 - [~] Raw query UI: out of scope — filter panel covers the use case
 - [x] Timestamp display: UTC epoch → local timezone via `Intl.DateTimeFormat`
 
