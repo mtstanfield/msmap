@@ -580,6 +580,18 @@ docker run --rm -v "$PWD:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 ```
 
+### Frontend mockups
+
+For fast popup/UI iteration without running the full app, open
+`web/popup_mock.html` directly in a browser or serve the `web/` directory:
+
+```bash
+cd web
+python3 -m http.server 8081
+```
+
+Then visit `http://localhost:8081/popup_mock.html`.
+
 ### Fuzzer (libFuzzer on the syslog parser)
 
 Build the fuzz target:

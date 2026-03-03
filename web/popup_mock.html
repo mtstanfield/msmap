@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>msmap Popup Mock</title>
+    <link rel="stylesheet" href="app.css">
+    <style>
+        body {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            box-sizing: border-box;
+            background:
+                radial-gradient(circle at top, rgba(88, 166, 255, 0.12), transparent 32%),
+                linear-gradient(180deg, #0d1117, #11161d 45%, #0d1117);
+            color: #e6edf3;
+        }
+
+        .mock-stage {
+            width: min(980px, 100%);
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .mock-panel {
+            padding: 16px;
+            border: 1px solid rgba(48, 54, 61, 0.9);
+            border-radius: 14px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
+                rgba(22, 27, 34, 0.86);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
+        }
+
+        .mock-panel h1 {
+            margin: 0 0 4px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #c9d1d9;
+        }
+
+        .mock-panel p {
+            margin: 0 0 12px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #8b949e;
+        }
+
+        .mock-map {
+            min-height: 320px;
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(48, 54, 61, 0.7);
+            background:
+                radial-gradient(circle at 30% 20%, rgba(88, 166, 255, 0.12), transparent 28%),
+                linear-gradient(180deg, rgba(13, 17, 23, 0.92), rgba(13, 17, 23, 0.78)),
+                #0d1117;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        .mock-map.mobile {
+            width: 292px;
+            max-width: 100%;
+            min-height: 468px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        .mock-map.mobile .popup-time-full {
+            display: none;
+        }
+
+        .mock-map.mobile .popup-time-compact {
+            display: inline;
+        }
+
+        .mock-map .leaflet-popup {
+            position: static;
+            margin: 0;
+        }
+
+        .mock-map .leaflet-popup-content-wrapper {
+            overflow: hidden;
+        }
+
+        .leaflet-popup-content {
+            margin: 10px 12px 12px;
+        }
+
+        .leaflet-popup-tip-container,
+        .leaflet-popup-close-button {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .mock-stage {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mock-stage">
+        <section class="mock-panel">
+            <h1>Desktop Popup</h1>
+            <p>Representative drilldown content at typical popup width.</p>
+            <div class="mock-map">
+                <div class="leaflet-popup leaflet-zoom-animated">
+                    <div class="leaflet-popup-content-wrapper">
+                        <div class="leaflet-popup-content">
+                            <div class="popup-row">
+                                <div class="popup-summary">
+                                    <div class="popup-summary-top">
+                                        <div class="popup-header">
+                                            <div class="popup-kicker">Source</div>
+                                            <span class="ip">203.0.113.47</span>
+                                        </div>
+                                        <div class="popup-linkouts">
+                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="popup-signal-strip">
+                                        <div class="popup-chip-row">
+                                            <span class="popup-chip threat-high">Threat 91</span>
+                                            <span class="popup-chip popup-chip-intel">Tor exit</span>
+                                            <span class="popup-chip popup-chip-intel">DROP</span>
+                                        </div>
+                                        <div class="popup-usage">
+                                            <span class="popup-usage-label">type</span>
+                                            <span class="popup-usage-value">Data Center / Web Hosting / Transit</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-meta-grid">
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Hits</span>
+                                            <span class="popup-meta-value">38</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Country</span>
+                                            <span class="popup-meta-value">NL</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">First</span>
+                                            <span class="popup-meta-value">3/3/2026, 10:14:52 AM</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Last</span>
+                                            <span class="popup-meta-value">3/3/2026, 10:17:08 AM</span>
+                                        </div>
+                                        <div class="popup-meta-item popup-meta-item-wide">
+                                            <span class="popup-meta-label">ASN</span>
+                                            <span class="popup-meta-value">AS9009 M247 Europe SRL</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="popup-detail-wrap">
+                                    <div class="popup-detail-bar">
+                                        <div class="popup-detail-heading">Recent events</div>
+                                        <span class="popup-detail-position">2 / 20+</span>
+                                    </div>
+                                    <div class="popup-detail-card">
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">time</span>
+                                            <span class="popup-detail-value">3/3/2026, 10:17:08 AM</span>
+                                        </div>
+                                        <div class="popup-detail-row popup-flow">
+                                            <span class="popup-detail-label">flow</span>
+                                            <div class="popup-flow-value">
+                                                <span class="mono">203.0.113.47:49822</span>
+                                                <span class="popup-flow-arrow" aria-hidden="true">&rarr;</span>
+                                                <span class="mono">198.51.100.12:8291</span>
+                                            </div>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">proto</span>
+                                            <span class="popup-detail-value mono">TCP (syn)</span>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">rule</span>
+                                            <span class="popup-detail-value">input:drop-wan management ports</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-detail-nav">
+                                        <button type="button" class="popup-detail-button">&larr;</button>
+                                        <button type="button" class="popup-detail-button">&rarr;</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel">
+            <h1>Mobile-Sized Frame</h1>
+            <p>Same content constrained to a narrow viewport-style container.</p>
+            <div class="mock-map mobile">
+                <div class="leaflet-popup leaflet-zoom-animated">
+                    <div class="leaflet-popup-content-wrapper">
+                        <div class="leaflet-popup-content">
+                            <div class="popup-row">
+                                <div class="popup-summary">
+                                    <div class="popup-summary-top">
+                                        <div class="popup-header">
+                                            <div class="popup-kicker">Source</div>
+                                            <span class="ip">198.51.100.203</span>
+                                        </div>
+                                        <div class="popup-linkouts">
+                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="popup-signal-strip">
+                                        <div class="popup-chip-row">
+                                            <span class="popup-chip threat-medium">Threat 54</span>
+                                            <span class="popup-chip popup-chip-intel">Tor exit</span>
+                                            <span class="popup-chip popup-chip-intel">DROP</span>
+                                        </div>
+                                        <div class="popup-usage">
+                                            <span class="popup-usage-label">type</span>
+                                            <span class="popup-usage-value">ISP / Residential</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-meta-grid">
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Hits</span>
+                                            <span class="popup-meta-value">7</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Country</span>
+                                            <span class="popup-meta-value">US</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">First</span>
+                                            <span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 9:58:11 AM</span><span class="popup-time-compact">3/3, 9:58 AM</span></span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Last</span>
+                                            <span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 10:02:44 AM</span><span class="popup-time-compact">3/3, 10:02 AM</span></span>
+                                        </div>
+                                        <div class="popup-meta-item popup-meta-item-wide">
+                                            <span class="popup-meta-label">ASN</span>
+                                            <span class="popup-meta-value">AS7922 Comcast Cable</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="popup-detail-wrap">
+                                    <div class="popup-detail-bar">
+                                        <div class="popup-detail-heading">Recent events</div>
+                                        <span class="popup-detail-position">1 / 7</span>
+                                    </div>
+                                    <div class="popup-detail-card">
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">time</span>
+                                            <span class="popup-detail-value"><span class="popup-time-full">3/3/2026, 10:02:44 AM</span><span class="popup-time-compact">3/3, 10:02 AM</span></span>
+                                        </div>
+                                        <div class="popup-detail-row popup-flow">
+                                            <span class="popup-detail-label">flow</span>
+                                            <div class="popup-flow-value">
+                                                <span class="mono">198.51.100.203:60314</span>
+                                                <span class="popup-flow-arrow" aria-hidden="true">&rarr;</span>
+                                                <span class="mono">198.51.100.12:22</span>
+                                            </div>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">proto</span>
+                                            <span class="popup-detail-value mono">TCP (syn)</span>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">rule</span>
+                                            <span class="popup-detail-value">input:drop-wan ssh</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-detail-nav">
+                                        <button type="button" class="popup-detail-button" disabled>&larr;</button>
+                                        <button type="button" class="popup-detail-button">&rarr;</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel">
+            <h1>Long-String Stress</h1>
+            <p>Intentional worst-case strings for overflow and wrapping sanity checks.</p>
+            <div class="mock-map">
+                <div class="leaflet-popup leaflet-zoom-animated">
+                    <div class="leaflet-popup-content-wrapper">
+                        <div class="leaflet-popup-content">
+                            <div class="popup-row">
+                                <div class="popup-summary">
+                                    <div class="popup-summary-top">
+                                        <div class="popup-header">
+                                            <div class="popup-kicker">Source</div>
+                                            <span class="ip">2001:0db8:85a3:0000:0000:8a2e:0370:7334</span>
+                                        </div>
+                                        <div class="popup-linkouts">
+                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg>
+                                            </a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB">
+                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="popup-signal-strip">
+                                        <div class="popup-chip-row">
+                                            <span class="popup-chip threat-high">Threat 100</span>
+                                            <span class="popup-chip popup-chip-intel">Tor exit</span>
+                                        </div>
+                                        <div class="popup-usage">
+                                            <span class="popup-usage-label">type</span>
+                                            <span class="popup-usage-value">Enterprise Software-as-a-Service Platform / Content Delivery / Edge Compute / Reverse Proxy / Multi-Tenant Infrastructure</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-meta-grid">
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Hits</span>
+                                            <span class="popup-meta-value">2,941</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Country</span>
+                                            <span class="popup-meta-value">DE</span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">First</span>
+                                            <span class="popup-meta-value"><span class="popup-time-full">3/2/2026, 11:58:11 PM</span><span class="popup-time-compact">3/2, 11:58 PM</span></span>
+                                        </div>
+                                        <div class="popup-meta-item">
+                                            <span class="popup-meta-label">Last</span>
+                                            <span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 10:42:44 AM</span><span class="popup-time-compact">3/3, 10:42 AM</span></span>
+                                        </div>
+                                        <div class="popup-meta-item popup-meta-item-wide">
+                                            <span class="popup-meta-label">ASN</span>
+                                            <span class="popup-meta-value">AS424242 Example International Backbone and Extremely Long Network Operator Name GmbH &amp; Co. KG</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="popup-detail-wrap">
+                                    <div class="popup-detail-bar">
+                                        <div class="popup-detail-heading">Recent events</div>
+                                        <span class="popup-detail-position">17 / 20+</span>
+                                    </div>
+                                    <div class="popup-detail-card">
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">time</span>
+                                            <span class="popup-detail-value"><span class="popup-time-full">3/3/2026, 10:42:44 AM</span><span class="popup-time-compact">3/3, 10:42 AM</span></span>
+                                        </div>
+                                        <div class="popup-detail-row popup-flow">
+                                            <span class="popup-detail-label">flow</span>
+                                            <div class="popup-flow-value">
+                                                <span class="mono">2001:0db8:85a3:0000:0000:8a2e:0370:7334:61337</span>
+                                                <span class="popup-flow-arrow" aria-hidden="true">&rarr;</span>
+                                                <span class="mono">2001:0db8:0000:0000:0000:ffff:c633:640c:65535</span>
+                                            </div>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">proto</span>
+                                            <span class="popup-detail-value mono">TCP (syn,ack,ecn,cwr,nonce)</span>
+                                        </div>
+                                        <div class="popup-detail-row">
+                                            <span class="popup-detail-label">rule</span>
+                                            <span class="popup-detail-value">input:drop-wan suspicious-remote-management-probe-with-repeated-pathological-subsystem-signature-and-experimental-metadata-tag</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-detail-nav">
+                                        <button type="button" class="popup-detail-button">&larr;</button>
+                                        <button type="button" class="popup-detail-button">&rarr;</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

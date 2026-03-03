@@ -488,6 +488,20 @@ function fmtTs(ts) {
     return new Date(ts * 1000).toLocaleString();
 }
 
+function fmtTsCompact(ts) {
+    return new Date(ts * 1000).toLocaleString(undefined, {
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
+function buildResponsiveTimestamp(ts) {
+    return '<span class="popup-time-full">' + escapeHtml(fmtTs(ts)) + '</span>' +
+        '<span class="popup-time-compact">' + escapeHtml(fmtTsCompact(ts)) + '</span>';
+}
+
 function fmtPort(p) {
     return (p !== null && p !== undefined) ? ':' + p : '';
 }
@@ -771,7 +785,7 @@ function buildSummaryItem(label, value, wide = false) {
         '<div class="popup-meta-item',
         wide ? ' popup-meta-item-wide' : '',
         '">',
-        '<span class="label">', label, '</span>',
+        '<span class="popup-meta-label">', label, '</span>',
         '<span class="popup-meta-value">', value, '</span>',
         '</div>',
     ].join('');
@@ -780,29 +794,28 @@ function buildSummaryItem(label, value, wide = false) {
 function buildAggregateSummary(r) {
     const metaItems = [
         buildSummaryItem('Hits', escapeHtml(String(r.count))),
-        buildSummaryItem(
-            'Sample dst port',
-            r.sample_dst_port !== null && r.sample_dst_port !== undefined
-                ? escapeHtml(String(r.sample_dst_port))
-                : ''
-        ),
-        buildSummaryItem('First seen', escapeHtml(fmtTs(r.first_ts))),
-        buildSummaryItem('Last seen', escapeHtml(fmtTs(r.last_ts))),
         buildSummaryItem('Country', r.country ? escapeHtml(r.country) : ''),
+        buildSummaryItem('First', buildResponsiveTimestamp(r.first_ts)),
+        buildSummaryItem('Last', buildResponsiveTimestamp(r.last_ts)),
         buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : '', true),
     ].filter(Boolean).join('');
+    const intel = buildIntelBadges(r);
+    const usage = r.usage_type
+        ? '<div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">' +
+            escapeHtml(r.usage_type) + '</span></div>'
+        : '';
 
     return [
         '<div class="popup-summary">',
+        '<div class="popup-summary-top">',
         '<div class="popup-header">',
+        '<div class="popup-kicker">Source</div>',
         '<span class="ip">' + escapeHtml(r.src_ip) + '</span>',
-        '<div class="popup-subtitle">Aggregate source activity in the selected window</div>',
         '</div>',
-        '<div class="popup-meta-grid">' + metaItems + '</div>',
-        buildIntelBadges(r),
-        r.usage_type ? '<div class="popup-usage"><span class="label">usage </span>' +
-            escapeHtml(r.usage_type) + '</div>' : '',
         buildLinkouts(r.src_ip),
+        '</div>',
+        intel || usage ? '<div class="popup-signal-strip">' + intel + usage + '</div>' : '',
+        '<div class="popup-meta-grid">' + metaItems + '</div>',
         '</div>',
     ].join('');
 }
@@ -810,13 +823,25 @@ function buildAggregateSummary(r) {
 function buildDetailCard(row) {
     return [
         '<div class="popup-detail-card">',
-        '<div class="popup-detail-row"><span class="label">time </span>' + fmtTs(row.ts) + '</div>',
-        '<div class="popup-detail-row popup-flow"><span class="label">flow </span><span class="mono">' + escapeHtml(row.src_ip) +
-            fmtPort(row.src_port) + '</span> &rarr; <span class="mono">' +
+        '<div class="popup-detail-row">',
+        '<span class="popup-detail-label">time</span>',
+        '<span class="popup-detail-value">' + buildResponsiveTimestamp(row.ts) + '</span>',
+        '</div>',
+        '<div class="popup-detail-row popup-flow">',
+        '<span class="popup-detail-label">flow</span>',
+        '<div class="popup-flow-value"><span class="mono">' + escapeHtml(row.src_ip) + fmtPort(row.src_port) +
+            '</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">' +
             escapeHtml(row.dst_ip) + fmtPort(row.dst_port) + '</span></div>',
-        '<div class="popup-detail-row"><span class="label">proto </span><span class="mono">' + escapeHtml(row.proto || '?') +
-            (row.tcp_flags ? ' (' + escapeHtml(row.tcp_flags) + ')' : '') + '</span></div>',
-        '<div class="popup-detail-row"><span class="label">rule </span>' + escapeHtml(row.rule) + '</div>',
+        '</div>',
+        '<div class="popup-detail-row">',
+        '<span class="popup-detail-label">proto</span>',
+        '<span class="popup-detail-value mono">' + escapeHtml(row.proto || '?') +
+            (row.tcp_flags ? ' (' + escapeHtml(row.tcp_flags) + ')' : '') + '</span>',
+        '</div>',
+        '<div class="popup-detail-row">',
+        '<span class="popup-detail-label">rule</span>',
+        '<span class="popup-detail-value">' + escapeHtml(row.rule) + '</span>',
+        '</div>',
         '</div>',
     ].join('');
 }
@@ -850,13 +875,15 @@ function buildDetailPane(srcIp) {
 
     return [
         '<div id="' + slotId + '" class="popup-detail-wrap">',
+        '<div class="popup-detail-bar">',
         '<div class="popup-detail-heading">Recent events</div>',
+        '<span class="popup-detail-position">' + (state.selectedIndex + 1) + ' / ' +
+            detailStateLabel(state) + '</span>',
+        '</div>',
         buildDetailCard(row),
         '<div class="popup-detail-nav">',
         '<button type="button" class="popup-detail-button" data-action="older" data-ip="' +
             escapeHtml(srcIp) + '"' + disablePrev + '>&larr;</button>',
-        '<span class="popup-detail-position">' + (state.selectedIndex + 1) + ' / ' +
-            detailStateLabel(state) + '</span>',
         '<button type="button" class="popup-detail-button" data-action="newer" data-ip="' +
             escapeHtml(srcIp) + '"' + disableNewer + '>&rarr;</button>',
         '</div>',
