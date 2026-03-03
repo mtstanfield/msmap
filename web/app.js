@@ -141,6 +141,7 @@ const cluster = L.markerClusterGroup({
         const children = clusterMarker.getAllChildMarkers();
         const total = children.length;
         const nHigh = children.filter(m => m.options.severity === 'high').length;
+        const hasSpike = children.some(m => m.options.spiking === true);
         const ratio = total > 0 ? nHigh / total : 0;
         let cls;
         if      (ratio === 0)  { cls = 'safe'; }
@@ -149,7 +150,7 @@ const cluster = L.markerClusterGroup({
         else                   { cls = 'high'; }
         return L.divIcon({
             html:      '<div><span>' + total + '</span></div>',
-            className: 'marker-cluster marker-cluster-threat-' + cls,
+            className: 'marker-cluster marker-cluster-threat-' + cls + (hasSpike ? ' marker-cluster-spike' : ''),
             iconSize:  L.point(40, 40),
         });
     },
@@ -1260,6 +1261,7 @@ function renderMap(rows) {
             fillOpacity: 0.75,
             weight:      mobileUi ? (spiking ? 2.5 : 2) : (spiking ? 2 : 1),
             severity:    severity,
+            spiking:     spiking,
             srcIp:       r.src_ip,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
