@@ -211,6 +211,10 @@ const seenMarkerIps = new Set();
 const detailStateByIp = new Map();
 const activeArcs = new Set();
 
+function isMobileMapUi() {
+    return window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
+}
+
 function animationsEnabled() {
     return fAnimations.value === 'on';
 }
@@ -1234,15 +1238,16 @@ function renderMap(rows) {
 
         const severity = markerSeverity(r);
         const spiking = isSpikeMarker(r);
+        const mobileUi = isMobileMapUi();
         const color = severity === 'high'
             ? '#f85149'
             : markerColor((r.threat_max !== undefined) ? r.threat_max : null);
         const marker = L.circleMarker([r.lat, r.lon], {
-            radius:      spiking ? 6 : 5,
+            radius:      mobileUi ? (spiking ? 8 : 7) : (spiking ? 6 : 5),
             color:       color,
             fillColor:   color,
             fillOpacity: 0.75,
-            weight:      spiking ? 2 : 1,
+            weight:      mobileUi ? (spiking ? 2.5 : 2) : (spiking ? 2 : 1),
             severity:    severity,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
