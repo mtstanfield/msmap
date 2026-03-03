@@ -149,6 +149,10 @@ html, body {
     color: #f85149;
 }
 
+#stat-intel-value.status-state-syncing {
+    color: #8b949e;
+}
+
 #stat-intel-value.status-state-off {
     color: #8b949e;
 }

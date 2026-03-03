@@ -528,7 +528,7 @@ function setOperatorStatus(status) {
     statEventsValue.textContent = formatCompactCount(status.rows_24h ?? 0);
     statSourcesValue.textContent = formatCompactCount(status.distinct_sources_24h ?? 0);
 
-    statIntelValue.classList.remove('status-state-ok', 'status-state-stale', 'status-state-off');
+    statIntelValue.classList.remove('status-state-ok', 'status-state-stale', 'status-state-off', 'status-state-syncing');
     if (status.intel_enabled !== true) {
         statIntelValue.textContent = 'off';
         statIntelValue.classList.add('status-state-off');
@@ -537,7 +537,10 @@ function setOperatorStatus(status) {
 
     const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
     const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
-    if (refreshTs > 0 && (now - refreshTs) <= (12 * 3600)) {
+    if (refreshTs <= 0) {
+        statIntelValue.textContent = 'syncing';
+        statIntelValue.classList.add('status-state-syncing');
+    } else if ((now - refreshTs) <= (12 * 3600)) {
         statIntelValue.textContent = 'ok';
         statIntelValue.classList.add('status-state-ok');
     } else {
