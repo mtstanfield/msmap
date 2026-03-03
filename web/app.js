@@ -1180,6 +1180,31 @@ function maybeAnimateMarker(marker, srcIp) {
     setTimeout(() => { el.classList.remove('marker-new'); }, 700);
 }
 
+function isSpikeMarker(row) {
+    const windowSecs = currentWindowSecs();
+    if (windowSecs !== 900 && windowSecs !== 3600) { return false; }
+    if (!Number.isFinite(row.count) || !Number.isFinite(row.first_ts) || !Number.isFinite(row.last_ts)) {
+        return false;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const count = row.count;
+    const span = Math.max(0, row.last_ts - row.first_ts);
+    const age = Math.max(0, now - row.last_ts);
+
+    if (windowSecs === 900) {
+        return count >= 10 && span <= 300 && age <= 120;
+    }
+
+    return count >= 25 && span <= 900 && age <= 300;
+}
+
+function applySpikeMarkerState(marker, spiking) {
+    const el = marker.getElement();
+    if (!el) { return; }
+    el.classList.toggle('marker-spike', spiking && animationsEnabled());
+}
+
 function renderMap(rows) {
     const reopenIp = activePopupIp;
     let reopenMarker = null;
@@ -1199,19 +1224,25 @@ function renderMap(rows) {
         totalSeen += Number.isFinite(r.count) ? r.count : 0;
 
         const severity = markerSeverity(r);
+        const spiking = isSpikeMarker(r);
         const color = severity === 'high'
             ? '#f85149'
             : markerColor((r.threat_max !== undefined) ? r.threat_max : null);
         const marker = L.circleMarker([r.lat, r.lon], {
-            radius:      5,
+            radius:      spiking ? 6 : 5,
             color:       color,
             fillColor:   color,
             fillOpacity: 0.75,
-            weight:      1,
+            weight:      spiking ? 2 : 1,
             severity:    severity,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
-        marker.on('add', () => { setTimeout(() => { maybeAnimateMarker(marker, r.src_ip); }, 0); });
+        marker.on('add', () => {
+            setTimeout(() => {
+                maybeAnimateMarker(marker, r.src_ip);
+                applySpikeMarkerState(marker, spiking);
+            }, 0);
+        });
         marker.on('popupopen', () => {
             activePopupIp = r.src_ip;
             bindPopupControls(marker, r);
