@@ -6,7 +6,7 @@
 const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
 const ERROR_REFRESH_MS  = 60000;
-const DETAIL_PAGE_SIZE  = 100;
+const DETAIL_PAGE_SIZE  = 20;
 
 const ARC_DRAW_MS   = 1200;
 const ARC_FADE_MS   =  500;
@@ -18,7 +18,6 @@ function saveFilters() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             time:        fTime.value,
-            dedup:       fDedup.checked,
             tor:         fTor.checked,
             datacenter:  fDatacenter.checked,
             residential: fResidential.checked,
@@ -37,7 +36,6 @@ function loadFilters() {
         if (!raw) { return; }
         const s = JSON.parse(raw);
         if (s.time        !== undefined) { fTime.value         = s.time; }
-        if (s.dedup       !== undefined) { fDedup.checked      = s.dedup; }
         if (s.tor         !== undefined) { fTor.checked        = s.tor; }
         if (s.datacenter  !== undefined) { fDatacenter.checked = s.datacenter; }
         if (s.residential !== undefined) { fResidential.checked = s.residential; }
@@ -107,7 +105,6 @@ const statError     = document.getElementById('stat-error');
 const filterPanel   = document.getElementById('filter-panel');
 const filterToggle  = document.getElementById('filter-toggle');
 const fTime         = document.getElementById('f-time');
-const fDedup        = document.getElementById('f-dedup');
 const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
@@ -131,7 +128,6 @@ document.getElementById('f-apply').addEventListener('click', () => {
 
 document.getElementById('f-clear').addEventListener('click', () => {
     fTime.value          = '900';
-    fDedup.checked       = true;
     fTor.checked         = false;
     fDatacenter.checked  = false;
     fResidential.checked = false;
@@ -144,7 +140,6 @@ document.getElementById('f-clear').addEventListener('click', () => {
     pollNow();
 });
 
-fDedup.addEventListener('change',       () => { saveFilters(); pollNow(); });
 fTor.addEventListener('change',         () => { saveFilters(); pollNow(); });
 fDatacenter.addEventListener('change',  () => { saveFilters(); pollNow(); });
 fResidential.addEventListener('change', () => { saveFilters(); pollNow(); });
@@ -167,6 +162,8 @@ let pollTimer     = null;
 
 let homePt     = null;
 let homeMarker = null;
+const seenMarkerIps = new Set();
+const detailStateByIp = new Map();
 
 function currentWindowSecs() {
     const n = parseInt(fTime.value, 10);
@@ -222,6 +219,38 @@ function passesFilters(r) {
     return false;
 }
 
+function detailSlotId(srcIp) {
+    return 'detail-' + srcIp.replace(/[^A-Za-z0-9_-]/g, '-');
+}
+
+function detailStateLabel(state) {
+    const total = state.rows.length;
+    if (!state.nextCursor) {
+        return String(total);
+    }
+    return total + '+';
+}
+
+function ensureDetailState(srcIp) {
+    const windowSecs = currentWindowSecs();
+    const existing = detailStateByIp.get(srcIp);
+    if (existing && existing.windowSecs === windowSecs) {
+        return existing;
+    }
+
+    const fresh = {
+        rows: [],
+        selectedIndex: 0,
+        nextCursor: '',
+        loading: false,
+        error: '',
+        loaded: false,
+        windowSecs: windowSecs,
+    };
+    detailStateByIp.set(srcIp, fresh);
+    return fresh;
+}
+
 function buildMapQueryString() {
     const params = new URLSearchParams();
     params.set('window', String(currentWindowSecs()));
@@ -230,6 +259,86 @@ function buildMapQueryString() {
     if (fPort.value)           { params.set('port', fPort.value); }
     if (fCountry.value.trim()) { params.set('country', fCountry.value.trim().toUpperCase()); }
     return '?' + params.toString();
+}
+
+function buildAggregateSummary(r) {
+    return [
+        '<span class="ip">' + escapeHtml(r.src_ip) + '</span><br>',
+        '<span class="label">hits </span>' + r.count + '<br>',
+        '<span class="label">first seen </span>' + fmtTs(r.first_ts) + '<br>',
+        '<span class="label">last seen </span>' + fmtTs(r.last_ts) + '<br>',
+        r.sample_dst_port !== null && r.sample_dst_port !== undefined
+            ? '<span class="label">sample dst port </span>' + r.sample_dst_port + '<br>'
+            : '',
+        r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
+        r.asn ? '<span class="label">asn </span>' + escapeHtml(r.asn) + '<br>' : '',
+        (r.threat_max !== null && r.threat_max !== undefined)
+            ? '<span class="label">max threat </span><span class="' + threatClass(r.threat_max) + '">'
+              + threatLabel(r.threat_max) + '</span><br>'
+            : '',
+        r.usage_type ? '<span class="label">usage </span>' + escapeHtml(r.usage_type) + '<br>' : '',
+        (r.is_tor !== null && r.is_tor !== undefined)
+            ? '<span class="label">tor </span>' + (r.is_tor ? '<span class="threat-high">yes</span>' : 'no') + '<br>'
+            : '',
+    ].join('');
+}
+
+function buildDetailCard(row) {
+    return [
+        '<div class="popup-detail-card">',
+        '<div><span class="label">time </span>' + fmtTs(row.ts) + '</div>',
+        '<div><span class="label">flow </span><span class="mono">' + escapeHtml(row.src_ip) +
+            fmtPort(row.src_port) + '</span> &rarr; <span class="mono">' +
+            escapeHtml(row.dst_ip) + fmtPort(row.dst_port) + '</span></div>',
+        '<div><span class="label">proto </span><span class="mono">' + escapeHtml(row.proto || '?') +
+            (row.tcp_flags ? ' (' + escapeHtml(row.tcp_flags) + ')' : '') + '</span></div>',
+        '<div><span class="label">rule </span>' + escapeHtml(row.rule) + '</div>',
+        '</div>',
+    ].join('');
+}
+
+function buildDetailPane(srcIp) {
+    const state = ensureDetailState(srcIp);
+    const slotId = detailSlotId(srcIp);
+
+    if ((!state.loaded && !state.error) || (state.loading && state.rows.length === 0)) {
+        return '<div id="' + slotId + '" class="popup-detail-state">Loading recent events...</div>';
+    }
+
+    if (state.error && state.rows.length === 0) {
+        return [
+            '<div id="' + slotId + '" class="popup-detail-state popup-detail-error">',
+            '<div>' + escapeHtml(state.error) + '</div>',
+            '<button type="button" class="popup-detail-button" data-action="retry" data-ip="' +
+                escapeHtml(srcIp) + '">Retry</button>',
+            '</div>',
+        ].join('');
+    }
+
+    if (!state.rows.length) {
+        return '<div id="' + slotId + '" class="popup-detail-state">No recent events in selected window.</div>';
+    }
+
+    const row = state.rows[state.selectedIndex];
+    const disableNewer = state.selectedIndex === 0 || state.loading ? ' disabled' : '';
+    const atOldestLoaded = state.selectedIndex >= state.rows.length - 1;
+    const disablePrev = (atOldestLoaded && !state.nextCursor) || state.loading ? ' disabled' : '';
+
+    return [
+        '<div id="' + slotId + '" class="popup-detail-wrap">',
+        '<div class="popup-detail-heading">Recent events</div>',
+        buildDetailCard(row),
+        '<div class="popup-detail-nav">',
+        '<button type="button" class="popup-detail-button" data-action="older" data-ip="' +
+            escapeHtml(srcIp) + '"' + disablePrev + '>&larr;</button>',
+        '<span class="popup-detail-position">' + (state.selectedIndex + 1) + ' / ' +
+            detailStateLabel(state) + '</span>',
+        '<button type="button" class="popup-detail-button" data-action="newer" data-ip="' +
+            escapeHtml(srcIp) + '"' + disableNewer + '>&rarr;</button>',
+        '</div>',
+        state.loading ? '<div class="popup-detail-hint">Loading older events...</div>' : '',
+        '</div>',
+    ].join('');
 }
 
 function setError(msg) {
@@ -372,73 +481,127 @@ lmap.on('zoomstart', () => {
 });
 
 function buildAggregatePopup(r) {
-    const rows = [
+    return [
         '<div class="popup-row">',
-        '<span class="ip">' + escapeHtml(r.src_ip) + '</span><br>',
-        '<span class="label">hits </span>' + r.count + '<br>',
-        '<span class="label">first seen </span>' + fmtTs(r.first_ts) + '<br>',
-        '<span class="label">last seen </span>' + fmtTs(r.last_ts) + '<br>',
-        r.sample_dst_port !== null && r.sample_dst_port !== undefined
-            ? '<span class="label">sample dst port </span>' + r.sample_dst_port + '<br>'
-            : '',
-        r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
-        r.asn ? '<span class="label">asn </span>' + escapeHtml(r.asn) + '<br>' : '',
-        (r.threat_max !== null && r.threat_max !== undefined)
-            ? '<span class="label">max threat </span><span class="' + threatClass(r.threat_max) + '">'
-              + threatLabel(r.threat_max) + '</span><br>'
-            : '',
-        r.usage_type ? '<span class="label">usage </span>' + escapeHtml(r.usage_type) + '<br>' : '',
-        (r.is_tor !== null && r.is_tor !== undefined)
-            ? '<span class="label">tor </span>' + (r.is_tor ? '<span class="threat-high">yes</span>' : 'no') + '<br>'
-            : '',
-        '<div id="detail-' + escapeHtml(r.src_ip).replace(/\./g, '-') + '">Loading recent events...</div>',
+        buildAggregateSummary(r),
+        buildDetailPane(r.src_ip),
         '</div>',
-    ];
-    return rows.join('');
+    ].join('');
 }
 
-function buildDetailRows(rows) {
-    if (!rows.length) { return '<div class="label">No recent raw events in this window.</div>'; }
-    const parts = ['<div class="popup-row">'];
-    for (const r of rows) {
-        parts.push(
-            '<div style="margin-top:6px">',
-            '<span class="label">time </span>' + fmtTs(r.ts) + '<br>',
-            '<span class="label">flow </span>' + escapeHtml(r.src_ip) + fmtPort(r.src_port) +
-                ' &rarr; ' + escapeHtml(r.dst_ip) + fmtPort(r.dst_port) + '<br>',
-            '<span class="label">proto </span>' + escapeHtml(r.proto || '?') +
-                (r.tcp_flags ? ' (' + escapeHtml(r.tcp_flags) + ')' : '') + '<br>',
-            '<span class="label">rule </span>' + escapeHtml(r.rule) + '<br>',
-            '</div>'
-        );
+function updatePopupContent(marker, row) {
+    marker.setPopupContent(buildAggregatePopup(row));
+    if (marker.isPopupOpen()) {
+        bindPopupControls(marker, row);
     }
-    parts.push('</div>');
-    return parts.join('');
 }
 
-async function loadDetail(marker, srcIp) {
-    const popup = marker.getPopup();
-    if (!popup) { return; }
-
+async function fetchDetailPage(srcIp, cursor) {
     const since = Math.floor(Date.now() / 1000) - currentWindowSecs();
     const params = new URLSearchParams({
         ip: srcIp,
         since: String(since),
         limit: String(DETAIL_PAGE_SIZE),
     });
+    if (cursor) { params.set('cursor', cursor); }
 
+    const resp = await fetch('/api/detail?' + params.toString());
+    if (!resp.ok) {
+        throw new Error('detail unavailable');
+    }
+    return resp.json();
+}
+
+async function loadDetail(marker, row, cursor) {
+    const state = ensureDetailState(row.src_ip);
+    if (state.loading) { return; }
+
+    state.loading = true;
+    state.error = '';
+    updatePopupContent(marker, row);
     try {
-        const resp = await fetch('/api/detail?' + params.toString());
-        if (!resp.ok) { return; }
-        const body = await resp.json();
-        const current = popup.getContent();
-        const slotId = 'detail-' + srcIp.replace(/\./g, '-');
-        const detail = buildDetailRows(body.rows || []);
-        popup.setContent(current.replace(
-            '<div id="' + slotId + '">Loading recent events...</div>',
-            '<div id="' + slotId + '">' + detail + '</div>'
-        ));
-    } catch (_) {}
+        const body = await fetchDetailPage(row.src_ip, cursor);
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+        if (cursor) {
+            state.rows = state.rows.concat(rows);
+        } else {
+            state.rows = rows;
+            state.selectedIndex = 0;
+        }
+        state.nextCursor = typeof body.next_cursor === 'string' ? body.next_cursor : '';
+        state.loaded = true;
+    } catch (_) {
+        state.error = 'Could not load recent events.';
+        state.loaded = true;
+    } finally {
+        state.loading = false;
+        updatePopupContent(marker, row);
+    }
+}
+
+async function showOlderDetail(marker, row) {
+    const state = ensureDetailState(row.src_ip);
+    if (state.loading) { return; }
+    if (state.selectedIndex < state.rows.length - 1) {
+        state.selectedIndex++;
+        updatePopupContent(marker, row);
+        return;
+    }
+    if (!state.nextCursor) { return; }
+
+    const priorLength = state.rows.length;
+    await loadDetail(marker, row, state.nextCursor);
+    if (state.rows.length > priorLength) {
+        state.selectedIndex = priorLength;
+        updatePopupContent(marker, row);
+    }
+}
+
+function showNewerDetail(marker, row) {
+    const state = ensureDetailState(row.src_ip);
+    if (state.loading || state.selectedIndex === 0) { return; }
+    state.selectedIndex--;
+    updatePopupContent(marker, row);
+}
+
+function bindPopupControls(marker, row) {
+    const popup = marker.getPopup();
+    const popupEl = popup ? popup.getElement() : null;
+    if (!popupEl) { return; }
+
+    popupEl.querySelectorAll('[data-action]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const action = button.getAttribute('data-action');
+            if (action === 'retry') {
+                const state = ensureDetailState(row.src_ip);
+                state.rows = [];
+                state.selectedIndex = 0;
+                state.nextCursor = '';
+                state.loaded = false;
+                void loadDetail(marker, row, '');
+                return;
+            }
+            if (action === 'older') {
+                void showOlderDetail(marker, row);
+                return;
+            }
+            if (action === 'newer') {
+                showNewerDetail(marker, row);
+            }
+        }, { once: true });
+    });
+}
+
+function maybeAnimateMarker(marker, srcIp) {
+    if (seenMarkerIps.has(srcIp)) { return; }
+    const el = marker.getElement();
+    if (!el) { return; }
+
+    void el.getBoundingClientRect();
+    el.classList.add('marker-new');
+    seenMarkerIps.add(srcIp);
+    setTimeout(() => { el.classList.remove('marker-new'); }, 700);
 }
 
 function renderMap(rows) {
@@ -465,7 +628,16 @@ function renderMap(rows) {
             threat:      threat,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
-        marker.on('popupopen', () => { void loadDetail(marker, r.src_ip); });
+        marker.on('add', () => { setTimeout(() => { maybeAnimateMarker(marker, r.src_ip); }, 0); });
+        marker.on('popupopen', () => {
+            bindPopupControls(marker, r);
+            const state = ensureDetailState(r.src_ip);
+            if (!state.rows.length && !state.loading) {
+                void loadDetail(marker, r, '');
+            } else {
+                updatePopupContent(marker, r);
+            }
+        });
         cluster.addLayer(marker);
         mappedCount++;
 

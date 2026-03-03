@@ -179,6 +179,83 @@ html, body {
     font-size: 13px;
 }
 
+.popup-detail-wrap {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #30363d;
+}
+
+.popup-detail-heading {
+    margin-bottom: 6px;
+    color: #8b949e;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.popup-detail-card {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 10px;
+    line-height: 1.6;
+}
+
+.popup-detail-card .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+}
+
+.popup-detail-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.popup-detail-button {
+    min-width: 32px;
+    height: 28px;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    background: #21262d;
+    color: #e6edf3;
+    cursor: pointer;
+    font: inherit;
+}
+
+.popup-detail-button:hover:not(:disabled) {
+    border-color: #58a6ff;
+    color: #58a6ff;
+}
+
+.popup-detail-button:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.popup-detail-position {
+    flex: 1;
+    text-align: center;
+    color: #8b949e;
+    font-size: 11px;
+}
+
+.popup-detail-hint,
+.popup-detail-state {
+    margin-top: 8px;
+    color: #8b949e;
+    font-size: 11px;
+}
+
+.popup-detail-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
 /* ── AbuseIPDB threat score ───────────────────────────────────────────────── */
 
 .threat-unknown { color: #8b949e; }
