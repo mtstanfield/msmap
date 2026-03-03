@@ -177,6 +177,7 @@ const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
 const fAnimations   = document.getElementById('f-animations');
+const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 
@@ -559,6 +560,10 @@ function setMapFeedState(nextState) {
     );
 }
 
+function setHomeLegendVisible(visible) {
+    legendHome.style.display = visible ? '' : 'none';
+}
+
 async function fetchStatus() {
     if (statusInFlight) {
         return;
@@ -811,6 +816,7 @@ async function fetchHome() {
                 clearActiveArcs();
                 homePt = null;
                 if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+                setHomeLegendVisible(false);
                 homeFetchDisabled = true;
             }
             return;
@@ -833,6 +839,7 @@ async function fetchHome() {
 
 function addHomeMarker() {
     if (!homePt || homeMarker) { return; }
+    setHomeLegendVisible(true);
     homeMarker = L.circleMarker([homePt.lat, homePt.lon], {
         radius:      8,
         color:       '#58a6ff',

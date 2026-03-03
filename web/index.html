@@ -60,6 +60,13 @@
         </select>
 
         <div id="filter-legend">
+            <div id="legend-home" style="display:none">
+                <div class="legend-title">Home</div>
+                <div class="legend-row">
+                    <span class="legend-home-swatch" aria-hidden="true"></span>
+                    <span>Configured home location</span>
+                </div>
+            </div>
             <div class="legend-title">Threat</div>
             <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
             <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
@@ -68,10 +75,6 @@
             <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
             <div class="legend-title">Notes</div>
             <div class="legend-notes">
-                <div class="legend-note">
-                    <span class="legend-note-label">Home</span>
-                    <span class="legend-note-value">Blue circle marks the configured home location.</span>
-                </div>
                 <div class="legend-note">
                     <span class="legend-note-label">Ripple</span>
                     <span class="legend-note-value">First seen in this browser session.</span>
