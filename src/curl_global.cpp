@@ -9,6 +9,8 @@ namespace msmap {
 bool ensure_curl_global_init() noexcept
 {
     static std::once_flag init_once;
+    // Function-local static avoids a mutable namespace-scope singleton while
+    // still giving the whole process one shared libcurl global-init result.
     static bool init_ok = false; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     std::call_once(init_once, []() noexcept {

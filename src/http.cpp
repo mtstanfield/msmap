@@ -151,6 +151,32 @@ std::string safe_param(const char* v, std::size_t max_len)
     return (sv.size() <= max_len) ? std::string{sv} : std::string{};
 }
 
+std::optional<std::int64_t> parse_positive_i64_exact(const char* raw)
+{
+    if (raw == nullptr || *raw == '\0') {
+        return std::nullopt;
+    }
+    char* end = nullptr;
+    const auto parsed = std::strtoll(raw, &end, 10);
+    if (end == raw || *end != '\0' || parsed <= 0) {
+        return std::nullopt;
+    }
+    return parsed;
+}
+
+std::optional<int> parse_bounded_int_exact(const char* raw, int min_val, int max_val)
+{
+    if (raw == nullptr || *raw == '\0') {
+        return std::nullopt;
+    }
+    char* end = nullptr;
+    const auto parsed = std::strtol(raw, &end, 10);
+    if (end == raw || *end != '\0' || parsed < min_val || parsed > max_val) {
+        return std::nullopt;
+    }
+    return static_cast<int>(parsed);
+}
+
 /// Parse URL query parameters from an MHD connection into a QueryFilters.
 /// All fields are validated and range-checked; invalid values are silently
 /// discarded (treated as "no constraint") rather than propagated.
@@ -162,18 +188,12 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
 
     const char* v = nullptr;
 
-    // Timestamps: must be a positive epoch value.
+    // Timestamps: must be positive epoch values with no trailing junk.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "since");
-    if (v != nullptr) {
-        const std::int64_t n = std::strtoll(v, nullptr, 10);
-        if (n > 0) { f.since = n; }
-    }
+    if (const auto n = parse_positive_i64_exact(v); n.has_value()) { f.since = *n; }
 
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "until");
-    if (v != nullptr) {
-        const std::int64_t n = std::strtoll(v, nullptr, 10);
-        if (n > 0) { f.until = n; }
-    }
+    if (const auto n = parse_positive_i64_exact(v); n.has_value()) { f.until = *n; }
 
     // IP address: IPv6 max representation is 45 chars (e.g. compressed form).
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
@@ -194,28 +214,19 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
 
     // Destination port: valid TCP/UDP range.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
-    if (v != nullptr) {
-        const long n = std::strtol(v, nullptr, 10);
-        if (n >= 1 && n <= 65535) {
-            f.dst_port = static_cast<int>(n);
-        }
+    if (const auto n = parse_bounded_int_exact(v, 1, 65535); n.has_value()) {
+        f.dst_port = *n;
     }
 
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "cursor");
-    if (v != nullptr) {
-        const int n = static_cast<int>(std::strtol(v, nullptr, 10));
-        if (n >= 0) {
-            f.offset = n;
-        }
+    if (const auto n = parse_bounded_int_exact(v, 0, 1'000'000); n.has_value()) {
+        f.offset = *n;
     }
 
     // Row limit: cap detail pages to 500.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
-    if (v != nullptr) {
-        const int n = static_cast<int>(std::strtol(v, nullptr, 10));
-        if (n > 0 && n <= 500) {
-            f.limit = n;
-        }
+    if (const auto n = parse_bounded_int_exact(v, 1, 500); n.has_value()) {
+        f.limit = *n;
     }
 
     return f;
@@ -230,9 +241,9 @@ MapFilters parse_map_filters(MHD_Connection* conn)
     std::int64_t window_secs = 900;
     if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "window");
         v != nullptr) {
-        const std::int64_t n = std::strtoll(v, nullptr, 10);
-        if (n == 900 || n == 3600 || n == 21600 || n == 86400) {
-            window_secs = n;
+        if (const auto n = parse_positive_i64_exact(v); n.has_value() &&
+            (*n == 900 || *n == 3600 || *n == 21600 || *n == 86400)) {
+            window_secs = *n;
         }
     }
     f.since = now - window_secs;
@@ -255,9 +266,8 @@ MapFilters parse_map_filters(MHD_Connection* conn)
     }
     if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
         v != nullptr) {
-        const long n = std::strtol(v, nullptr, 10);
-        if (n >= 1 && n <= 65535) {
-            f.dst_port = static_cast<int>(n);
+        if (const auto n = parse_bounded_int_exact(v, 1, 65535); n.has_value()) {
+            f.dst_port = *n;
         }
     }
 
@@ -270,8 +280,9 @@ std::int64_t map_window_from_request(MHD_Connection* conn)
     if (v == nullptr) {
         return 900;
     }
-    const std::int64_t n = std::strtoll(v, nullptr, 10);
-    return (n == 900 || n == 3600 || n == 21600 || n == 86400) ? n : 900;
+    const auto n = parse_positive_i64_exact(v);
+    return (n.has_value() && (*n == 900 || *n == 3600 || *n == 21600 || *n == 86400))
+        ? *n : 900;
 }
 
 std::string make_etag(std::string_view body)
@@ -427,7 +438,7 @@ HttpServer::HttpServer(std::uint16_t       port,
     // Pass &ctx_ as cls so handle_request can reach both the database and the
     // home resolver.  ctx_ is a member so its address is stable for the
     // daemon's lifetime.
-    // MHD_USE_INTERNAL_POLLING_THREAD: MHD manages its own thread.
+    // MHD_USE_INTERNAL_POLLING_THREAD: MHD manages its own poll thread.
     // MHD_USE_ERROR_LOG: MHD forwards error messages to stderr.
     MHD_Daemon* const raw = MHD_start_daemon(
         static_cast<unsigned int>(MHD_USE_INTERNAL_POLLING_THREAD) |

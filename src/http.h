@@ -19,18 +19,18 @@ struct HandlerCtx {
     const HomeResolver*  home_resolver;  // null when MSMAP_HOME_HOST is unset
 };
 
-/// Custom deleter: calls MHD_stop_daemon, which joins the internal polling
-/// thread before returning.  Declared here; defined in http.cpp where the
-/// full microhttpd.h is included.
+/// Custom deleter: calls MHD_stop_daemon, which stops libmicrohttpd's internal
+/// polling thread and worker pool before returning. Declared here; defined in
+/// http.cpp where the full microhttpd.h is included.
 struct MhdDaemonCloser {
     void operator()(MHD_Daemon* d) const noexcept;
 };
 
 /// Embedded HTTP/1.1 server backed by libmicrohttpd.
 ///
-/// Starts one internal polling thread on construction; that thread handles
-/// all incoming HTTP connections.  The server stops (and the thread exits)
-/// when this object is destroyed.
+/// Starts libmicrohttpd with one internal polling thread plus a configurable
+/// request-worker pool. The server stops and joins those internal threads when
+/// this object is destroyed.
 ///
 /// Endpoints:
 ///   GET /api/map           — aggregate JSON object for the requested window

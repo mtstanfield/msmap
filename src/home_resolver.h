@@ -22,13 +22,13 @@ struct HomePoint {
 
 // ── HomeResolver ──────────────────────────────────────────────────────────────
 
-/// Resolves MSMAP_HOME_HOST → lat/lon and re-checks every 30 minutes.
+/// Resolves MSMAP_HOME_HOST → IPv4 + lat/lon and re-checks every 30 minutes.
 ///
 /// Performs the initial DNS + GeoIP resolution synchronously in the
 /// constructor (so /api/home is ready before the first HTTP request).
 /// A background thread then wakes every kRecheckSecs and repeats the
-/// lookup; if the resolved IP changes the stored HomePoint is updated
-/// and a [INFO] line is logged.
+/// lookup; if the resolved IP or coordinates change the stored HomePoint is
+/// updated and a [INFO] line is logged.
 ///
 /// `get()` returns a copy of the current HomePoint under a mutex and is
 /// safe to call from any thread (e.g. the MHD polling thread).

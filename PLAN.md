@@ -1,9 +1,10 @@
 # Project Plan: msmap – Mikrotik Firewall Log Viewer
 
 ## Overview
-Ingest Mikrotik firewall logs via rsyslog → parse and store inbound connection
-records in SQLite → enrich with GeoIP/OSINT → serve a self-contained web UI
-(world map, filters, query interface) from a single distroless binary.
+Ingest Mikrotik firewall logs directly over UDP syslog → parse and store
+inbound connection records in SQLite → enrich with GeoIP/OSINT → serve a
+self-contained web UI (world map, filters, query interface) from a single
+distroless binary.
 
 ---
 
@@ -16,9 +17,9 @@ records in SQLite → enrich with GeoIP/OSINT → serve a self-contained web UI
 | Database        | SQLite (WAL mode)              | Single-file, zero-server, well-suited to log workloads |
 | GeoIP           | `libmaxminddb` + local GeoLite2-City.mmdb | No external calls at runtime              |
 | OSINT           | AbuseIPDB (cached in SQLite)   | SQLite cache with TTL; no live queries at serve time   |
-| Log ingest      | rsyslog → TCP 5140             | rsyslog reformats timestamp; msmap listens on loopback |
+| Log ingest      | direct UDP syslog → UDP 5140   | self-contained ingest path; RFC 3339 relay format still accepted |
 | JSON            | Hand-rolled serializer         | Known data shapes; zero dependency; ~50 lines          |
-| Build           | CMake 3.29+ + Ninja + clang-18 | Best practices template                                |
+| Build           | CMake 3.29+ (supported 3.x) + Ninja + clang-18 | Docker-first toolchain                         |
 | Dependencies    | apt (.a static libs)           | No Conan/CPM; all libs in Debian bookworm              |
 
 ### Frontend

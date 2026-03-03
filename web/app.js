@@ -1091,6 +1091,10 @@ async function poll() {
 }
 
 function pollNow() {
+    if (pollTimer !== null) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+    }
     clearActiveArcs();
     isInitialLoad = true;
     lastMapTs = 0;

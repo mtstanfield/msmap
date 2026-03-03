@@ -164,7 +164,7 @@ private:
     bool exec(const char* sql) noexcept;
     /// Shared DELETE implementation — caller must already hold mutex_.
     int  prune_unlocked(std::int64_t cutoff_ts) noexcept;
-    /// Called from insert() (already under mutex_) with the 1-year cutoff.
+    /// Called from insert() (already under mutex_) with the production 24h cutoff.
     void prune_old() noexcept;
 
     // mutex_ serialises all SQLite calls from the listener thread (insert)

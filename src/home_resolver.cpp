@@ -108,8 +108,7 @@ void HomeResolver::worker() noexcept
             continue;
         }
 
-        // Detect IP change by comparing coordinates (sufficient proxy — same
-        // IP always produces the same GeoIP result).
+        // Log only when the resolved IP or its derived coordinates changed.
         const bool changed = (!result_.valid ||
                               fresh.resolved_ip != result_.resolved_ip ||
                               fresh.lat != result_.lat ||

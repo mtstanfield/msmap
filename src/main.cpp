@@ -148,9 +148,10 @@ int main() {
     // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
     msmap::GeoIp geoip{city_path, asn_path};
 
-    // Resolve MSMAP_HOME_HOST → lat/lon for the arc animation.  HomeResolver
+    // Resolve MSMAP_HOME_HOST → IP + lat/lon for /api/home, home-directed arcs,
+    // and RFC1918 destination rewrite on newly ingested rows. HomeResolver
     // performs the initial lookup synchronously then re-checks every 30 minutes
-    // in a background thread.  When home_host is empty the resolver is not
+    // in a background thread. When home_host is empty the resolver is not
     // constructed and HttpServer receives a null pointer — /api/home returns 404.
     std::unique_ptr<msmap::HomeResolver> home_resolver;
     if (!home_host.empty()) {
@@ -183,7 +184,8 @@ int main() {
     }
     msmap::IpIntelCache* const intel_ptr = intel_cache.valid() ? &intel_cache : nullptr;
 
-    // HTTP server starts its own internal thread; run_listener blocks below.
+    // HttpServer starts libmicrohttpd's internal poll thread plus the worker
+    // pool configured by MSMAP_HTTP_THREADS; run_listener blocks below.
     // Declaration order is load-bearing: C++ destroys locals in reverse order,
     // so `http` (HttpServer) is destroyed before `home_resolver` and `db`.
     // HttpServer's destructor calls MHD_stop_daemon which joins its thread

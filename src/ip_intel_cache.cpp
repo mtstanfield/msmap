@@ -22,24 +22,6 @@ namespace msmap {
 
 namespace {
 
-struct IpNet {
-    int                    family{AF_UNSPEC};
-    std::array<std::uint8_t, 16> bytes{};
-    std::uint8_t           prefix_len{0};
-};
-
-struct SnapshotState {
-    bool              tor_loaded{false};
-    bool              drop_loaded{false};
-    std::vector<IpNet> tor_nets;
-    std::vector<IpNet> drop_nets;
-};
-
-// NOLINTNEXTLINE(*-avoid-non-const-global-variables)
-std::mutex g_snapshot_mutex;
-// NOLINTNEXTLINE(*-avoid-non-const-global-variables)
-SnapshotState g_snapshot_state;
-
 std::size_t curl_write_cb(const char* ptr, std::size_t /*size*/,
                           std::size_t nmemb, void* userdata) noexcept
 {
@@ -210,14 +192,6 @@ std::vector<IpNet> parse_drop_json(std::string_view body)
     return nets;
 }
 
-void replace_snapshot(std::vector<IpNet> nets,
-                      bool& loaded_flag,
-                      std::vector<IpNet>& target) noexcept
-{
-    target = std::move(nets);
-    loaded_flag = true;
-}
-
 } // namespace
 
 IpIntelCache::IpIntelCache(Database& db, const IpIntelSources& sources,
@@ -291,23 +265,23 @@ void IpIntelCache::refresh_sources() noexcept
     if (!tor_url_.empty()) {
         if (const auto body = fetch_body(tor_url_); body.has_value()) {
             auto nets = parse_line_oriented_nets(*body);
-            if (!nets.empty()) {
-                const std::lock_guard<std::mutex> lock{g_snapshot_mutex};
-                replace_snapshot(std::move(nets), g_snapshot_state.tor_loaded, g_snapshot_state.tor_nets);
-            }
+            // A successful empty fetch is still authoritative: replace any old
+            // snapshot so stale Tor intel does not linger indefinitely.
+            const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+            snapshot_.tor_nets = std::move(nets);
+            snapshot_.tor_loaded = true;
         }
     }
 
     if (!drop_url_.empty()) {
         if (const auto body = fetch_body(drop_url_); body.has_value()) {
             auto nets = parse_drop_json(*body);
-            if (!nets.empty()) {
-                const std::lock_guard<std::mutex> lock{g_snapshot_mutex};
-                replace_snapshot(std::move(nets), g_snapshot_state.drop_loaded, g_snapshot_state.drop_nets);
-            }
+            // Same rule as Tor: successful empty snapshots clear prior state.
+            const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+            snapshot_.drop_nets = std::move(nets);
+            snapshot_.drop_loaded = true;
         }
     }
-
 }
 
 void IpIntelCache::refresh_known_ips() noexcept
@@ -328,15 +302,15 @@ void IpIntelCache::process_pending(const std::unordered_set<std::string>& pendin
     }
 }
 
-IpIntel IpIntelCache::classify_ip(const std::string& ip) noexcept
+IpIntel IpIntelCache::classify_ip(const std::string& ip) const noexcept
 {
-    const std::lock_guard<std::mutex> lock{g_snapshot_mutex};
+    const std::lock_guard<std::mutex> lock{snapshot_mutex_};
     IpIntel intel;
-    if (g_snapshot_state.tor_loaded) {
-        intel.tor_exit = matches_any(ip, g_snapshot_state.tor_nets);
+    if (snapshot_.tor_loaded) {
+        intel.tor_exit = matches_any(ip, snapshot_.tor_nets);
     }
-    if (g_snapshot_state.drop_loaded) {
-        intel.spamhaus_drop = matches_any(ip, g_snapshot_state.drop_nets);
+    if (snapshot_.drop_loaded) {
+        intel.spamhaus_drop = matches_any(ip, snapshot_.drop_nets);
     }
     return intel;
 }

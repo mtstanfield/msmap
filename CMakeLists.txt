@@ -43,8 +43,8 @@ find_package(PkgConfig  REQUIRED)
 find_package(Python3    REQUIRED COMPONENTS Interpreter)
 find_package(Threads    REQUIRED)
 
-# cmake (any version) does not support a STATIC keyword in pkg_check_modules;
-# passing STATIC is treated as a module name and causes a configure error.
+# pkg_check_modules does not support a STATIC keyword; passing STATIC is
+# treated as a module name and causes a configure error.
 # Always discover with IMPORTED_TARGET for include paths and compile flags.
 # When MSMAP_LINK_STATIC=ON, INTERFACE_LINK_LIBRARIES is overridden below
 # using the <prefix>_STATIC_LIBRARIES variables (from pkg-config --static --libs)

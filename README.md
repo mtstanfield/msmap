@@ -44,7 +44,7 @@ msmap binary
 | Layer | Choice | Notes |
 |---|---|---|
 | Language | C++23 | `clang-18`, `-std=c++23` |
-| Build | CMake 3.29+ + Ninja | run inside the dev container |
+| Build | CMake 3.29+ (supported 3.x) + Ninja | run inside the dev container |
 | HTTP server | `libmicrohttpd` | embedded, no framework |
 | Database | SQLite | WAL mode, parameterized queries only |
 | GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups |
@@ -517,7 +517,7 @@ docker run --rm -p 8080:8080 msmap
 ```
 .
 ├── Dockerfile              # Multi-stage: dev → builder → distroless:nonroot
-├── CMakeLists.txt          # Build system (cmake 3.29+, Ninja, clang-18)
+├── CMakeLists.txt          # Build system (supported CMake 3.x, Ninja, clang-18)
 ├── PLAN.md                 # Feature plan and todo list
 ├── CLAUDE.md               # Instructions for Claude Code
 ├── FINDINGS.md             # Issues log for remediation tracking
