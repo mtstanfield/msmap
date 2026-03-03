@@ -22,6 +22,13 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
     payload.ok = false;
     payload.now = static_cast<std::int64_t>(std::time(nullptr));
     payload.abuse_enabled = abuse_enabled;
+    payload.abuse_rate_remaining =
+        (abuse_enabled && abuse_cache != nullptr)
+            ? std::optional<int>{abuse_cache->rate_remaining()}
+            : std::nullopt;
+    payload.abuse_quota_exhausted =
+        abuse_enabled && payload.abuse_rate_remaining.has_value() &&
+        *payload.abuse_rate_remaining <= 0;
     payload.intel_enabled = intel_enabled;
     payload.home_configured = home_resolver != nullptr;
     payload.home_valid = payload.home_configured && home_resolver->get().valid;
@@ -112,6 +119,13 @@ void StatusCache::refresh_snapshot() noexcept
     payload.distinct_sources_24h = db_snapshot->distinct_sources_24h;
     payload.db_size_bytes = db_snapshot->db_size_bytes;
     payload.abuse_enabled = abuse_enabled_;
+    payload.abuse_rate_remaining =
+        (abuse_enabled_ && abuse_cache_ != nullptr)
+            ? std::optional<int>{abuse_cache_->rate_remaining()}
+            : std::nullopt;
+    payload.abuse_quota_exhausted =
+        abuse_enabled_ && payload.abuse_rate_remaining.has_value() &&
+        *payload.abuse_rate_remaining <= 0;
     payload.intel_enabled = intel_enabled_;
     payload.home_configured = home_resolver_ != nullptr;
     payload.home_valid = payload.home_configured && home_resolver_->get().valid;

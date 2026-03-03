@@ -325,6 +325,12 @@ int AbuseCache::rate_remaining() const noexcept
     return rate_remaining_;
 }
 
+void AbuseCache::set_rate_remaining_for_test(int remaining) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    rate_remaining_ = remaining < 0 ? 0 : remaining;
+}
+
 std::optional<std::int64_t> AbuseCache::cache_row_count() const noexcept
 {
     const std::lock_guard<std::mutex> lock{db_mutex_};

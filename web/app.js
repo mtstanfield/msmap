@@ -175,12 +175,14 @@ const statTime      = document.getElementById('stat-time');
 const statEvents    = document.getElementById('stat-events');
 const statSources   = document.getElementById('stat-sources');
 const statIntel     = document.getElementById('stat-intel');
+const statAbuse     = document.getElementById('stat-abuse');
 const statMappedValue = document.getElementById('stat-mapped-value');
 const statTotalValue  = document.getElementById('stat-total-value');
 const statTimeValue   = document.getElementById('stat-time-value');
 const statEventsValue = document.getElementById('stat-events-value');
 const statSourcesValue = document.getElementById('stat-sources-value');
 const statIntelValue = document.getElementById('stat-intel-value');
+const statAbuseValue = document.getElementById('stat-abuse-value');
 const statError     = document.getElementById('stat-error');
 const filterPanel   = document.getElementById('filter-panel');
 const filterToggle  = document.getElementById('filter-toggle');
@@ -569,6 +571,7 @@ function setOperatorStatus(status) {
         statEvents.style.display = 'none';
         statSources.style.display = 'none';
         statIntel.style.display = 'none';
+        statAbuse.style.display = 'none';
         statusOpSeparators.forEach((el) => {
             el.style.display = 'none';
         });
@@ -578,6 +581,7 @@ function setOperatorStatus(status) {
     statEvents.style.display = '';
     statSources.style.display = '';
     statIntel.style.display = '';
+    statAbuse.style.display = '';
     statusOpSeparators.forEach((el) => {
         el.style.display = '';
     });
@@ -586,23 +590,43 @@ function setOperatorStatus(status) {
     statSourcesValue.textContent = formatCompactCount(status.distinct_sources_24h ?? 0);
 
     statIntelValue.classList.remove('status-state-ok', 'status-state-stale', 'status-state-off', 'status-state-syncing');
+    statAbuseValue.classList.remove('status-state-ok', 'status-state-stale', 'status-state-off', 'status-state-syncing');
     if (status.intel_enabled !== true) {
         statIntelValue.textContent = 'off';
         statIntelValue.classList.add('status-state-off');
+    } else {
+        const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
+        const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
+        if (refreshTs <= 0) {
+            statIntelValue.textContent = 'syncing';
+            statIntelValue.classList.add('status-state-syncing');
+        } else if ((now - refreshTs) <= (12 * 3600)) {
+            statIntelValue.textContent = 'ok';
+            statIntelValue.classList.add('status-state-ok');
+        } else {
+            statIntelValue.textContent = 'stale';
+            statIntelValue.classList.add('status-state-stale');
+        }
+    }
+
+    if (status.abuse_enabled !== true) {
+        statAbuseValue.textContent = 'off';
+        statAbuseValue.classList.add('status-state-off');
+        statAbuse.dataset.tooltip = 'AbuseIPDB lookups are disabled. Cached threat data may still be shown.';
         return;
     }
 
-    const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
-    const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
-    if (refreshTs <= 0) {
-        statIntelValue.textContent = 'syncing';
-        statIntelValue.classList.add('status-state-syncing');
-    } else if ((now - refreshTs) <= (12 * 3600)) {
-        statIntelValue.textContent = 'ok';
-        statIntelValue.classList.add('status-state-ok');
+    const abuseRemaining = Number.isFinite(status.abuse_rate_remaining) ? status.abuse_rate_remaining : null;
+    if (status.abuse_quota_exhausted === true) {
+        statAbuseValue.textContent = 'quota';
+        statAbuseValue.classList.add('status-state-stale');
+        statAbuse.dataset.tooltip = 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
     } else {
-        statIntelValue.textContent = 'stale';
-        statIntelValue.classList.add('status-state-stale');
+        statAbuseValue.textContent = 'ok';
+        statAbuseValue.classList.add('status-state-ok');
+        statAbuse.dataset.tooltip = abuseRemaining !== null
+            ? ('AbuseIPDB can accept new lookups. ' + abuseRemaining + ' requests remaining today.')
+            : 'AbuseIPDB can accept new lookups.';
     }
 }
 

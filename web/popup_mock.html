@@ -90,6 +90,21 @@
             overflow: hidden;
         }
 
+        .mock-footer-wrap {
+            min-height: 0;
+            padding: 0;
+            border-radius: 10px;
+            border: 1px solid rgba(48, 54, 61, 0.7);
+            background:
+                linear-gradient(180deg, rgba(13, 17, 23, 0.92), rgba(13, 17, 23, 0.78)),
+                #0d1117;
+            overflow: hidden;
+        }
+
+        .mock-footer-wrap #status-bar {
+            position: static;
+        }
+
         .leaflet-popup-tip-container,
         .leaflet-popup-close-button {
             display: none;
@@ -502,6 +517,61 @@
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
                             <span class="legend-label">Spamhaus DROP</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel mock-panel-wide">
+            <h1>Live Footer</h1>
+            <p>Current desktop footer with the split <code>Feeds</code> and <code>Abuse</code> status items. The Abuse tooltip includes the current requests remaining.</p>
+            <div class="mock-footer-wrap">
+                <div id="status-bar">
+                    <div id="status-left">
+                        <div class="status-group status-tooltip-target status-tooltip-align-left" tabindex="0" data-tooltip="Current visible aggregate markers and the total hits they represent after client-side filters.">
+                            <span class="status-item">
+                                <span class="status-label">Mapped</span>
+                                <span class="status-value status-value-ops">184</span>
+                            </span>
+                            <span class="status-sep" aria-hidden="true">&middot;</span>
+                            <span class="status-item">
+                                <span class="status-label">Hits</span>
+                                <span class="status-value status-value-ops">12.4K</span>
+                            </span>
+                        </div>
+                        <div id="status-ops" class="status-group">
+                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Retained connection rows in the last 24 hours.">
+                                <span class="status-label">Events</span>
+                                <span class="status-value status-value-ops">248K</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Distinct source IPs retained in the last 24 hours.">
+                                <span class="status-label">Sources</span>
+                                <span class="status-value status-value-ops">18.7K</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Status of the Tor Project and Spamhaus DROP background feed refresh.">
+                                <span class="status-label">Feeds</span>
+                                <span class="status-value status-value-ops status-state-ok">ok</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="AbuseIPDB can accept new lookups. 742 requests remaining today.">
+                                <span class="status-label">Abuse</span>
+                                <span class="status-value status-value-ops status-state-ok">ok</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div id="status-right">
+                        <div class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Freshness of the current /api/map data shown on the map.">
+                            <span class="status-dot is-healthy" aria-hidden="true"></span>
+                            <span id="stat-time-value">Updated 18s ago</span>
+                        </div>
+                        <span id="stat-brand">
+                            <span class="brand-mark" aria-hidden="true">🌐</span>
+                            <span class="brand-name">msmap</span>
+                        </span>
+                        <a href="#" rel="noopener noreferrer">GitHub</a>
+                        <span id="stat-built">built 2026-03-03 11:14 UTC</span>
                     </div>
                 </div>
             </div>

@@ -1,3 +1,4 @@
+#include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
 #include "status_cache.h"
@@ -18,6 +19,9 @@ TEST_CASE("status cache: empty database snapshot is available", "[status]")
     REQUIRE(snapshot->rows_24h == 0);
     REQUIRE(snapshot->distinct_sources_24h == 0);
     REQUIRE_FALSE(snapshot->latest_event_ts.has_value());
+    REQUIRE(snapshot->abuse_enabled == false);
+    REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE(snapshot->generated_at >= snapshot->now);
 }
 
@@ -53,6 +57,9 @@ TEST_CASE("status cache: populated database snapshot includes counts", "[status]
     REQUIRE(snapshot->rows_24h == 2);
     REQUIRE(snapshot->distinct_sources_24h == 2);
     REQUIRE(snapshot->latest_event_ts == 1500);
+    REQUIRE(snapshot->abuse_enabled == false);
+    REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
 }
 
 TEST_CASE("status cache: invalid database publishes an unhealthy snapshot", "[status]")
@@ -69,5 +76,44 @@ TEST_CASE("status cache: invalid database publishes an unhealthy snapshot", "[st
     REQUIRE(snapshot->rows_24h == 0);
     REQUIRE(snapshot->distinct_sources_24h == 0);
     REQUIRE_FALSE(snapshot->latest_event_ts.has_value());
+    REQUIRE(snapshot->abuse_enabled == false);
+    REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE(snapshot->generated_at == snapshot->now);
+}
+
+TEST_CASE("status cache: abuse cache exposes remaining quota", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::AbuseCache abuse{":memory:", "dummy_key"};
+    REQUIRE(abuse.valid());
+    abuse.set_rate_remaining_for_test(742);
+
+    msmap::StatusCache status{db, nullptr, &abuse, nullptr, true, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->abuse_enabled);
+    REQUIRE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE(*snapshot->abuse_rate_remaining == 742);
+    REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
+}
+
+TEST_CASE("status cache: abuse cache exposes exhausted quota", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::AbuseCache abuse{":memory:", "dummy_key"};
+    REQUIRE(abuse.valid());
+    abuse.set_rate_remaining_for_test(0);
+
+    msmap::StatusCache status{db, nullptr, &abuse, nullptr, true, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->abuse_enabled);
+    REQUIRE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE(*snapshot->abuse_rate_remaining == 0);
+    REQUIRE(snapshot->abuse_quota_exhausted);
 }

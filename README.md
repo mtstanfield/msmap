@@ -406,7 +406,8 @@ backend caches:
   stale or failing)
 - `Events`: total retained connection rows in the current 24-hour window
 - `Sources`: distinct retained source IPs in that window
-- `Intel`: compact Tor/DROP refresh state (`ok`, `stale`, or `off`)
+- `Feeds`: compact Tor/DROP refresh state (`ok`, `stale`, `syncing`, or `off`)
+- `Abuse`: AbuseIPDB availability/quota state for new lookups (`ok`, `quota`, or `off`)
 - inline error text when the most recent poll failed
 
 The footer metadata on the right shows `🌐 msmap`, the GitHub link, and the
@@ -479,6 +480,8 @@ Response fields include:
 - `rows_24h`
 - `distinct_sources_24h`
 - `abuse_enabled`
+- `abuse_rate_remaining`
+- `abuse_quota_exhausted`
 - `intel_enabled`
 - `home_configured`
 - `home_valid`

@@ -92,6 +92,9 @@ public:
     /// Current number of API calls remaining today.
     [[nodiscard]] int rate_remaining() const noexcept;
 
+    /// Test hook for simulating quota exhaustion or partial remaining quota.
+    void set_rate_remaining_for_test(int remaining) noexcept;
+
     /// Number of rows currently stored in the abuse cache table.
     [[nodiscard]] std::optional<std::int64_t> cache_row_count() const noexcept;
 

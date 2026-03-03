@@ -166,6 +166,12 @@ std::string status_to_json(const StatusPayload& snapshot)
     out += std::to_string(snapshot.distinct_sources_24h);
     out += ",\"abuse_enabled\":";
     out += snapshot.abuse_enabled ? "true" : "false";
+    out += ",\"abuse_rate_remaining\":";
+    append_i64_or_null(out, snapshot.abuse_rate_remaining.has_value()
+                                ? std::optional<std::int64_t>{*snapshot.abuse_rate_remaining}
+                                : std::nullopt);
+    out += ",\"abuse_quota_exhausted\":";
+    out += snapshot.abuse_quota_exhausted ? "true" : "false";
     out += ",\"intel_enabled\":";
     out += snapshot.intel_enabled ? "true" : "false";
     out += ",\"home_configured\":";

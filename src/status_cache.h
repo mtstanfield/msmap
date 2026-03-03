@@ -21,6 +21,8 @@ struct StatusPayload {
     std::int64_t                  rows_24h{};
     std::int64_t                  distinct_sources_24h{};
     bool                          abuse_enabled{false};
+    std::optional<int>            abuse_rate_remaining;
+    bool                          abuse_quota_exhausted{false};
     bool                          intel_enabled{false};
     bool                          home_configured{false};
     bool                          home_valid{false};
