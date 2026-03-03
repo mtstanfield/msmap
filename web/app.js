@@ -862,27 +862,43 @@ function bindPopupControls(marker, row) {
     const popupEl = popup ? popup.getElement() : null;
     if (!popupEl) { return; }
 
-    popupEl.querySelectorAll('[data-action]').forEach((button) => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            const action = button.getAttribute('data-action');
-            if (action === 'retry') {
-                const state = ensureDetailState(row.src_ip);
-                state.rows = [];
-                state.selectedIndex = 0;
-                state.nextCursor = '';
-                state.loaded = false;
-                void loadDetail(marker, row, '');
-                return;
-            }
-            if (action === 'older') {
-                void showOlderDetail(marker, row);
-                return;
-            }
-            if (action === 'newer') {
-                showNewerDetail(marker, row);
-            }
-        }, { once: true });
+    if (popupEl.dataset.mmPopupControlsBound === '1') { return; }
+
+    popupEl.dataset.mmPopupControlsBound = '1';
+    L.DomEvent.disableClickPropagation(popupEl);
+    L.DomEvent.disableScrollPropagation(popupEl);
+
+    ['mousedown', 'pointerdown', 'dblclick'].forEach((eventName) => {
+        popupEl.addEventListener(eventName, (event) => {
+            if (!event.target.closest('[data-action]')) { return; }
+            event.stopPropagation();
+        });
+    });
+
+    popupEl.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-action]');
+        if (!button || !popupEl.contains(button)) { return; }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const action = button.getAttribute('data-action');
+        if (action === 'retry') {
+            const state = ensureDetailState(row.src_ip);
+            state.rows = [];
+            state.selectedIndex = 0;
+            state.nextCursor = '';
+            state.loaded = false;
+            void loadDetail(marker, row, '');
+            return;
+        }
+        if (action === 'older') {
+            void showOlderDetail(marker, row);
+            return;
+        }
+        if (action === 'newer') {
+            showNewerDetail(marker, row);
+        }
     });
 }
 
