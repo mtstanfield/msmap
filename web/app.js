@@ -168,17 +168,6 @@ lmap.on('popupclose', (event) => {
         activePopupIp = '';
     }
 });
-cluster.on('spiderfied', (event) => {
-    if (!animationsEnabled()) { return; }
-    setTimeout(() => {
-        for (const marker of event.markers || []) {
-            const srcIp = marker?.options?.srcIp;
-            if (typeof srcIp === 'string' && srcIp) {
-                maybeAnimateMarker(marker, srcIp);
-            }
-        }
-    }, 0);
-});
 
 const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
@@ -1333,14 +1322,15 @@ function applySpikeMarkerState(marker, spiking) {
     el.classList.toggle('marker-spike', spiking && animationsEnabled());
 
     const tooltip = marker.getTooltip();
-    if (spiking && !animationsEnabled()) {
+    if (spiking) {
         if (!tooltip) {
             marker.bindTooltip('!', {
                 permanent: true,
-                direction: 'top',
-                offset: [8, -8],
+                direction: 'center',
+                offset: [0, 0],
                 className: 'spike-node-badge',
                 opacity: 1,
+                interactive: false,
             });
         }
         marker.openTooltip();
