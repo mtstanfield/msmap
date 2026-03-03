@@ -497,9 +497,6 @@ function buildIntelBadges(r) {
     if (r.spamhaus_drop === true) {
         chips.push('<span class="popup-chip popup-chip-intel">DROP</span>');
     }
-    if (r.spamhaus_bcl === true) {
-        chips.push('<span class="popup-chip popup-chip-intel">BCL</span>');
-    }
     if (!chips.length) { return ''; }
     return '<div class="popup-chip-row">' + chips.join('') + '</div>';
 }

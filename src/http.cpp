@@ -62,9 +62,6 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         out += ",\"spamhaus_drop\":";
         if (row.spamhaus_drop.has_value()) { out += (*row.spamhaus_drop ? "true" : "false"); }
         else                               { out += "null"; }
-        out += ",\"spamhaus_bcl\":";
-        if (row.spamhaus_bcl.has_value()) { out += (*row.spamhaus_bcl ? "true" : "false"); }
-        else                              { out += "null"; }
         out += '}';
     }
 
@@ -134,9 +131,6 @@ std::string map_rows_to_json(const std::vector<MapRow>& rows,
         out += ",\"spamhaus_drop\":";
         if (row.spamhaus_drop.has_value()) { out += (*row.spamhaus_drop ? "true" : "false"); }
         else                               { out += "null"; }
-        out += ",\"spamhaus_bcl\":";
-        if (row.spamhaus_bcl.has_value()) { out += (*row.spamhaus_bcl ? "true" : "false"); }
-        else                              { out += "null"; }
         out += '}';
     }
 

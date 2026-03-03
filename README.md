@@ -10,7 +10,7 @@ The current architecture is:
 - aggregate-first map rendering via `GET /api/map`
 - lazy raw-event drilldown via `GET /api/detail`
 - AbuseIPDB for threat score and usage classification
-- Tor Project and Spamhaus enrichment for popup/source intel
+- Tor Project and Spamhaus DROP enrichment for popup/source intel
 - distroless runtime with embedded web assets
 
 TLS termination, caching, and rate limiting are expected to live in front of
@@ -29,7 +29,7 @@ msmap binary
     ├── SQLite DB       (WAL mode, 24h retention)
     ├── GeoIP           (libmaxminddb + local GeoLite2 City/ASN mmdb)
     ├── Abuse cache     (AbuseIPDB score + usage_type, SQLite-backed)
-    ├── Intel cache     (Tor Project + Spamhaus, background refreshed)
+    ├── Intel cache     (Tor Project + Spamhaus DROP, background refreshed)
     ├── Home resolver   (optional home marker / arcs / RFC1918 dst rewrite)
     └── HTTP server     (libmicrohttpd, embedded assets + JSON API)
             │
@@ -49,7 +49,7 @@ msmap binary
 | Database | SQLite | WAL mode, parameterized queries only |
 | GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups |
 | Threat / usage | AbuseIPDB | 30-day SQLite cache, optional API key |
-| Source intel | Tor Project + Spamhaus | background-refreshed local cache |
+| Source intel | Tor Project + Spamhaus DROP | background-refreshed local cache |
 | Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
 | Runtime | `distroless/cc-debian12:nonroot` | static-ish binary, uid 65532 |
 
@@ -73,7 +73,6 @@ msmap binary
 | `MSMAP_INTEL_REFRESH_SECS` | `21600` | Refresh interval for Tor Project / Spamhaus source intel |
 | `MSMAP_TOR_EXIT_URL` | `https://check.torproject.org/api/bulk` | Tor Project bulk exit source |
 | `MSMAP_SPAMHAUS_DROP_URL` | `https://www.spamhaus.org/drop/drop_v4.json` | Spamhaus DROP source |
-| `MSMAP_SPAMHAUS_BCL_URL` | _(empty — disabled)_ | Optional Spamhaus BCL source |
 
 ### Volumes
 
@@ -159,7 +158,6 @@ services:
       # MSMAP_HOME_HOST: "your.public.hostname.or.ip"
       # MSMAP_TOR_EXIT_URL: "https://check.torproject.org/api/bulk"
       # MSMAP_SPAMHAUS_DROP_URL: "https://www.spamhaus.org/drop/drop_v4.json"
-      # MSMAP_SPAMHAUS_BCL_URL: "https://..."
 
 volumes:
   msmap-data:
@@ -173,7 +171,6 @@ Notes:
   still readable but new threat/usage lookups are disabled.
 - `MSMAP_HOME_HOST` is optional; without it, the home marker, home-directed
   arcs, and RFC1918 destination rewrite are disabled.
-- `MSMAP_SPAMHAUS_BCL_URL` is optional and disabled by default.
 
 ### GeoLite2 databases (optional, recommended)
 
@@ -343,7 +340,7 @@ Clicking a marker shows:
 - **Threat score** chip from AbuseIPDB
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** badge from Tor Project bulk exit data
-- **Spamhaus DROP/BCL** badges when the source IP matches those lists
+- **Spamhaus DROP** badge when the source IP matches that list
 - Compact pivot buttons for GreyNoise, AbuseIPDB, and AlienVault OTX
 - A condensed recent-event viewer loaded on demand from `GET /api/detail`
 - Arrow controls to step older/newer through the raw-event history for that
@@ -354,7 +351,7 @@ the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup.
 
 Threat colour and `usage_type` still come from AbuseIPDB. Tor status comes from
-Tor Project bulk exit data, and Spamhaus DROP/BCL badges come from locally
+Tor Project bulk exit data, and Spamhaus DROP badges come from locally
 cached list lookups. AbuseIPDB results are cached for 30 days; an API key is
 not required to view previously cached data.
 
@@ -533,7 +530,7 @@ docker run --rm -p 8080:8080 msmap
 │   ├── db.cpp/.h           # SQLite WAL database, schema, queries
 │   ├── geoip.cpp/.h        # MaxMind GeoLite2 enrichment
 │   ├── abuse_cache.cpp/.h  # AbuseIPDB cache (SQLite-backed, background refresh)
-│   ├── ip_intel_cache.cpp/.h # Tor Project + Spamhaus source-intel cache
+│   ├── ip_intel_cache.cpp/.h # Tor Project + Spamhaus DROP source-intel cache
 │   ├── home_resolver.cpp/.h  # Home marker resolver and periodic refresh
 │   ├── http.cpp/.h         # libmicrohttpd HTTP server + REST API
 │   └── json.h              # Hand-rolled JSON serializer

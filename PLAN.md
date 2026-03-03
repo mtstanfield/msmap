@@ -168,7 +168,7 @@ docker build -t msmap .
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
 - [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `usage_type`, `last_checked`); background refresh; `usageType` backfilled into `connections` via background worker
-- [x] Source-IP intel cache: Tor Project bulk exit data + Spamhaus DROP/BCL surfaced in `/api/map` and `/api/detail`
+- [x] Source-IP intel cache: Tor Project bulk exit data + Spamhaus DROP surfaced in `/api/map` and `/api/detail`
 
 ### Web UI
 - [x] libmicrohttpd HTTP server on port 8080

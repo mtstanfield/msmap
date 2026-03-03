@@ -20,7 +20,6 @@ namespace msmap {
 struct IpIntel {
     std::optional<bool> tor_exit;
     std::optional<bool> spamhaus_drop;
-    std::optional<bool> spamhaus_bcl;
 };
 
 // Full definition in geoip.h; forward declaration is enough for the
@@ -53,7 +52,6 @@ struct ConnectionRow {
     std::string        usage_type;      // AbuseIPDB usageType; empty when not enriched
     std::optional<bool> tor_exit;       // Tor Project authoritative signal
     std::optional<bool> spamhaus_drop;  // Spamhaus DROP membership
-    std::optional<bool> spamhaus_bcl;   // Spamhaus BCL membership
 };
 
 // ── Query filter type ─────────────────────────────────────────────────────────
@@ -96,7 +94,6 @@ struct MapRow {
     std::string            usage_type;
     std::optional<bool>    tor_exit;
     std::optional<bool>    spamhaus_drop;
-    std::optional<bool>    spamhaus_bcl;
 };
 
 struct DetailPage {

@@ -30,10 +30,8 @@ struct IpNet {
 struct SnapshotState {
     bool              tor_loaded{false};
     bool              drop_loaded{false};
-    bool              bcl_loaded{false};
     std::vector<IpNet> tor_nets;
     std::vector<IpNet> drop_nets;
-    std::vector<IpNet> bcl_nets;
 };
 
 // NOLINTNEXTLINE(*-avoid-non-const-global-variables)
@@ -226,7 +224,6 @@ IpIntelCache::IpIntelCache(Database& db, const IpIntelSources& sources,
     : db_(db),
       tor_url_(sources.tor_url),
       drop_url_(sources.drop_url),
-      bcl_url_(sources.bcl_url),
       refresh_secs_(refresh_secs > 0 ? refresh_secs : 21600),
       valid_(curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK)
 {
@@ -313,15 +310,6 @@ void IpIntelCache::refresh_sources() noexcept
         }
     }
 
-    if (!bcl_url_.empty()) {
-        if (const auto body = fetch_body(bcl_url_); body.has_value()) {
-            auto nets = parse_line_oriented_nets(*body);
-            if (!nets.empty()) {
-                const std::lock_guard<std::mutex> lock{g_snapshot_mutex};
-                replace_snapshot(std::move(nets), g_snapshot_state.bcl_loaded, g_snapshot_state.bcl_nets);
-            }
-        }
-    }
 }
 
 void IpIntelCache::refresh_known_ips() noexcept
@@ -351,9 +339,6 @@ IpIntel IpIntelCache::classify_ip(const std::string& ip) noexcept
     }
     if (g_snapshot_state.drop_loaded) {
         intel.spamhaus_drop = matches_any(ip, g_snapshot_state.drop_nets);
-    }
-    if (g_snapshot_state.bcl_loaded) {
-        intel.spamhaus_bcl = matches_any(ip, g_snapshot_state.bcl_nets);
     }
     return intel;
 }

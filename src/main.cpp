@@ -109,7 +109,6 @@ int main() {
     const std::string tor_exit_url = env_or("MSMAP_TOR_EXIT_URL", kDefaultTorExitUrl);
     const std::string spamhaus_drop_url =
         env_or("MSMAP_SPAMHAUS_DROP_URL", kDefaultSpamhausDropUrl);
-    const std::string spamhaus_bcl_url = env_or("MSMAP_SPAMHAUS_BCL_URL", "");
     const unsigned int http_threads =
         env_uint_bounded("MSMAP_HTTP_THREADS", kDefaultHttpThreads, 1U, 16U);
     const auto intel_refresh_secs =
@@ -124,7 +123,6 @@ int main() {
               << "[INFO] home host : " << (home_host.empty() ? "(not set)" : home_host) << '\n'
               << "[INFO] tor intel : " << tor_exit_url << '\n'
               << "[INFO] drop intel: " << spamhaus_drop_url << '\n'
-              << "[INFO] bcl intel : " << (spamhaus_bcl_url.empty() ? "(disabled)" : spamhaus_bcl_url) << '\n'
               << "[INFO] listen    : 0.0.0.0:"   << listen_port << " (UDP/syslog)\n"
               << "[INFO] http      : 0.0.0.0:"   << http_port   << " threads=" << http_threads << '\n';
 
@@ -178,7 +176,6 @@ int main() {
     const msmap::IpIntelSources intel_sources{
         .tor_url = tor_exit_url,
         .drop_url = spamhaus_drop_url,
-        .bcl_url = spamhaus_bcl_url,
     };
     msmap::IpIntelCache intel_cache{db, intel_sources, intel_refresh_secs};
     if (!intel_cache.valid()) {

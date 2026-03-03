@@ -14,7 +14,6 @@ namespace msmap {
 struct IpIntelSources {
     std::string tor_url;
     std::string drop_url;
-    std::string bcl_url;
 };
 
 class IpIntelCache {
@@ -42,7 +41,6 @@ private:
     Database&    db_;
     std::string  tor_url_;
     std::string  drop_url_;
-    std::string  bcl_url_;
     std::int64_t refresh_secs_;
     bool         valid_{false};
 

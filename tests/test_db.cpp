@@ -379,7 +379,6 @@ TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
     REQUIRE(db.upsert_ip_intel(entry.src_ip, msmap::IpIntel{
         .tor_exit = true,
         .spamhaus_drop = false,
-        .spamhaus_bcl = true,
     }));
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
@@ -388,6 +387,4 @@ TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
     REQUIRE(*rows.front().tor_exit);
     REQUIRE(rows.front().spamhaus_drop.has_value());
     REQUIRE_FALSE(*rows.front().spamhaus_drop);
-    REQUIRE(rows.front().spamhaus_bcl.has_value());
-    REQUIRE(*rows.front().spamhaus_bcl);
 }
