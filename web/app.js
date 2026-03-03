@@ -9,9 +9,9 @@ const ERROR_REFRESH_MS  = 60000;
 const DETAIL_PAGE_SIZE  = 20;
 const TEXT_FILTER_DEBOUNCE_MS = 400;
 
-const ARC_DRAW_MS   = 1200;
-const ARC_FADE_MS   =  500;
-const MAX_ARCS_POLL =   15;
+const ARC_DRAW_MS   =  800;
+const ARC_FADE_MS   =  300;
+const MAX_ARCS_POLL =   10;
 
 const STORAGE_KEY = 'msmap_filters';
 const DEFAULT_FILTERS = Object.freeze({
@@ -150,13 +150,13 @@ let mappedCount   = 0;
 let totalSeen     = 0;
 let lastMapTs     = 0;
 let isInitialLoad = true;
-let arcsFired     = 0;
 let pollTimer     = null;
 
 let homePt     = null;
 let homeMarker = null;
 const seenMarkerIps = new Set();
 const detailStateByIp = new Map();
+const activeArcs = new Set();
 
 function currentWindowSecs() {
     const n = parseInt(fTime.value, 10);
@@ -328,11 +328,13 @@ function resetToDefaults() {
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
     appliedTextFilters.country = DEFAULT_FILTERS.country;
     updateTextValidity();
+    clearActiveArcs();
     saveFilters();
     pollNow();
 }
 
 function applyNonTextFilters() {
+    clearActiveArcs();
     saveFilters();
     pollNow();
 }
@@ -550,6 +552,7 @@ async function fetchHome() {
         const resp = await fetch('/api/home');
         if (!resp.ok) {
             if (resp.status === 404) {
+                clearActiveArcs();
                 homePt = null;
                 if (homeMarker) { homeMarker.remove(); homeMarker = null; }
             }
@@ -562,6 +565,7 @@ async function fetchHome() {
 
         const changed = !homePt || homePt.lat !== fresh.lat || homePt.lon !== fresh.lon;
         if (changed) {
+            clearActiveArcs();
             homePt = fresh;
             if (homeMarker) { homeMarker.remove(); homeMarker = null; }
             addHomeMarker();
@@ -583,10 +587,37 @@ function addHomeMarker() {
     homeMarker.addTo(lmap);
 }
 
+function shortestWrappedLon(srcLon, dstLon) {
+    let best = srcLon;
+    let bestDistance = Math.abs(srcLon - dstLon);
+    for (const candidate of [srcLon - 360, srcLon + 360]) {
+        const distance = Math.abs(candidate - dstLon);
+        if (distance < bestDistance) {
+            best = candidate;
+            bestDistance = distance;
+        }
+    }
+    return best;
+}
+
+function clearActiveArcs() {
+    for (const arcState of activeArcs) {
+        if (arcState.rafId !== null) {
+            cancelAnimationFrame(arcState.rafId);
+        }
+        if (arcState.removeTimeoutId !== null) {
+            clearTimeout(arcState.removeTimeoutId);
+        }
+        arcState.svg.remove();
+    }
+    activeArcs.clear();
+}
+
 function fireArc(srcLat, srcLon, color) {
     if (!homePt) { return; }
 
-    const src = lmap.latLngToLayerPoint([srcLat, srcLon]);
+    const wrappedSrcLon = shortestWrappedLon(srcLon, homePt.lon);
+    const src = lmap.latLngToLayerPoint([srcLat, wrappedSrcLon]);
     const dst = lmap.latLngToLayerPoint([homePt.lat, homePt.lon]);
 
     const dx = dst.x - src.x;
@@ -639,6 +670,13 @@ function fireArc(srcLat, srcLon, color) {
     svg.appendChild(dot);
     lmap.getPanes().overlayPane.appendChild(svg);
 
+    const arcState = {
+        svg: svg,
+        rafId: null,
+        removeTimeoutId: null,
+    };
+    activeArcs.add(arcState);
+
     const totalLen = path.getTotalLength();
     path.style.strokeDasharray = String(totalLen);
     path.style.strokeDashoffset = String(totalLen);
@@ -648,14 +686,17 @@ function fireArc(srcLat, srcLon, color) {
 
     const t0 = performance.now();
     function step(now) {
+        if (!activeArcs.has(arcState)) { return; }
+
         const frac = Math.min((now - t0) / ARC_DRAW_MS, 1.0);
         const pt = path.getPointAtLength(frac * totalLen);
         dot.setAttribute('cx', String(pt.x));
         dot.setAttribute('cy', String(pt.y));
         if (frac < 1.0) {
-            requestAnimationFrame(step);
+            arcState.rafId = requestAnimationFrame(step);
             return;
         }
+        arcState.rafId = null;
         const ring = document.createElementNS(NS, 'circle');
         ring.setAttribute('cx', String(dst.x));
         ring.setAttribute('cy', String(dst.y));
@@ -667,16 +708,70 @@ function fireArc(srcLat, srcLon, color) {
         svg.appendChild(ring);
         svg.style.transition = 'opacity ' + ARC_FADE_MS + 'ms ease-out';
         svg.style.opacity = '0';
-        setTimeout(() => { svg.remove(); }, ARC_FADE_MS + 50);
+        arcState.removeTimeoutId = setTimeout(() => {
+            svg.remove();
+            activeArcs.delete(arcState);
+            arcState.removeTimeoutId = null;
+        }, ARC_FADE_MS + 50);
     }
-    requestAnimationFrame(step);
+    arcState.rafId = requestAnimationFrame(step);
 }
 
-lmap.on('zoomstart', () => {
-    lmap.getPanes().overlayPane
-        .querySelectorAll('svg.msmap-arc')
-        .forEach((el) => { el.remove(); });
-});
+lmap.on('zoomstart', clearActiveArcs);
+
+function shouldCandidateArc(row) {
+    return !isInitialLoad &&
+        homePt &&
+        fAnimations.checked &&
+        typeof row.last_ts === 'number' &&
+        row.last_ts > lastMapTs &&
+        Number.isFinite(row.lat) &&
+        Number.isFinite(row.lon);
+}
+
+function arcOriginKey(lat, lon) {
+    const roundedLat = Math.round(lat * 2) / 2;
+    const roundedLon = Math.round(lon * 2) / 2;
+    return String(roundedLat) + ':' + String(roundedLon);
+}
+
+function makeArcCandidate(row, color) {
+    return {
+        srcIp: row.src_ip,
+        lat: row.lat,
+        lon: row.lon,
+        lastTs: row.last_ts,
+        threat: (row.threat_max !== null && row.threat_max !== undefined) ? row.threat_max : -1,
+        count: Number.isFinite(row.count) ? row.count : 0,
+        color: color,
+        dedupeKey: arcOriginKey(row.lat, row.lon),
+    };
+}
+
+function compareArcCandidates(left, right) {
+    if (left.lastTs !== right.lastTs) { return right.lastTs - left.lastTs; }
+    if (left.threat !== right.threat) { return right.threat - left.threat; }
+    if (left.count !== right.count) { return right.count - left.count; }
+    return left.srcIp.localeCompare(right.srcIp);
+}
+
+function dedupeArcCandidates(candidates) {
+    const seenKeys = new Set();
+    const deduped = [];
+    for (const candidate of candidates) {
+        if (seenKeys.has(candidate.dedupeKey)) { continue; }
+        seenKeys.add(candidate.dedupeKey);
+        deduped.push(candidate);
+    }
+    return deduped;
+}
+
+function renderArcBatch(candidates) {
+    const ranked = candidates.slice().sort(compareArcCandidates);
+    for (const candidate of dedupeArcCandidates(ranked).slice(0, MAX_ARCS_POLL)) {
+        fireArc(candidate.lat, candidate.lon, candidate.color);
+    }
+}
 
 function buildAggregatePopup(r) {
     return [
@@ -806,7 +901,7 @@ function renderMap(rows) {
     cluster.clearLayers();
     mappedCount = 0;
     totalSeen = 0;
-    arcsFired = 0;
+    const arcCandidates = [];
 
     for (const r of rows) {
         totalSeen += r.count;
@@ -839,12 +934,12 @@ function renderMap(rows) {
         cluster.addLayer(marker);
         mappedCount++;
 
-        if (!isInitialLoad && homePt && fAnimations.checked &&
-            arcsFired < MAX_ARCS_POLL && r.last_ts > lastMapTs) {
-            fireArc(r.lat, r.lon, color);
-            arcsFired++;
+        if (shouldCandidateArc(r)) {
+            arcCandidates.push(makeArcCandidate(r, color));
         }
     }
+
+    renderArcBatch(arcCandidates);
 }
 
 function scheduleNextPoll(delayMs) {
@@ -889,6 +984,7 @@ async function poll() {
 }
 
 function pollNow() {
+    clearActiveArcs();
     isInitialLoad = true;
     lastMapTs = 0;
     statMapped.textContent = '0 mapped';

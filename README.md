@@ -285,13 +285,17 @@ browser then:
 
 1. Places a hollow blue ring marker at the home location (always visible,
    outside the cluster layer).
-2. For each newly active source IP in a poll batch, draws an animated bezier arc
-   from that IP toward home — colored to match the threat level of the source.
-   The arc line draws itself over 1.2 s (`stroke-dashoffset` CSS transition),
+2. For newly active source IPs in a poll batch, selects the most relevant
+   distinct origins and draws animated bezier arcs from those points toward
+   home. Arcs are ranked by recency, threat, and hit count, and are coloured to
+   match the threat level of the source.
+3. The arc line draws itself over 0.8 s (`stroke-dashoffset` CSS transition),
    with a dot tracking the head; a pulse ring fires on arrival. The assembly
-   fades out and is removed after ~1.7 s total.
-3. Rate-limits arcs to 15 per poll batch to avoid visual overload.
-4. Clears stale arcs on map zoom (layer coordinates rescale on zoom).
+   fades out and is removed after roughly 1.1 s total.
+4. Rate-limits arcs to 10 per poll batch and collapses near-identical origins
+   so one hotspot does not dominate the animation budget.
+5. Clears stale arcs on zoom, filter changes, animation-toggle changes, and
+   home-point changes.
 
 Marker circles also apply a one-shot ripple animation the first time a source IP
 appears in the current browser session. The ripple does not replay on later
