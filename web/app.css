@@ -69,7 +69,8 @@ html, body {
 #filter-panel input:focus-visible,
 .popup-detail-button:focus-visible,
 .popup-linkout:focus-visible,
-#status-right a:focus-visible {
+#status-right a:focus-visible,
+.status-tooltip-target:focus-visible {
     outline: 2px solid #58a6ff;
     outline-offset: 2px;
 }
@@ -106,6 +107,39 @@ html, body {
     align-items: center;
     gap: 10px;
     min-width: 0;
+}
+
+.status-tooltip-target {
+    position: relative;
+}
+
+.status-tooltip-target::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 10px);
+    transform: translateX(-50%) translateY(4px);
+    min-width: 180px;
+    max-width: 260px;
+    padding: 6px 8px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: rgba(22, 27, 34, 0.96);
+    color: #c9d1d9;
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: normal;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 1002;
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+
+.status-tooltip-target:hover::after,
+.status-tooltip-target:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .status-item-ops {

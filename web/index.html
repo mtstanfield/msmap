@@ -98,7 +98,7 @@
     <!-- Status bar -->
     <div id="status-bar">
         <div id="status-left">
-            <div class="status-group" title="Current visible aggregate markers and the total hits they represent after client-side filters.">
+            <div class="status-group status-tooltip-target" tabindex="0" data-tooltip="Current visible aggregate markers and the total hits they represent after client-side filters.">
                 <span id="stat-mapped" class="status-item">
                     <span class="status-label">Mapped</span>
                     <span id="stat-mapped-value" class="status-value status-value-ops">0</span>
@@ -109,22 +109,22 @@
                     <span id="stat-total-value" class="status-value status-value-ops">0</span>
                 </span>
             </div>
-            <div id="stat-time" class="status-group status-freshness" title="Freshness of the current /api/map data shown on the map.">
+            <div id="stat-time" class="status-group status-freshness status-tooltip-target" tabindex="0" data-tooltip="Freshness of the current /api/map data shown on the map.">
                 <span class="status-dot is-unknown" aria-hidden="true"></span>
                 <span id="stat-time-value">Waiting for data</span>
             </div>
-            <div id="status-ops" class="status-group" title="Backend/operator stats for the retained 24-hour dataset and source-intel refresh state.">
-                <span id="stat-events" class="status-item status-item-ops" style="display:none" title="Retained connection rows in the last 24 hours.">
+            <div id="status-ops" class="status-group status-tooltip-target" tabindex="0" data-tooltip="Backend/operator stats for the retained 24-hour dataset and source-intel refresh state.">
+                <span id="stat-events" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Retained connection rows in the last 24 hours.">
                     <span class="status-label">Events</span>
                     <span id="stat-events-value" class="status-value status-value-ops">--</span>
                 </span>
                 <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-sources" class="status-item status-item-ops" style="display:none" title="Distinct source IPs retained in the last 24 hours.">
+                <span id="stat-sources" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Distinct source IPs retained in the last 24 hours.">
                     <span class="status-label">Sources</span>
                     <span id="stat-sources-value" class="status-value status-value-ops">--</span>
                 </span>
                 <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-intel" class="status-item status-item-ops" style="display:none" title="Status of the Tor Project and Spamhaus DROP background intel refresh.">
+                <span id="stat-intel" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Status of the Tor Project and Spamhaus DROP background intel refresh.">
                     <span class="status-label">Intel</span>
                     <span id="stat-intel-value" class="status-value status-value-ops">--</span>
                 </span>
