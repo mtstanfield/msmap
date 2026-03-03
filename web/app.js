@@ -661,6 +661,10 @@ function otxIconSvg() {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg>';
 }
 
+function shodanIconSvg() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg>';
+}
+
 function buildIntelBadges(r) {
     const chips = [];
     const threat = buildThreatChip(r.threat_max);
@@ -682,6 +686,11 @@ function buildLinkouts(srcIp) {
             href: 'https://viz.greynoise.io/ip/' + safeIp,
             icon: greyNoiseIconSvg(),
             title: 'Open GreyNoise',
+        },
+        {
+            href: 'https://www.shodan.io/host/' + safeIp,
+            icon: shodanIconSvg(),
+            title: 'Open Shodan',
         },
         {
             href: 'https://www.abuseipdb.com/check/' + safeIp,

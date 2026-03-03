@@ -375,7 +375,7 @@ Clicking a marker shows:
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** badge from Tor Project bulk exit data
 - **Spamhaus DROP** badge when the source IP matches that list
-- Compact pivot buttons for GreyNoise, AbuseIPDB, and AlienVault OTX
+- Compact pivot buttons for GreyNoise, Shodan, AbuseIPDB, and AlienVault OTX
 - A condensed recent-event viewer loaded on demand from `GET /api/detail`
 - Arrow controls to step older/newer through the raw-event history for that
   aggregate source IP marker
