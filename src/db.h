@@ -98,27 +98,16 @@ public:
     /// Delete all rows with ts < cutoff_ts and return the count removed.
     /// Thread-safe: acquires an internal mutex.
     /// Production code uses the automatic trigger inside insert() (every 10 000
-    /// rows, 24h cutoff); call this directly when a specific cutoff is
+    /// rows, one-year cutoff); call this directly when a specific cutoff is
     /// needed (manual maintenance, tests).
-    int prune_older_than(std::int64_t cutoff_ts = 86400 /* 24h */) noexcept;
+    int prune_older_than(std::int64_t cutoff_ts) noexcept;
 
 private:
     bool exec(const char* sql) noexcept;
     /// Shared DELETE implementation — caller must already hold mutex_.
     int  prune_unlocked(std::int64_t cutoff_ts) noexcept;
-    /// Called from insert() (already under mutex_) with the 24h cutoff.
+    /// Called from insert() (already under mutex_) with the 1-year cutoff.
     void prune_old() noexcept;
-
-    /// In-memory cache of recent rows (ts DESC, 24h prune).
-    /// Protects against DB mutex contention for UI queries (read-mostly).
-    mutable std::mutex                           cache_mutex_;
-    std::vector<ConnectionRow>                   recent_cache_;  // ts DESC
-    static constexpr std::size_t                 kMaxCacheSize = 300'000;  // ~120MB
-    static constexpr std::int64_t                kCacheRetentionSecs = 86400;  // 24h
-    void insert_to_cache(const ConnectionRow& row) noexcept;
-    void prune_cache() noexcept;
-    [[nodiscard]] std::vector<ConnectionRow> query_cache(const QueryFilters& f) const noexcept;
-    void load_cache_from_db() noexcept;
 
     // mutex_ serialises all SQLite calls from the listener thread (insert)
     // and the HTTP thread (query_connections).  Declared mutable so that
