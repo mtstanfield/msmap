@@ -797,6 +797,10 @@ html, body {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
+.leaflet-popup-content {
+    margin: 10px 12px 12px;
+}
+
 @media (max-width: 700px) {
     .popup-row {
         min-width: min(224px, calc(100vw - 88px));
@@ -847,9 +851,9 @@ html, body {
     }
 }
 
+.leaflet-popup-tip-container { display: none; }
 .leaflet-popup-tip         { background: #161b22; }
-.leaflet-popup-close-button        { color: #8b949e !important; }
-.leaflet-popup-close-button:hover  { color: #e6edf3 !important; }
+.leaflet-popup-close-button        { display: none; }
 
 /* ── Marker animation – arrival pulse ring ───────────────────────────────── */
 
