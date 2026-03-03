@@ -196,6 +196,7 @@ In Winbox or WebFig → **System → Logging → Actions**, add a new action:
 |---|---|
 | Name | `msmap` |
 | Type | `remote` |
+| BSD Syslog | `yes` |
 | Remote address | `<host running msmap>` |
 | Remote port | `5140` |
 | Src address | your router's LAN IP (e.g. `192.168.88.1`) |
@@ -209,6 +210,11 @@ Then under **System → Logging**, add a rule:
 
 Set `MSMAP_INGEST_ALLOW` to the router's LAN IP to reject syslog from
 unexpected sources.
+
+For direct MikroTik-to-msmap logging, the remote action must use **BSD syslog**
+format. The default MikroTik remote log format is not accepted directly by
+msmap. RFC 3339 input is only supported when a relay such as rsyslog rewrites
+the log format before forwarding it.
 
 ### nginx reference config
 
@@ -308,7 +314,7 @@ events from `GET /api/detail`.
 | Time range | Last 15 min / 1 h / 6 h / 24 h |
 | Protocol | All / TCP / UDP |
 | Source IP | Exact source IP match |
-| Dst Port | Exact destination port match |
+| Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
 | Animations | On / Off for marker ripple and home-directed arcs |
 | Legend | Always-visible reference block under the filters |
@@ -481,7 +487,9 @@ tab is visible, much less frequently than `GET /api/map`.
 
 ## Log Format
 
-msmap listens on UDP 5140 and parses BSD syslog sent directly by Mikrotik:
+msmap listens on UDP 5140 and parses BSD syslog sent directly by Mikrotik. For
+direct router input, the MikroTik remote logging action must have **BSD
+Syslog** enabled:
 
 ```
 <134>Mar  2 08:14:23 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
