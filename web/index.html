@@ -22,24 +22,8 @@
         <div class="filter-header">
             <div class="filter-title">Filters</div>
             <div class="filter-header-actions">
-                <button id="f-legend" type="button">Legend</button>
                 <button id="f-defaults" type="button">Defaults</button>
             </div>
-        </div>
-
-        <div id="filter-legend" style="display:none">
-            <div class="legend-title">Threat</div>
-            <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
-            <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
-            <div class="legend-row"><span class="legend-swatch threat-low"></span><span>Low</span></div>
-            <div class="legend-row"><span class="legend-swatch threat-medium"></span><span>Medium</span></div>
-            <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
-            <div class="legend-title">Notes</div>
-            <div class="legend-note">All protocol excludes ICMP in the UI.</div>
-            <div class="legend-note">Ripple = first seen in this browser session.</div>
-            <div class="legend-note">Arcs = recent activity toward Home.</div>
-            <div class="legend-note">Tor exit = Tor Project. DROP = Spamhaus.</div>
-            <div class="legend-note">Network type comes from AbuseIPDB usage.</div>
         </div>
 
         <label class="filter-label" for="f-time">Time range</label>
@@ -80,21 +64,37 @@
             <option value="on">On</option>
             <option value="off">Off</option>
         </select>
+
+        <div id="filter-legend">
+            <div class="legend-title">Threat</div>
+            <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-low"></span><span>Low</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-medium"></span><span>Medium</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
+            <div class="legend-title">Notes</div>
+            <div class="legend-note">Ripple = first seen in this browser session.</div>
+            <div class="legend-note">Arcs = recent activity toward Home.</div>
+            <div class="legend-note">Tor exit = Tor Project. DROP = Spamhaus.</div>
+            <div class="legend-note">Network type comes from AbuseIPDB usage.</div>
+        </div>
     </div>
 
     <!-- Status bar -->
     <div id="status-bar">
         <div id="status-left">
-            <div id="stat-mapped" class="status-pill">
+            <span id="stat-mapped" class="status-item">
                 <span class="status-label">Mapped</span>
                 <span id="stat-mapped-value" class="status-value">0</span>
-            </div>
-            <div id="stat-total" class="status-pill">
+            </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <span id="stat-total" class="status-item">
                 <span class="status-label">Hits</span>
                 <span id="stat-total-value" class="status-value">0</span>
-            </div>
+            </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
             <div id="stat-time" class="status-freshness">
-                <span class="status-dot" aria-hidden="true"></span>
+                <span class="status-dot is-unknown" aria-hidden="true"></span>
                 <span id="stat-time-value">Waiting for data</span>
             </div>
             <span id="stat-error" style="display:none"></span>

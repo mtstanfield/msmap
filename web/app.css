@@ -9,7 +9,7 @@ html, body {
 
 #map {
     position: fixed;
-    inset: 0 0 38px 0; /* leave room for status bar */
+    inset: 0 0 34px 0; /* leave room for status bar */
     background: #262626; /* match CartoDB Dark Matter tile background */
 }
 
@@ -20,7 +20,7 @@ html, body {
     bottom: 0;
     left: 0;
     right: 0;
-    min-height: 38px;
+    min-height: 34px;
     background:
         linear-gradient(90deg, rgba(88, 166, 255, 0.08), transparent 22%),
         #161b22;
@@ -31,7 +31,7 @@ html, body {
     justify-content: space-between;
     padding: 0 12px;
     font-size: 12px;
-    gap: 18px;
+    gap: 14px;
     z-index: 1000;
 }
 
@@ -62,17 +62,6 @@ html, body {
     color: #e6edf3;
 }
 
-.status-pill {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 7px;
-    min-height: 24px;
-    padding: 0 10px;
-    border: 1px solid #30363d;
-    border-radius: 999px;
-    background: rgba(13, 17, 23, 0.88);
-}
-
 .status-label {
     color: #8b949e;
     font-size: 10px;
@@ -83,9 +72,21 @@ html, body {
 
 .status-value {
     color: #e6edf3;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+.status-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.status-sep {
+    color: #484f58;
+    flex-shrink: 0;
 }
 
 #stat-mapped .status-value {
@@ -108,13 +109,16 @@ html, body {
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    background: #3fb950;
-    box-shadow: 0 0 0 4px rgba(63, 185, 80, 0.12);
     flex-shrink: 0;
 }
 
+.status-dot.is-unknown { background: #6e7681; }
+.status-dot.is-healthy { background: #3fb950; }
+.status-dot.is-stale { background: #f85149; }
+
 #stat-time-value {
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 #stat-error {
@@ -191,7 +195,7 @@ html, body {
     font-size: 13px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .filter-title {
@@ -216,7 +220,6 @@ html, body {
     gap: 6px;
 }
 
-#f-legend,
 #f-defaults {
     padding: 4px 7px;
     border-radius: 4px;
@@ -233,19 +236,13 @@ html, body {
     color: #e6edf3;
 }
 
-#f-legend.active,
-#f-legend:hover {
-    background: #30363d;
-    color: #e6edf3;
-}
-
 #filter-legend {
-    margin: 2px 0 6px;
-    padding: 10px;
+    margin-top: 8px;
+    padding: 9px 10px;
     border: 1px solid #30363d;
     border-radius: 6px;
     background:
-        radial-gradient(circle at top left, rgba(88, 166, 255, 0.08), transparent 42%),
+        radial-gradient(circle at top left, rgba(88, 166, 255, 0.05), transparent 42%),
         #0d1117;
 }
 
@@ -336,8 +333,8 @@ html, body {
 
 .popup-row {
     font-size: 12px;
-    line-height: 1.7;
-    min-width: 250px;
+    line-height: 1.55;
+    min-width: 224px;
 }
 
 .popup-row .label {
@@ -357,33 +354,32 @@ html, body {
 .popup-summary {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
 }
 
 .popup-header {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
 }
 
 .popup-subtitle {
     color: #8b949e;
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .popup-meta-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin-top: 2px;
+    gap: 4px 10px;
+    margin-top: 1px;
 }
 
 .popup-meta-item {
-    min-height: 44px;
-    padding: 7px 8px;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    background: rgba(13, 17, 23, 0.78);
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
 
 .popup-meta-item-wide {
@@ -391,46 +387,48 @@ html, body {
 }
 
 .popup-meta-item .label {
-    display: block;
-    margin-bottom: 3px;
+    display: inline;
+    margin-bottom: 0;
+    margin-right: 5px;
 }
 
 .popup-meta-value {
     color: #e6edf3;
     font-size: 12px;
     font-weight: 600;
+    display: inline;
 }
 
 .popup-usage {
-    margin-top: 2px;
+    margin-top: 0;
     color: #c9d1d9;
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: 11px;
+    line-height: 1.35;
 }
 
 .popup-detail-wrap {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
     border-top: 1px solid #30363d;
 }
 
 .popup-chip-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 2px;
+    gap: 4px;
+    margin-top: 1px;
     margin-bottom: 0;
 }
 
 .popup-chip {
     display: inline-flex;
     align-items: center;
-    min-height: 18px;
-    padding: 0 7px;
-    border-radius: 999px;
+    min-height: 16px;
+    padding: 0 5px;
+    border-radius: 4px;
     border: 1px solid #30363d;
     background: #21262d;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.02em;
     text-transform: uppercase;
@@ -448,8 +446,8 @@ html, body {
 
 .popup-linkouts {
     display: flex;
-    gap: 6px;
-    margin-top: 2px;
+    gap: 5px;
+    margin-top: 1px;
     margin-bottom: 0;
 }
 
@@ -457,17 +455,21 @@ html, body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    height: 24px;
-    padding: 0 6px;
-    border-radius: 999px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 4px;
     border: 1px solid #30363d;
     background: rgba(13, 17, 23, 0.82);
     color: #8b949e;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
     text-decoration: none;
+}
+
+.popup-linkout svg {
+    width: 13px;
+    height: 13px;
+    display: block;
+    fill: currentColor;
 }
 
 .popup-linkout:hover {
@@ -476,9 +478,9 @@ html, body {
 }
 
 .popup-detail-heading {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     color: #8b949e;
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
@@ -489,12 +491,12 @@ html, body {
         #0d1117;
     border: 1px solid #30363d;
     border-radius: 6px;
-    padding: 10px 11px;
-    line-height: 1.65;
+    padding: 7px 8px;
+    line-height: 1.45;
 }
 
 .popup-detail-row + .popup-detail-row {
-    margin-top: 6px;
+    margin-top: 4px;
 }
 
 .popup-flow {
@@ -513,17 +515,17 @@ html, body {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    margin-top: 10px;
-    padding-top: 8px;
+    margin-top: 7px;
+    padding-top: 6px;
     border-top: 1px solid rgba(48, 54, 61, 0.7);
 }
 
 .popup-detail-button {
     min-width: 36px;
-    height: 30px;
+    height: 28px;
     border: 1px solid #30363d;
     border-radius: 4px;
-    background: #21262d;
+    background: #1b2128;
     color: #e6edf3;
     cursor: pointer;
     font: inherit;
@@ -545,11 +547,12 @@ html, body {
     color: #8b949e;
     font-size: 11px;
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 .popup-detail-hint,
 .popup-detail-state {
-    margin-top: 8px;
+    margin-top: 6px;
     color: #8b949e;
     font-size: 11px;
     line-height: 1.45;

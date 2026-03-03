@@ -22,7 +22,6 @@ const DEFAULT_FILTERS = Object.freeze({
     country: '',
     networkType: '',
     animations: 'on',
-    legendOpen: 'off',
 });
 
 const appliedTextFilters = {
@@ -43,7 +42,6 @@ function saveFilters() {
             country:     appliedTextFilters.country,
             networkType: fNetworkType.value,
             animations:  fAnimations.value,
-            legendOpen:  legendOpen ? 'on' : 'off',
         }));
     } catch (_) {}
 }
@@ -62,9 +60,6 @@ function loadFilters() {
         if (s.country     !== undefined) { fCountry.value = s.country; }
         if (s.networkType !== undefined) { setSelectValue(fNetworkType, s.networkType, DEFAULT_FILTERS.networkType); }
         if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
-        if (s.legendOpen === 'on') {
-            setLegendOpen(true);
-        }
     } catch (_) {}
 }
 
@@ -135,8 +130,7 @@ const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
 const fNetworkType  = document.getElementById('f-network-type');
 const fAnimations   = document.getElementById('f-animations');
-const fLegend       = document.getElementById('f-legend');
-const filterLegend  = document.getElementById('filter-legend');
+const statDot       = statTime.querySelector('.status-dot');
 
 filterToggle.classList.add('active');
 filterToggle.addEventListener('click', () => {
@@ -150,7 +144,10 @@ let totalSeen     = 0;
 let lastMapTs     = 0;
 let isInitialLoad = true;
 let pollTimer     = null;
-let legendOpen    = false;
+let activePopupIp = '';
+let suppressPopupAutoClose = false;
+let lastMapSuccessAt = 0;
+let mapFeedState = 'unknown';
 
 let homePt     = null;
 let homeMarker = null;
@@ -160,12 +157,6 @@ const activeArcs = new Set();
 
 function animationsEnabled() {
     return fAnimations.value === 'on';
-}
-
-function setLegendOpen(open) {
-    legendOpen = open;
-    filterLegend.style.display = legendOpen ? '' : 'none';
-    fLegend.classList.toggle('active', legendOpen);
 }
 
 function currentWindowSecs() {
@@ -337,7 +328,6 @@ function resetToDefaults() {
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
-    setLegendOpen(DEFAULT_FILTERS.legendOpen === 'on');
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -355,10 +345,6 @@ function applyNonTextFilters() {
 }
 
 document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
-fLegend.addEventListener('click', () => {
-    setLegendOpen(!legendOpen);
-    saveFilters();
-});
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
 fAnimations.addEventListener('change', applyNonTextFilters);
@@ -458,6 +444,25 @@ function setStatusFreshness(text) {
     statTimeValue.textContent = text;
 }
 
+function setMapFeedState(nextState) {
+    mapFeedState = nextState;
+    statDot.classList.remove('is-unknown', 'is-healthy', 'is-stale');
+    statDot.classList.add(
+        nextState === 'healthy' ? 'is-healthy' :
+        nextState === 'stale' ? 'is-stale' :
+        'is-unknown'
+    );
+}
+
+function updateMapFeedIndicator(now = Date.now()) {
+    if (lastMapSuccessAt === 0) {
+        setMapFeedState('unknown');
+        return;
+    }
+    const staleAfterMs = NORMAL_REFRESH_MS * 2;
+    setMapFeedState((now - lastMapSuccessAt) <= staleAfterMs ? 'healthy' : 'stale');
+}
+
 function ensureDetailState(srcIp) {
     const windowSecs = currentWindowSecs();
     const existing = detailStateByIp.get(srcIp);
@@ -493,6 +498,18 @@ function buildThreatChip(score) {
     return '<span class="popup-chip ' + threatClass(score) + '">Threat ' + score + '</span>';
 }
 
+function greyNoiseIconSvg() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg>';
+}
+
+function abuseIpdbIconSvg() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg>';
+}
+
+function otxIconSvg() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg>';
+}
+
 function buildIntelBadges(r) {
     const chips = [];
     const threat = buildThreatChip(r.threat_max);
@@ -512,23 +529,23 @@ function buildLinkouts(srcIp) {
     const links = [
         {
             href: 'https://viz.greynoise.io/ip/' + safeIp,
-            label: 'GN',
+            icon: greyNoiseIconSvg(),
             title: 'Open GreyNoise',
         },
         {
             href: 'https://www.abuseipdb.com/check/' + safeIp,
-            label: 'AB',
+            icon: abuseIpdbIconSvg(),
             title: 'Open AbuseIPDB',
         },
         {
             href: 'https://otx.alienvault.com/indicator/ip/' + safeIp,
-            label: 'OTX',
+            icon: otxIconSvg(),
             title: 'Open AlienVault OTX',
         },
     ];
     return '<div class="popup-linkouts">' + links.map((link) =>
         '<a class="popup-linkout" href="' + link.href + '" target="_blank" rel="noopener noreferrer" title="' +
-        link.title + '" aria-label="' + link.title + '">' + link.label + '</a>'
+        link.title + '" aria-label="' + link.title + '">' + link.icon + '</a>'
     ).join('') + '</div>';
 }
 
@@ -539,7 +556,7 @@ function buildSummaryItem(label, value, wide = false) {
         wide ? ' popup-meta-item-wide' : '',
         '">',
         '<span class="label">', label, '</span>',
-        '<div class="popup-meta-value">', value, '</div>',
+        '<span class="popup-meta-value">', value, '</span>',
         '</div>',
     ].join('');
 }
@@ -1006,6 +1023,11 @@ function maybeAnimateMarker(marker, srcIp) {
 }
 
 function renderMap(rows) {
+    const reopenIp = activePopupIp;
+    let reopenMarker = null;
+    let reopenRow = null;
+
+    suppressPopupAutoClose = true;
     cluster.clearLayers();
     mappedCount = 0;
     totalSeen = 0;
@@ -1031,6 +1053,7 @@ function renderMap(rows) {
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
         marker.on('add', () => { setTimeout(() => { maybeAnimateMarker(marker, r.src_ip); }, 0); });
         marker.on('popupopen', () => {
+            activePopupIp = r.src_ip;
             bindPopupControls(marker, r);
             const state = ensureDetailState(r.src_ip);
             if (!state.rows.length && !state.loading) {
@@ -1039,15 +1062,34 @@ function renderMap(rows) {
                 updatePopupContent(marker, r);
             }
         });
+        marker.on('popupclose', () => {
+            if (!suppressPopupAutoClose && activePopupIp === r.src_ip) {
+                activePopupIp = '';
+            }
+        });
         cluster.addLayer(marker);
         mappedCount++;
+        if (reopenIp && r.src_ip === reopenIp) {
+            reopenMarker = marker;
+            reopenRow = r;
+        }
 
         if (shouldCandidateArc(r)) {
             arcCandidates.push(makeArcCandidate(r, color));
         }
     }
 
+    if (!reopenMarker && reopenIp) {
+        activePopupIp = '';
+    }
+
     renderArcBatch(arcCandidates);
+    if (reopenMarker && reopenRow) {
+        reopenMarker.openPopup();
+        updatePopupContent(reopenMarker, reopenRow);
+        bindPopupControls(reopenMarker, reopenRow);
+    }
+    suppressPopupAutoClose = false;
 }
 
 function scheduleNextPoll(delayMs) {
@@ -1059,10 +1101,12 @@ function scheduleNextPoll(delayMs) {
 
 async function poll() {
     await fetchHome();
+    updateMapFeedIndicator();
     try {
         const resp = await fetch('/api/map' + buildMapQueryString(), { cache: 'default' });
         if (!resp.ok) {
             setError('API ' + resp.status);
+            updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
             scheduleNextPoll(ERROR_REFRESH_MS);
             return;
         }
@@ -1079,6 +1123,8 @@ async function poll() {
             }
         }
         lastMapTs = newestTs;
+        lastMapSuccessAt = Date.now();
+        updateMapFeedIndicator(lastMapSuccessAt);
         setStatusCounts(mappedCount, totalSeen);
         setStatusFreshness('Updated ' + new Date().toLocaleTimeString());
         isInitialLoad = false;
@@ -1086,6 +1132,7 @@ async function poll() {
         scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
     } catch (err) {
         setError(err.message);
+        updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
         scheduleNextPoll(ERROR_REFRESH_MS);
     }
 }
@@ -1104,16 +1151,17 @@ function pollNow() {
 }
 
 document.addEventListener('visibilitychange', () => {
+    updateMapFeedIndicator();
     scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
 });
 
 fetchHome().then(() => {
     addHomeMarker();
-    setLegendOpen(DEFAULT_FILTERS.legendOpen === 'on');
     loadFilters();
     appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
     appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
     appliedTextFilters.country = validateCountryValue(fCountry.value).normalized;
     updateTextValidity();
+    updateMapFeedIndicator();
     pollNow();
 });

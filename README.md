@@ -292,7 +292,7 @@ events from `GET /api/detail`.
 | Country | 2-letter ISO code (requires GeoIP) |
 | Network type | All / Datacenter / Residential from AbuseIPDB `usage_type` |
 | Animations | On / Off for marker ripple and home-directed arcs |
-| Legend | Inline explanation of threat colours, animation semantics, and intel badges |
+| Legend | Always-visible reference block under the filters |
 
 All selects apply immediately. Text filters auto-apply once the value is
 valid, and `Defaults` resets the panel to the standard 15-minute view.
@@ -348,7 +348,8 @@ Clicking a marker shows:
 
 The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
-page of raw rows into the popup.
+page of raw rows into the popup, and it stays open across normal map refreshes
+while the same source IP remains visible in the current filtered view.
 
 Threat colour and `usage_type` still come from AbuseIPDB. Tor status comes from
 Tor Project bulk exit data, and Spamhaus DROP badges come from locally
@@ -361,7 +362,9 @@ The bottom status bar shows the current operational state of the map:
 
 - `Mapped`: aggregate markers currently rendered
 - `Hits`: total matching event volume represented by the visible aggregate rows
-- `Updated`: freshness of the last successful poll
+- `Updated`: freshness of the last successful poll, with a dot that reflects
+  live `/api/map` freshness (`unknown` on startup, green when current, red when
+  stale or failing)
 - inline error text when the most recent poll failed
 
 The footer metadata on the right shows `🌐 msmap`, the GitHub link, and the
