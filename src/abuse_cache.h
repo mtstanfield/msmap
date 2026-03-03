@@ -92,6 +92,9 @@ public:
     /// Current number of API calls remaining today.
     [[nodiscard]] int rate_remaining() const noexcept;
 
+    /// Last quota remaining value confirmed by an AbuseIPDB HTTP response.
+    [[nodiscard]] std::optional<int> confirmed_rate_remaining() const noexcept;
+
     /// Test hook for simulating quota exhaustion or partial remaining quota.
     void set_rate_remaining_for_test(int remaining) noexcept;
 
@@ -120,14 +123,16 @@ private:
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     std::optional<AbuseResult>  fetch_abuse(const std::string& ip,
                                              bool& request_made,
-                                             bool& quota_exhausted) noexcept;
+                                             bool& quota_exhausted,
+                                             std::optional<int>& confirmed_remaining) noexcept;
 
     /// Update rate counter, in_flight set, and SQLite cache after a fetch.
     /// Extracted from worker() to keep its cognitive complexity in bounds.
-    void apply_fetch_result(const std::string&               ip,
+    void apply_fetch_result(const std::string&                ip,
                             const std::optional<AbuseResult>& result,
-                            bool                              request_made,
-                            bool                              quota_exhausted) noexcept;
+                            bool                               request_made,
+                            bool                               quota_exhausted,
+                            std::optional<int>                 confirmed_remaining) noexcept;
 
     // ── Configuration ────────────────────────────────────────────────────────
     std::string db_path_;
@@ -154,6 +159,7 @@ private:
     // ── Rate limiting ────────────────────────────────────────────────────────
     // Accessed only under queue_mutex_.
     int          rate_remaining_{kDailyQuota};
+    std::optional<int> confirmed_rate_remaining_;
     std::int64_t rate_reset_day_{0};              // epoch_day() at last reset
     bool         quota_warned_{false};            // suppress repeated log lines
 

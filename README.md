@@ -407,7 +407,7 @@ backend caches:
 - `Events`: total retained connection rows in the current 24-hour window
 - `Sources`: distinct retained source IPs in that window
 - `Feeds`: compact Tor/DROP refresh state (`ok`, `stale`, `syncing`, or `off`)
-- `Abuse`: AbuseIPDB availability/quota state for new lookups (`ok`, `quota`, or `off`)
+- `Abuse`: AbuseIPDB availability/quota state for new lookups (`syncing`, `ok`, `quota`, or `off`)
 - inline error text when the most recent poll failed
 
 The footer metadata on the right shows `🌐 msmap`, the GitHub link, and the

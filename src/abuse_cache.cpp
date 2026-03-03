@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <sqlite3.h>
 
+#include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <cstdlib>
@@ -11,6 +12,7 @@
 #include <ctime>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace msmap {
@@ -54,6 +56,45 @@ std::size_t curl_write_cb(const char* ptr, std::size_t /*size*/,
     auto* const buf = static_cast<std::string*>(userdata);
     buf->append(ptr, nmemb);
     return nmemb;
+}
+
+struct RateHeaderState {
+    std::optional<int> remaining;
+};
+
+std::size_t curl_header_cb(const char* ptr, std::size_t size,
+                           std::size_t nmemb, void* userdata) noexcept
+{
+    auto* const state = static_cast<RateHeaderState*>(userdata);
+    if (state == nullptr) {
+        return size * nmemb;
+    }
+
+    const std::size_t len = size * nmemb;
+    std::string line(ptr, len);
+    while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
+        line.pop_back();
+    }
+
+    constexpr std::string_view kRemainingHeader{"x-ratelimit-remaining:"};
+    std::string lower;
+    lower.reserve(line.size());
+    for (const char ch : line) {
+        lower.push_back(static_cast<char>(
+            std::tolower(static_cast<unsigned char>(ch))));
+    }
+
+    if (lower.rfind(kRemainingHeader, 0) == 0) {
+        const char* value = line.c_str() + static_cast<std::ptrdiff_t>(kRemainingHeader.size());
+        while (*value == ' ' || *value == '\t') { ++value; }
+        char* end = nullptr;
+        const long parsed = std::strtol(value, &end, 10);
+        if (end != value && parsed >= 0) {
+            state->remaining = static_cast<int>(parsed);
+        }
+    }
+
+    return len;
 }
 
 // ── Minimal JSON extractor ────────────────────────────────────────────────────
@@ -325,10 +366,17 @@ int AbuseCache::rate_remaining() const noexcept
     return rate_remaining_;
 }
 
+std::optional<int> AbuseCache::confirmed_rate_remaining() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return confirmed_rate_remaining_;
+}
+
 void AbuseCache::set_rate_remaining_for_test(int remaining) noexcept
 {
     const std::lock_guard<std::mutex> lock{queue_mutex_};
     rate_remaining_ = remaining < 0 ? 0 : remaining;
+    confirmed_rate_remaining_ = rate_remaining_;
 }
 
 std::optional<std::int64_t> AbuseCache::cache_row_count() const noexcept
@@ -356,6 +404,7 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     const std::int64_t today = epoch_day();
     if (today != rate_reset_day_) {
         rate_remaining_ = kDailyQuota;
+        confirmed_rate_remaining_.reset();
         rate_reset_day_ = today;
         quota_warned_   = false;  // allow one new warning next quota period
         return true;
@@ -436,8 +485,9 @@ void AbuseCache::worker() noexcept
         // HTTP request; pure network failures don't consume API quota.
         bool request_made    = false;
         bool quota_exhausted = false;
-        const auto result = fetch_abuse(ip, request_made, quota_exhausted);
-        apply_fetch_result(ip, result, request_made, quota_exhausted);
+        std::optional<int> confirmed_remaining;
+        const auto result = fetch_abuse(ip, request_made, quota_exhausted, confirmed_remaining);
+        apply_fetch_result(ip, result, request_made, quota_exhausted, confirmed_remaining);
     }
 }
 
@@ -446,7 +496,8 @@ void AbuseCache::worker() noexcept
 void AbuseCache::apply_fetch_result(const std::string&                ip,
                                     const std::optional<AbuseResult>& result,
                                     bool                               request_made,
-                                    bool                               quota_exhausted) noexcept
+                                    bool                               quota_exhausted,
+                                    std::optional<int>                 confirmed_remaining) noexcept
 {
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
@@ -456,7 +507,11 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
             // of firing another request.  Re-queue the IP so it is processed
             // once the daily quota resets at midnight.
             rate_remaining_ = 0;
+            confirmed_rate_remaining_ = 0;
             if (!stop_) { queue_.insert(ip); }
+        } else if (confirmed_remaining.has_value()) {
+            rate_remaining_ = *confirmed_remaining;
+            confirmed_rate_remaining_ = *confirmed_remaining;
         } else if (request_made) {
             --rate_remaining_;
         }
@@ -479,10 +534,12 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
 
 std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
                                                     bool& request_made,    // NOLINT(bugprone-easily-swappable-parameters)
-                                                    bool& quota_exhausted) noexcept
+                                                    bool& quota_exhausted,
+                                                    std::optional<int>& confirmed_remaining) noexcept
 {
     request_made    = false;
     quota_exhausted = false;
+    confirmed_remaining.reset();
 
     CURL* const curl = curl_easy_init();
     if (curl == nullptr) {
@@ -507,11 +564,14 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
 
     std::string body;
     body.reserve(512);
+    RateHeaderState headers;
 
     (void)curl_easy_setopt(curl, CURLOPT_URL,            url.c_str());
     (void)curl_easy_setopt(curl, CURLOPT_HTTPHEADER,     raw_headers);
     (void)curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  curl_write_cb);
     (void)curl_easy_setopt(curl, CURLOPT_WRITEDATA,      &body);
+    (void)curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_header_cb);
+    (void)curl_easy_setopt(curl, CURLOPT_HEADERDATA,     &headers);
     (void)curl_easy_setopt(curl, CURLOPT_TIMEOUT,        10L);
     (void)curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
@@ -527,6 +587,7 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
     // An HTTP response was received; the API call counts against quota
     // regardless of the status code.
     request_made = true;
+    confirmed_remaining = headers.remaining;
 
     long http_code{0};
     (void)curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
@@ -535,6 +596,7 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
         // rate_remaining_ immediately so it stops firing requests rather
         // than waiting for our local counter to count down to zero.
         quota_exhausted = true;
+        confirmed_remaining = 0;
         return std::nullopt;
     }
     if (http_code != 200) {

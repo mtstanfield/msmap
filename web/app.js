@@ -617,7 +617,11 @@ function setOperatorStatus(status) {
     }
 
     const abuseRemaining = Number.isFinite(status.abuse_rate_remaining) ? status.abuse_rate_remaining : null;
-    if (status.abuse_quota_exhausted === true) {
+    if (abuseRemaining === null && status.abuse_quota_exhausted !== true) {
+        statAbuseValue.textContent = 'syncing';
+        statAbuseValue.classList.add('status-state-syncing');
+        statAbuse.dataset.tooltip = 'Waiting for the first live AbuseIPDB response to confirm current requests remaining.';
+    } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
         statAbuseValue.classList.add('status-state-stale');
         statAbuse.dataset.tooltip = 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';

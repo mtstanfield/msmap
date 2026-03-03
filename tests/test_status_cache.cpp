@@ -100,6 +100,22 @@ TEST_CASE("status cache: abuse cache exposes remaining quota", "[status]")
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
 }
 
+TEST_CASE("status cache: abuse cache remains unknown before first live confirmation", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::AbuseCache abuse{":memory:", "dummy_key"};
+    REQUIRE(abuse.valid());
+
+    msmap::StatusCache status{db, nullptr, &abuse, nullptr, true, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->abuse_enabled);
+    REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
+    REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
+}
+
 TEST_CASE("status cache: abuse cache exposes exhausted quota", "[status]")
 {
     msmap::Database db{":memory:"};

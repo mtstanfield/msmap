@@ -117,6 +117,7 @@ TEST_CASE("AbuseCache: rate_remaining starts at kDailyQuota")
     const msmap::AbuseCache cache{":memory:", "dummy_key"};
     REQUIRE(cache.valid());
     CHECK(cache.rate_remaining() == msmap::kDailyQuota);
+    CHECK_FALSE(cache.confirmed_rate_remaining().has_value());
 }
 
 TEST_CASE("AbuseCache: rate_limit_reset_if_new_day returns false same day")
@@ -126,6 +127,7 @@ TEST_CASE("AbuseCache: rate_limit_reset_if_new_day returns false same day")
     // Same calendar day as construction — no reset expected.
     CHECK_FALSE(cache.rate_limit_reset_if_new_day());
     CHECK(cache.rate_remaining() == msmap::kDailyQuota);
+    CHECK_FALSE(cache.confirmed_rate_remaining().has_value());
 }
 
 // ── update_connections_abuse(): integration ───────────────────────────────────

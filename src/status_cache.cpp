@@ -24,7 +24,7 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
     payload.abuse_enabled = abuse_enabled;
     payload.abuse_rate_remaining =
         (abuse_enabled && abuse_cache != nullptr)
-            ? std::optional<int>{abuse_cache->rate_remaining()}
+            ? abuse_cache->confirmed_rate_remaining()
             : std::nullopt;
     payload.abuse_quota_exhausted =
         abuse_enabled && payload.abuse_rate_remaining.has_value() &&
@@ -121,7 +121,7 @@ void StatusCache::refresh_snapshot() noexcept
     payload.abuse_enabled = abuse_enabled_;
     payload.abuse_rate_remaining =
         (abuse_enabled_ && abuse_cache_ != nullptr)
-            ? std::optional<int>{abuse_cache_->rate_remaining()}
+            ? abuse_cache_->confirmed_rate_remaining()
             : std::nullopt;
     payload.abuse_quota_exhausted =
         abuse_enabled_ && payload.abuse_rate_remaining.has_value() &&
