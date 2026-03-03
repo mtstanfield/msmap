@@ -1,0 +1,1 @@
+2026-02-27T08:14:23+00:00 router FW_FWD_DNAT: FW_FWD_DNAT forward: in:ether1 out:(unknown 0), connection-state:new,dnat src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 108.89.70.182:54442->192.168.88.89:32400, NAT 108.89.70.182:54442->(108.89.67.16:3240->192.168.88.89:32400), len 52

@@ -75,5 +75,8 @@ tmp/
 ## Testing
 coverage/
 test-results/
+corpus/*
+!corpus/seed/
+!corpus/seed/**
 corpus/crashes/
 corpus/hangs/
