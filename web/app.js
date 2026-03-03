@@ -149,7 +149,7 @@ const cluster = L.markerClusterGroup({
         else if (ratio < 0.67) { cls = 'mid';  }
         else                   { cls = 'high'; }
         return L.divIcon({
-            html:      '<div><span>' + total + '</span></div>',
+            html:      '<div><span>' + total + '</span>' + (hasSpike ? '<i class="cluster-spike-dot" aria-hidden="true"></i>' : '') + '</div>',
             className: 'marker-cluster marker-cluster-threat-' + cls + (hasSpike ? ' marker-cluster-spike' : ''),
             iconSize:  L.point(40, 40),
         });

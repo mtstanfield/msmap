@@ -720,10 +720,21 @@ html, body {
 .marker-cluster-threat-high      { background-color: rgba(248,  81,  73, 0.3); }
 .marker-cluster-threat-high  div { background-color: rgba(248,  81,  73, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
 .marker-cluster-spike {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 .marker-cluster-spike div {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 14px rgba(248, 129, 56, 0.22);
+    position: relative;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 16px rgba(248, 129, 56, 0.28);
+}
+.cluster-spike-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #ffb86b;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45), 0 0 10px rgba(248, 129, 56, 0.45);
 }
 
 @media (max-width: 900px) {
