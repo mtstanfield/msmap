@@ -29,9 +29,32 @@ permissions:
   contents: read
 
 jobs:
+  # ── Prepare shared dev-image cache for this workflow run ────────────────────
+  prepare-dev-image:
+    name: Prepare Dev Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Prime the dev-image cache once for the current workflow run so later
+      # jobs can load the same image from a warm GHA cache instead of racing to
+      # rebuild it in parallel on cold cache runs.
+      - name: Build dev image cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: dev
+          cache-from: type=gha,scope=dev
+          cache-to: type=gha,scope=dev,mode=max
+
   # ── Build and test ───────────────────────────────────────────────────────────
   build-test:
     name: Build & Test
+    needs: [prepare-dev-image]
     runs-on: ubuntu-latest
 
     steps:
@@ -41,10 +64,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build the dev image and cache it.  This is the heavy step (~2 min on
-      # cold cache; a few seconds on warm cache).  Subsequent docker run
-      # commands reuse this image for all build/test operations.
-      - name: Build dev image
+      # Load the prepared dev image into the local daemon for docker run.
+      - name: Load dev image from cache
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -52,10 +73,11 @@ jobs:
           load: true          # load into local daemon so docker run works
           tags: msmap-dev:ci
           cache-from: type=gha,scope=dev
-          cache-to: type=gha,scope=dev,mode=max
 
       # Configure and build in a single container invocation.
       # Debug mode enables ASan + UBSan (see CMakeLists.txt option block).
+      # Use the same CPU target as the published release image so CI validates
+      # the shipped codegen profile instead of only the generic fallback.
       - name: Configure and Build (Debug + ASan + UBSan)
         run: |
           docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
@@ -64,6 +86,7 @@ jobs:
               -DCMAKE_CXX_STANDARD=23 \
               -DCMAKE_CXX_EXTENSIONS=OFF \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DMSMAP_CPU_TARGET=x86-64-v3 \
             && ninja -C build"
 
       # Unit + integration tests under ASan + UBSan.
@@ -77,6 +100,7 @@ jobs:
   # ── Static analysis (runs in parallel with build-test) ───────────────────────
   lint:
     name: Lint
+    needs: [prepare-dev-image]
     runs-on: ubuntu-latest
 
     steps:
@@ -85,9 +109,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Pull dev image from cache — build-test writes the cache (cache-to);
-      # we only read here (no cache-to) to avoid a write race between jobs.
-      - name: Pull dev image from cache
+      # Load the dev image from the cache primed by the prepare job.
+      - name: Load dev image from cache
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -113,6 +136,7 @@ jobs:
               -DCMAKE_CXX_EXTENSIONS=OFF \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
+              -DMSMAP_CPU_TARGET=x86-64-v3 \
             && ninja -C build web_bundle"
 
       # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
