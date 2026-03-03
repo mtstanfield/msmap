@@ -7,6 +7,7 @@
 #include "http.h"
 #include "ip_intel_cache.h"
 #include "listener.h"
+#include "status_cache.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -183,9 +184,17 @@ int main() {
         std::clog << "[WARN] IpIntelCache failed to initialize; Tor/Spamhaus intel disabled\n";
     }
     msmap::IpIntelCache* const intel_ptr = intel_cache.valid() ? &intel_cache : nullptr;
+    const bool abuse_enabled = abuse_ptr != nullptr && !abuse_key.empty();
+    const bool intel_enabled = intel_ptr != nullptr;
+
+    // NOLINTNEXTLINE(misc-const-correctness): background refresh mutates the cached snapshot.
+    msmap::StatusCache status_cache{db, home_resolver.get(), abuse_ptr, intel_ptr,
+                                    abuse_enabled, intel_enabled};
 
     // HttpServer starts libmicrohttpd's internal poll thread plus the worker
-    // pool configured by MSMAP_HTTP_THREADS; run_listener blocks below.
+    // pool configured by MSMAP_HTTP_THREADS; /api/status is served from the
+    // cached snapshot above rather than doing live DB aggregation per request.
+    // run_listener blocks below.
     // Declaration order is load-bearing: C++ destroys locals in reverse order,
     // so `http` (HttpServer) is destroyed before `home_resolver` and `db`.
     // HttpServer's destructor calls MHD_stop_daemon which joins its thread
@@ -194,8 +203,9 @@ int main() {
                                  home_resolver.get(),
                                  abuse_ptr,
                                  intel_ptr,
-                                 abuse_ptr != nullptr && !abuse_key.empty(),
-                                 intel_ptr != nullptr,
+                                 &status_cache,
+                                 abuse_enabled,
+                                 intel_enabled,
                                  http_threads};
     if (!http.valid()) {
         std::clog << "[FATAL] HTTP server failed to start on port "

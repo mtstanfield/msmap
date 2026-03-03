@@ -255,6 +255,18 @@ server {
         proxy_pass http://192.0.2.10:8080;
     }
 
+    location = /api/status {
+        include /config/nginx/proxy.conf;
+        proxy_cache msmap_api;
+        proxy_cache_lock on;
+        proxy_cache_background_update on;
+        proxy_cache_use_stale updating error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_cache_valid 200 15s;
+        proxy_cache_valid 503 5s;
+        add_header X-Cache-Status $upstream_cache_status always;
+        proxy_pass http://192.0.2.10:8080;
+    }
+
     location = /api/detail {
         include /config/nginx/proxy.conf;
         proxy_no_cache 1;
@@ -451,9 +463,11 @@ Response fields include:
 - `intel_last_refresh_ts`
 - `abuse_cache_rows`
 - `db_size_bytes`
+- `generated_at`
 
-This endpoint is informational, uncached (`Cache-Control: no-store`), and is
-polled much less frequently than `GET /api/map`.
+This endpoint is informational, served from an in-process cached snapshot, and
+intended to be short-cacheable at nginx. The browser only polls it while the
+tab is visible, much less frequently than `GET /api/map`.
 
 ---
 

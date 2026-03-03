@@ -161,6 +161,7 @@ public:
         query_detail_page(const QueryFilters& filters) const noexcept;
 
     /// Return a lightweight operational snapshot for the retained 24h window.
+    /// Used by StatusCache's background refresh, never on the public request path.
     [[nodiscard]] std::optional<StatusSnapshot> status_snapshot() const noexcept;
 
     /// Delete all rows with ts < cutoff_ts and return the count removed.

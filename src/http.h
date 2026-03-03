@@ -13,6 +13,7 @@ namespace msmap {
 class Database;
 class AbuseCache;
 class IpIntelCache;
+class StatusCache;
 
 /// Context bundle passed to the MHD request callback as `cls`.
 /// Groups the server-owned state the callback needs.
@@ -21,6 +22,7 @@ struct HandlerCtx {
     const HomeResolver*  home_resolver;  // null when MSMAP_HOME_HOST is unset
     const AbuseCache*    abuse_cache;    // null when AbuseIPDB is disabled
     const IpIntelCache*  intel_cache;    // null when Tor/DROP intel is disabled
+    const StatusCache*   status_cache;   // null only during tests/unsupported wiring
     bool                 abuse_enabled;
     bool                 intel_enabled;
 };
@@ -42,7 +44,7 @@ struct MhdDaemonCloser {
 ///   GET /api/map           — aggregate JSON object for the requested window
 ///   GET /api/detail        — paginated raw rows for popup drilldown
 ///   GET /api/home          — JSON {lat,lon} if MSMAP_HOME_HOST is set, else 404
-///   GET /api/status        — lightweight operator status snapshot
+///   GET /api/status        — cached operator status snapshot
 ///   GET /                  — full map UI (HTML)
 class HttpServer {
 public:
@@ -53,6 +55,7 @@ public:
                const HomeResolver* home_resolver,
                const AbuseCache*   abuse_cache,
                const IpIntelCache* intel_cache,
+               const StatusCache*  status_cache,
                bool                abuse_enabled,
                bool                intel_enabled,
                unsigned int        thread_pool_size = 4) noexcept;

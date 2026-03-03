@@ -1,0 +1,56 @@
+#include "db.h"
+#include "geoip.h"
+#include "status_cache.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+TEST_CASE("status cache: empty database snapshot is available", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::StatusCache status{db, nullptr, nullptr, nullptr, false, false, 60};
+    REQUIRE(status.valid());
+
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->ok);
+    REQUIRE(snapshot->rows_24h == 0);
+    REQUIRE(snapshot->distinct_sources_24h == 0);
+    REQUIRE_FALSE(snapshot->latest_event_ts.has_value());
+    REQUIRE(snapshot->generated_at >= snapshot->now);
+}
+
+TEST_CASE("status cache: populated database snapshot includes counts", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::LogEntry base{};
+    base.ts = 1000;
+    base.src_ip = "1.2.3.4";
+    base.src_port = 1234;
+    base.dst_ip = "10.0.0.1";
+    base.dst_port = 443;
+    base.proto = "TCP";
+    base.tcp_flags = "SYN";
+    base.rule = "FW_INPUT_NEW";
+    base.chain = "input";
+    base.in_iface = "ether1";
+    base.conn_state = "new";
+    base.pkt_len = 52;
+
+    msmap::LogEntry other = base;
+    other.ts = 1500;
+    other.src_ip = "5.6.7.8";
+
+    db.insert(base, msmap::GeoIpResult{});
+    db.insert(other, msmap::GeoIpResult{});
+
+    msmap::StatusCache status{db, nullptr, nullptr, nullptr, false, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->rows_24h == 2);
+    REQUIRE(snapshot->distinct_sources_24h == 2);
+    REQUIRE(snapshot->latest_event_ts == 1500);
+}

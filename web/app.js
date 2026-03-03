@@ -585,7 +585,7 @@ async function fetchStatus() {
     }
     statusInFlight = true;
     try {
-        const resp = await fetch('/api/status', { cache: 'no-store' });
+        const resp = await fetch('/api/status', { cache: 'default' });
         if (!resp.ok) {
             setOperatorStatus(null);
             return;
@@ -600,13 +600,22 @@ async function fetchStatus() {
 }
 
 function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
+    if (document.visibilityState === 'hidden') {
+        if (statusPollTimer !== null) {
+            clearTimeout(statusPollTimer);
+            statusPollTimer = null;
+        }
+        return;
+    }
     if (statusPollTimer !== null) {
         clearTimeout(statusPollTimer);
     }
     statusPollTimer = setTimeout(() => {
         statusPollTimer = null;
         void fetchStatus().then(() => {
-            scheduleStatusPoll(STATUS_REFRESH_MS);
+            if (document.visibilityState === 'visible') {
+                scheduleStatusPoll(STATUS_REFRESH_MS);
+            }
         });
     }, delayMs);
 }
@@ -1292,7 +1301,6 @@ async function poll() {
         if (!resp.ok) {
             setError('API ' + resp.status);
             updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
-            void fetchStatus();
             scheduleNextPoll(ERROR_REFRESH_MS);
             return;
         }
@@ -1319,7 +1327,6 @@ async function poll() {
     } catch (err) {
         setError(err.message);
         updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
-        void fetchStatus();
         scheduleNextPoll(ERROR_REFRESH_MS);
     } finally {
         pollInFlight = false;
@@ -1342,8 +1349,14 @@ function pollNow() {
 document.addEventListener('visibilitychange', () => {
     updateMapFeedIndicator();
     if (document.visibilityState === 'visible') {
+        void fetchStatus();
+        scheduleStatusPoll();
         requestPollNow();
         return;
+    }
+    if (statusPollTimer !== null) {
+        clearTimeout(statusPollTimer);
+        statusPollTimer = null;
     }
     scheduleNextPoll(HIDDEN_REFRESH_MS);
 });

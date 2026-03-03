@@ -130,7 +130,8 @@ add_executable(msmap
     src/http.cpp
     src/listener.cpp
     src/parser.cpp
-    src/abuse_cache.cpp)
+    src/abuse_cache.cpp
+    src/status_cache.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
 
@@ -143,6 +144,7 @@ add_dependencies(msmap web_bundle)
 target_include_directories(msmap PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 target_link_libraries(msmap PRIVATE
+    Threads::Threads
     PkgConfig::MICROHTTPD
     PkgConfig::SQLITE3
     PkgConfig::MAXMINDDB
@@ -228,6 +230,30 @@ if(MSMAP_ENABLE_TESTS)
 
     catch_discover_tests(test_http)
 
+    add_executable(test_status_cache
+        tests/test_status_cache.cpp
+        src/curl_global.cpp
+        src/abuse_cache.cpp
+        src/ip_intel_cache.cpp
+        src/status_cache.cpp
+        src/db.cpp
+        src/geoip.cpp
+        src/home_resolver.cpp
+        src/parser.cpp)
+
+    target_compile_features(test_status_cache PRIVATE cxx_std_23)
+    target_include_directories(test_status_cache PRIVATE src)
+    msmap_set_warnings(test_status_cache)
+    msmap_enable_sanitizers(test_status_cache)
+    target_link_libraries(test_status_cache PRIVATE
+        Catch2::Catch2WithMain
+        PkgConfig::SQLITE3
+        PkgConfig::MAXMINDDB
+        PkgConfig::LIBCURL
+        Threads::Threads)
+
+    catch_discover_tests(test_status_cache)
+
     add_executable(test_abuse_cache
         tests/test_abuse_cache.cpp
         src/curl_global.cpp
@@ -257,7 +283,8 @@ if(MSMAP_ENABLE_TESTS)
         src/db.cpp
         src/geoip.cpp
         src/home_resolver.cpp
-        src/parser.cpp)
+        src/parser.cpp
+        src/status_cache.cpp)
 
     target_compile_features(test_integration PRIVATE cxx_std_23)
     target_include_directories(test_integration PRIVATE src)
