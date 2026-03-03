@@ -117,10 +117,6 @@
                     <span id="stat-total-value" class="status-value status-value-ops">0</span>
                 </span>
             </div>
-            <div id="stat-time" class="status-group status-freshness status-tooltip-target" tabindex="0" data-tooltip="Freshness of the current /api/map data shown on the map.">
-                <span class="status-dot is-unknown" aria-hidden="true"></span>
-                <span id="stat-time-value">Waiting for data</span>
-            </div>
             <div id="status-ops" class="status-group">
                 <span id="stat-events" class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" style="display:none" tabindex="0" data-tooltip="Retained connection rows in the last 24 hours.">
                     <span class="status-label">Events</span>
@@ -140,6 +136,10 @@
             <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">
+            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Freshness of the current /api/map data shown on the map.">
+                <span class="status-dot is-unknown" aria-hidden="true"></span>
+                <span id="stat-time-value">Waiting for data</span>
+            </div>
             <span id="stat-brand">
                 <span class="brand-mark" aria-hidden="true">🌐</span>
                 <span class="brand-name">msmap</span>
