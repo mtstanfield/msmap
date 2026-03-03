@@ -321,12 +321,13 @@ events from `GET /api/detail`.
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
 | Animations | On / Off for highlight effects and home-directed arcs |
-| Legend | Always-visible reference block under the filters |
+| Legend | Reference block inside the filter panel |
 
 All selects apply immediately. Text filters auto-apply once the value is
 valid, and `Defaults` resets the panel to the standard 15-minute view. Applied
 filter state is mirrored into sparse query parameters, so copied URLs and
-bookmarks reopen the same view.
+bookmarks reopen the same view. On mobile-sized coarse-pointer UIs, the
+filter/legend panel starts closed behind the gear toggle to keep the map clear.
 
 The legend also makes the GeoIP precision explicit: map locations are
 approximate and should be read as placement hints, not exact device locations.
@@ -378,6 +379,7 @@ Clicking a marker shows:
 - **Spamhaus DROP** badge when the source IP matches that list
 - Compact pivot buttons for GreyNoise, Shodan, AbuseIPDB, and AlienVault OTX
 - A condensed recent-event viewer loaded on demand from `GET /api/detail`
+  on desktop-sized UI; mobile keeps the popup summary-only
 - Arrow controls to step older/newer through the raw-event history for that
   aggregate source IP marker
 
