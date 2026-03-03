@@ -54,3 +54,20 @@ TEST_CASE("status cache: populated database snapshot includes counts", "[status]
     REQUIRE(snapshot->distinct_sources_24h == 2);
     REQUIRE(snapshot->latest_event_ts == 1500);
 }
+
+TEST_CASE("status cache: invalid database publishes an unhealthy snapshot", "[status]")
+{
+    msmap::Database db{"/nonexistent/path/msmap.db"};
+    REQUIRE_FALSE(db.valid());
+
+    msmap::StatusCache status{db, nullptr, nullptr, nullptr, false, false, 60};
+    REQUIRE(status.valid());
+
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE_FALSE(snapshot->ok);
+    REQUIRE(snapshot->rows_24h == 0);
+    REQUIRE(snapshot->distinct_sources_24h == 0);
+    REQUIRE_FALSE(snapshot->latest_event_ts.has_value());
+    REQUIRE(snapshot->generated_at == snapshot->now);
+}

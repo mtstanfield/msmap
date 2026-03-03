@@ -9,6 +9,32 @@
 
 namespace msmap {
 
+namespace {
+
+StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
+                                   const HomeResolver*                home_resolver,
+                                   bool                               abuse_enabled,
+                                   bool                               intel_enabled,
+                                   const IpIntelCache*                intel_cache,
+                                   const AbuseCache*                  abuse_cache) noexcept
+{
+    StatusPayload payload = previous.value_or(StatusPayload{});
+    payload.ok = false;
+    payload.now = static_cast<std::int64_t>(std::time(nullptr));
+    payload.abuse_enabled = abuse_enabled;
+    payload.intel_enabled = intel_enabled;
+    payload.home_configured = home_resolver != nullptr;
+    payload.home_valid = payload.home_configured && home_resolver->get().valid;
+    payload.intel_last_refresh_ts =
+        intel_cache != nullptr ? intel_cache->last_refresh_ts() : std::nullopt;
+    payload.abuse_cache_rows =
+        abuse_cache != nullptr ? abuse_cache->cache_row_count() : std::nullopt;
+    payload.generated_at = payload.now;
+    return payload;
+}
+
+} // namespace
+
 StatusCache::StatusCache(Database& db,
                          const HomeResolver* home_resolver,
                          const AbuseCache* abuse_cache,
@@ -70,6 +96,11 @@ void StatusCache::refresh_snapshot() noexcept
 {
     const auto db_snapshot = db_.status_snapshot();
     if (!db_snapshot.has_value()) {
+        const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+        // Publish an explicit unhealthy snapshot so /api/status does not keep
+        // serving an old healthy payload forever after refresh failures.
+        snapshot_ = build_failed_payload(snapshot_, home_resolver_, abuse_enabled_,
+                                         intel_enabled_, intel_cache_, abuse_cache_);
         return;
     }
 

@@ -46,6 +46,8 @@ public:
     StatusCache(StatusCache&&)                 = delete;
     StatusCache& operator=(StatusCache&&)      = delete;
 
+    // True when the cache has any snapshot to serve, including an explicit
+    // unhealthy snapshot published after a refresh failure.
     [[nodiscard]] bool valid() const noexcept;
     [[nodiscard]] std::optional<StatusPayload> snapshot() const noexcept;
 
