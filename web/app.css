@@ -759,12 +759,8 @@ html, body {
 .marker-cluster-threat-mid   div { background-color: rgba(240, 136,  62, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
 .marker-cluster-threat-high      { background-color: rgba(248,  81,  73, 0.3); }
 .marker-cluster-threat-high  div { background-color: rgba(248,  81,  73, 0.6); color: #e6edf3; font-size: 12px; font-weight: 600; }
-.marker-cluster-spike {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
-}
 .marker-cluster-spike div {
     position: relative;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 16px rgba(248, 129, 56, 0.28);
 }
 .cluster-spike-dot {
     position: absolute;
@@ -773,8 +769,8 @@ html, body {
     width: 7px;
     height: 7px;
     border-radius: 999px;
-    background: #ffb86b;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45), 0 0 10px rgba(248, 129, 56, 0.45);
+    background: #f0f6fc;
+    box-shadow: 0 0 0 1px rgba(201, 209, 217, 0.7), 0 0 10px rgba(240, 246, 252, 0.2);
 }
 
 @media (max-width: 900px) {
