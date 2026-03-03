@@ -113,10 +113,6 @@ html, body {
     color: #30363d;
 }
 
-#stat-mapped .status-value {
-    color: #58a6ff;
-}
-
 #stat-total .status-value {
     color: #c9d1d9;
 }
