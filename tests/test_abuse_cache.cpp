@@ -72,13 +72,12 @@ TEST_CASE("AbuseCache: cache_store then lookup returns stored score")
     msmap::AbuseCache cache{":memory:", ""};
     REQUIRE(cache.valid());
 
-    const msmap::AbuseResult result{99, "Data Center/Web Hosting/Transit", false};
+    const msmap::AbuseResult result{99, "Data Center/Web Hosting/Transit"};
     REQUIRE(cache.cache_store("8.8.8.8", result));
     const auto hit = cache.lookup("8.8.8.8");
     REQUIRE(hit.has_value());
     REQUIRE(hit->score == 99);
     REQUIRE(hit->usage_type == "Data Center/Web Hosting/Transit");
-    REQUIRE_FALSE(hit->is_tor);
 }
 
 TEST_CASE("AbuseCache: cache_store zero score round-trips")
@@ -86,7 +85,7 @@ TEST_CASE("AbuseCache: cache_store zero score round-trips")
     msmap::AbuseCache cache{":memory:", ""};
     REQUIRE(cache.valid());
 
-    REQUIRE(cache.cache_store("1.1.1.1", msmap::AbuseResult{0, "ISP/Residential", false}));
+    REQUIRE(cache.cache_store("1.1.1.1", msmap::AbuseResult{0, "ISP/Residential"}));
     const auto hit = cache.lookup("1.1.1.1");
     REQUIRE(hit.has_value());
     REQUIRE(hit->score == 0);
@@ -131,7 +130,7 @@ TEST_CASE("AbuseCache: rate_limit_reset_if_new_day returns false same day")
 
 // ── update_connections_abuse(): integration ───────────────────────────────────
 
-TEST_CASE("AbuseCache: update_connections_abuse sets threat, usage_type, is_tor")
+TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")
 {
     const std::string db_path = tmp_db_path("patch");
 
@@ -150,12 +149,12 @@ TEST_CASE("AbuseCache: update_connections_abuse sets threat, usage_type, is_tor"
     {
         msmap::AbuseCache cache{db_path, ""};
         REQUIRE(cache.valid());
-        const msmap::AbuseResult result{75, "Data Center/Web Hosting/Transit", false};
+        const msmap::AbuseResult result{75, "Data Center/Web Hosting/Transit"};
         REQUIRE(cache.cache_store("5.5.5.5", result));
         cache.update_connections_abuse("5.5.5.5", result);
     }
 
-    // Re-open Database and verify all three fields were set.
+    // Re-open Database and verify the enrichment fields were set.
     {
         msmap::Database db{db_path};
         REQUIRE(db.valid());
@@ -163,8 +162,6 @@ TEST_CASE("AbuseCache: update_connections_abuse sets threat, usage_type, is_tor"
         REQUIRE(rows.size() == 1);
         REQUIRE(rows.at(0).threat == 75);
         REQUIRE(rows.at(0).usage_type == "Data Center/Web Hosting/Transit");
-        REQUIRE(rows.at(0).is_tor.has_value());
-        REQUIRE_FALSE(*rows.at(0).is_tor);
     }
 
     (void)std::remove(db_path.c_str());
@@ -181,11 +178,11 @@ TEST_CASE("AbuseCache: update_connections_abuse skips already-enriched rows")
         REQUIRE(db.insert(make_entry("6.6.6.6"), msmap::GeoIpResult{}));
     }
 
-    // First enrichment: sets threat + usage_type + is_tor.
+    // First enrichment: sets threat + usage_type.
     {
         msmap::AbuseCache cache{db_path, ""};
         REQUIRE(cache.valid());
-        const msmap::AbuseResult result{50, "ISP/Residential", false};
+        const msmap::AbuseResult result{50, "ISP/Residential"};
         REQUIRE(cache.cache_store("6.6.6.6", result));
         cache.update_connections_abuse("6.6.6.6", result);
     }
@@ -196,7 +193,7 @@ TEST_CASE("AbuseCache: update_connections_abuse skips already-enriched rows")
         msmap::AbuseCache cache{db_path, ""};
         REQUIRE(cache.valid());
         cache.update_connections_abuse("6.6.6.6",
-                                       msmap::AbuseResult{99, "Data Center", true});
+                                       msmap::AbuseResult{99, "Data Center"});
     }
 
     // Verify original values are preserved (score 50, not 99).
@@ -207,8 +204,6 @@ TEST_CASE("AbuseCache: update_connections_abuse skips already-enriched rows")
         REQUIRE(rows.size() == 1);
         REQUIRE(rows.at(0).threat == 50);
         REQUIRE(rows.at(0).usage_type == "ISP/Residential");
-        REQUIRE(rows.at(0).is_tor.has_value());
-        REQUIRE_FALSE(*rows.at(0).is_tor);
     }
 
     (void)std::remove(db_path.c_str());

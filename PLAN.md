@@ -112,7 +112,6 @@ proto_variant (ICMP)    :=                  ', ' IP '->' IP
 | `asn`        | TEXT NULL      |                                |
 | `threat`     | INTEGER NULL   | AbuseIPDB confidence score 0-100; NULL until enriched |
 | `usage_type` | TEXT NULL      | AbuseIPDB usageType; NULL until enriched |
-| `is_tor`     | INTEGER NULL   | AbuseIPDB isTor (0/1); NULL until enriched |
 
 ---
 
@@ -168,7 +167,8 @@ docker build -t msmap .
 
 ### Enrichment
 - [x] GeoIP: libmaxminddb lookup on ingest → fill country/lat/lon/asn columns
-- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `usage_type`, `is_tor`, `last_checked`); background refresh; `usageType` and `isTor` backfilled into `connections` via background worker
+- [x] OSINT: AbuseIPDB cache table (`ip`, `score`, `usage_type`, `last_checked`); background refresh; `usageType` backfilled into `connections` via background worker
+- [x] Source-IP intel cache: Tor Project bulk exit data + Spamhaus DROP/BCL surfaced in `/api/map` and `/api/detail`
 
 ### Web UI
 - [x] libmicrohttpd HTTP server on port 8080
@@ -180,11 +180,10 @@ docker build -t msmap .
       (5-level: grey=unknown, green=0, amber=1-33, orange=34-66, red=67-100;
       CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
 - [x] Filter/time-range panel: time range (15 min–24 h), protocol, src IP, dst port,
-      country; client-side enrichment toggles: Tor exits, Datacenter, Residential,
-      Animations; auto-apply with a Defaults reset; map polls aggregate markers
-      instead of capped raw rows
+      country, `Network type`, `Animations`; built-in legend; auto-apply with a
+      Defaults reset; map polls aggregate markers instead of capped raw rows
 - [x] Marker popup: aggregate summary plus condensed raw-event history viewer with
-      older/newer navigation and lazy paging
+      older/newer navigation, local pivot links, and compact Tor/Spamhaus intel badges
 - [x] Marker motion: one-shot ripple for source IPs first seen in the current
       browser session; optional home-directed arc animation when configured
 - [~] Raw query UI: out of scope — filter panel covers the use case
@@ -195,7 +194,7 @@ docker build -t msmap .
 - [x] Sanitizer builds: ASan + UBSan + -fno-sanitize-recover=all enabled by default in Debug builds
 - [x] clang-tidy clean (zero warnings, `-warnings-as-errors=*`)
 - [x] cppcheck clean (`--error-exitcode=1`)
-- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 78 tests passing
+- [x] Unit tests: Catch2 (parser, DB layer, enrichment, HTTP/JSON, AbuseCache) — 84 tests passing
 - [x] Integration test: full ingest → query pipeline (UDP socket → listener → parser → DB → query, 7 cases)
 
 ### Security

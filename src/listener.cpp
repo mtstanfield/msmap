@@ -3,6 +3,7 @@
 #include "db.h"
 #include "geoip.h"
 #include "home_resolver.h"
+#include "ip_intel_cache.h"
 #include "ip_utils.h"
 #include "parser.h"
 
@@ -59,7 +60,8 @@ constexpr std::size_t kRecvBufSize{4096};
 // ── Per-datagram handler ──────────────────────────────────────────────────────
 
 void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
-                      AbuseCache* abuse, const HomeResolver* home_resolver) {
+                      AbuseCache* abuse, IpIntelCache* intel_cache,
+                      const HomeResolver* home_resolver) {
     // Strip any trailing CR / LF that Mikrotik may append.
     while (!data.empty() && (data.back() == '\n' || data.back() == '\r')) {
         data.remove_suffix(1);
@@ -85,6 +87,9 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
         if (abuse != nullptr) {
             abuse->submit(result.entry.src_ip);
         }
+        if (intel_cache != nullptr) {
+            intel_cache->submit(result.entry.src_ip);
+        }
     } else {
         std::clog << "[WARN] parse: " << result.error << " | " << data << '\n';
     }
@@ -96,6 +101,7 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  IpIntelCache* intel_cache,
                   const HomeResolver* home_resolver,
                   const std::vector<std::uint32_t>& allow_ips,
                   const std::stop_token& stoken) {
@@ -162,7 +168,7 @@ void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
 
         // Each UDP datagram is one complete syslog message.
         process_datagram(std::string_view{buf.data(), static_cast<std::size_t>(n)},
-                         db, geoip, abuse, home_resolver);
+                         db, geoip, abuse, intel_cache, home_resolver);
     }
 }
 

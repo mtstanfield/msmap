@@ -267,14 +267,11 @@ from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
-| Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
-| Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
+| Network type | All / Datacenter / Residential from AbuseIPDB `usageType` |
 | Animations | Toggle marker ripple and home-directed arc animation on/off |
+| Legend | Inline explanation of threat colours, animation semantics, and intel badges |
 
-The Tor/datacenter/residential toggles are OR-combined when multiple are active.
-When none are checked all connections are shown regardless of enrichment status.
-Selects and toggles apply immediately. Text filters auto-apply once the value is
+All selects apply immediately. Text filters auto-apply once the value is
 valid, and `Defaults` resets the panel to the standard 15-minute view.
 
 ### Animations
@@ -317,9 +314,11 @@ Clicking a marker shows:
 - First/last seen timestamps for the aggregate source IP marker
 - Hit count within the selected window
 - Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
-- **Threat score** — latest and/or maximum AbuseIPDB abuse confidence 0–100
+- **Threat score** chip from AbuseIPDB
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
-- **Tor exit** — `yes` (highlighted) or `no`
+- **Tor exit** badge from Tor Project bulk exit data
+- **Spamhaus DROP/BCL** badges when the source IP matches those lists
+- Compact pivot buttons for GreyNoise, AbuseIPDB, and AlienVault OTX
 - A condensed recent-event viewer loaded on demand from `GET /api/detail`
 - Arrow controls to step older/newer through the raw-event history for that
   aggregate source IP marker
@@ -328,9 +327,10 @@ The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup.
 
-The OSINT fields appear once the background worker has resolved the IP against
-AbuseIPDB. Results are cached for 30 days; an API key is not required to view
-previously cached data.
+Threat colour and `usageType` still come from AbuseIPDB. Tor status comes from
+Tor Project bulk exit data, and Spamhaus DROP/BCL badges come from locally
+cached list lookups. AbuseIPDB results are cached for 30 days; an API key is
+not required to view previously cached data.
 
 ---
 

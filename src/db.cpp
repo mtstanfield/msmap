@@ -60,8 +60,16 @@ CREATE TABLE IF NOT EXISTS connections (
     lon        REAL,
     asn        TEXT,
     threat     INTEGER,
-    usage_type TEXT,
-    is_tor     INTEGER
+    usage_type TEXT
+))sql";
+
+constexpr const char* kCreateIpIntelTable = R"sql(
+CREATE TABLE IF NOT EXISTS ip_intel_cache (
+    ip             TEXT PRIMARY KEY,
+    tor_exit       INTEGER,
+    spamhaus_drop  INTEGER,
+    spamhaus_bcl   INTEGER,
+    last_checked   INTEGER NOT NULL
 ))sql";
 
 constexpr const char* kCreateIndexTs =
@@ -85,11 +93,27 @@ ON connections(ts, src_ip, dst_ip, proto,
 constexpr const char* kInsertSql = R"sql(
 INSERT OR IGNORE INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
-    rule, country, lat, lon, asn, threat, usage_type, is_tor)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    rule, country, lat, lon, asn, threat, usage_type)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
+
+constexpr const char* kPruneIpIntelSql =
+    "DELETE FROM ip_intel_cache WHERE ip NOT IN (SELECT DISTINCT src_ip FROM connections)";
+
+constexpr const char* kUpsertIpIntelSql = R"sql(
+INSERT INTO ip_intel_cache(ip, tor_exit, spamhaus_drop, spamhaus_bcl, last_checked)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(ip) DO UPDATE SET
+    tor_exit = excluded.tor_exit,
+    spamhaus_drop = excluded.spamhaus_drop,
+    spamhaus_bcl = excluded.spamhaus_bcl,
+    last_checked = excluded.last_checked
+)sql";
+
+constexpr const char* kDistinctSourceIpsSql =
+    "SELECT DISTINCT src_ip FROM connections";
 
 // RAII wrapper for the char* that sqlite3_exec may write into errmsg.
 struct SqliteErrFree {
@@ -156,7 +180,9 @@ ConnectionRow read_connection_row(sqlite3_stmt* stmt) noexcept
     row.asn        = col_text(stmt,                         11);
     row.threat     = col_opt_int(stmt,                      12);
     row.usage_type = col_text(stmt,                         13);
-    row.is_tor     = col_opt_bool(stmt,                     14);
+    row.tor_exit      = col_opt_bool(stmt,                  14);
+    row.spamhaus_drop = col_opt_bool(stmt,                  15);
+    row.spamhaus_bcl  = col_opt_bool(stmt,                  16);
     return row;
 }
 
@@ -245,7 +271,9 @@ void update_map_row(MapRow& out, const ConnectionRow& row, bool inserted)
         out.threat_max      = row.threat;
         out.sample_dst_port = row.dst_port;
         out.usage_type      = row.usage_type;
-        out.is_tor          = row.is_tor;
+        out.tor_exit        = row.tor_exit;
+        out.spamhaus_drop   = row.spamhaus_drop;
+        out.spamhaus_bcl    = row.spamhaus_bcl;
     }
 
     out.count += 1;
@@ -259,8 +287,14 @@ void update_map_row(MapRow& out, const ConnectionRow& row, bool inserted)
     if (out.usage_type.empty() && !row.usage_type.empty()) {
         out.usage_type = row.usage_type;
     }
-    if (!out.is_tor.has_value() && row.is_tor.has_value()) {
-        out.is_tor = row.is_tor;
+    if (!out.tor_exit.has_value() && row.tor_exit.has_value()) {
+        out.tor_exit = row.tor_exit;
+    }
+    if (!out.spamhaus_drop.has_value() && row.spamhaus_drop.has_value()) {
+        out.spamhaus_drop = row.spamhaus_drop;
+    }
+    if (!out.spamhaus_bcl.has_value() && row.spamhaus_bcl.has_value()) {
+        out.spamhaus_bcl = row.spamhaus_bcl;
     }
 
     if (!out.lat.has_value() && row.lat.has_value() && row.lon.has_value()) {
@@ -321,6 +355,7 @@ Database::Database(const std::string& path) noexcept
         !exec("PRAGMA cache_size=-131072")      ||
         !exec("PRAGMA wal_autocheckpoint=2000") ||
         !exec(kCreateTable)                     ||
+        !exec(kCreateIpIntelTable)              ||
         !exec(kCreateIndexTs)                   ||
         !exec(kCreateIndexSrcIp)                ||
         !exec(kCreateIndexDstPort)              ||
@@ -330,27 +365,26 @@ Database::Database(const std::string& path) noexcept
         return;
     }
 
-    // Prepare the reusable INSERT statement.
-    sqlite3_stmt* raw_stmt = nullptr;
-    if (sqlite3_prepare_v2(raw_db, kInsertSql, -1, &raw_stmt, nullptr)
-            != SQLITE_OK) {
-        std::clog << "[FATAL] prepare INSERT: "
-                  << sqlite3_errmsg(raw_db) << '\n';
-        db_.reset();
-        return;
-    }
-    insert_stmt_.reset(raw_stmt);
+    auto prepare = [&](const char* sql,
+                       std::unique_ptr<sqlite3_stmt, StmtFinalizer>& out,
+                       const char* label) {
+        sqlite3_stmt* raw_stmt = nullptr;
+        if (sqlite3_prepare_v2(raw_db, sql, -1, &raw_stmt, nullptr) != SQLITE_OK) {
+            std::clog << "[FATAL] prepare " << label << ": "
+                      << sqlite3_errmsg(raw_db) << '\n';
+            db_.reset();
+            return false;
+        }
+        out.reset(raw_stmt);
+        return true;
+    };
 
-    // Prepare the retention-prune DELETE statement.
-    raw_stmt = nullptr;
-    if (sqlite3_prepare_v2(raw_db, kPruneSql, -1, &raw_stmt, nullptr)
-            != SQLITE_OK) {
-        std::clog << "[FATAL] prepare prune: "
-                  << sqlite3_errmsg(raw_db) << '\n';
-        db_.reset();
+    if (!prepare(kInsertSql, insert_stmt_, "INSERT") ||
+        !prepare(kPruneSql, prune_stmt_, "prune") ||
+        !prepare(kUpsertIpIntelSql, upsert_ip_intel_stmt_, "ip_intel upsert") ||
+        !prepare(kDistinctSourceIpsSql, distinct_source_ips_stmt_, "distinct_source_ips")) {
         return;
     }
-    prune_stmt_.reset(raw_stmt);
 }
 
 // Defined here (not inline in db.h) so the unique_ptr destructors are
@@ -377,7 +411,7 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
 
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
-    // Bind all fifteen parameters (1-indexed).
+    // Bind all fourteen parameters (1-indexed).
     (void)sqlite3_bind_int64(stmt,  1, entry.ts);
     (void)sqlite3_bind_text( stmt,  2, entry.src_ip.c_str(), -1, kStaticText);
 
@@ -429,10 +463,8 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
         (void)sqlite3_bind_null(stmt, 13);
     }
 
-    // usage_type and is_tor are always NULL at insert time; the AbuseCache
-    // background worker backfills them via update_connections_abuse().
+    // usage_type is NULL at insert time; AbuseCache backfills it later.
     (void)sqlite3_bind_null(stmt, 14);
-    (void)sqlite3_bind_null(stmt, 15);
 
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
@@ -449,13 +481,66 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
     return true;
 }
 
+bool Database::upsert_ip_intel(const std::string& ip, const IpIntel& intel) noexcept
+{
+    if (!db_) {
+        return false;
+    }
+
+    const std::lock_guard<std::mutex> lock{mutex_};
+    sqlite3_stmt* const stmt = upsert_ip_intel_stmt_.get();
+    (void)sqlite3_bind_text(stmt, 1, ip.c_str(), -1, kStaticText);
+    if (intel.tor_exit.has_value()) {
+        (void)sqlite3_bind_int(stmt, 2, *intel.tor_exit ? 1 : 0);
+    } else {
+        (void)sqlite3_bind_null(stmt, 2);
+    }
+    if (intel.spamhaus_drop.has_value()) {
+        (void)sqlite3_bind_int(stmt, 3, *intel.spamhaus_drop ? 1 : 0);
+    } else {
+        (void)sqlite3_bind_null(stmt, 3);
+    }
+    if (intel.spamhaus_bcl.has_value()) {
+        (void)sqlite3_bind_int(stmt, 4, *intel.spamhaus_bcl ? 1 : 0);
+    } else {
+        (void)sqlite3_bind_null(stmt, 4);
+    }
+    (void)sqlite3_bind_int64(stmt, 5, static_cast<std::int64_t>(std::time(nullptr)));
+
+    const int rc = sqlite3_step(stmt);
+    (void)sqlite3_reset(stmt);
+    if (rc != SQLITE_DONE) {
+        std::clog << "[WARN] upsert_ip_intel: " << sqlite3_errmsg(db_.get()) << '\n';
+        return false;
+    }
+    return true;
+}
+
+std::vector<std::string> Database::distinct_source_ips() const noexcept
+{
+    if (!db_) {
+        return {};
+    }
+
+    const std::lock_guard<std::mutex> lock{mutex_};
+    sqlite3_stmt* const stmt = distinct_source_ips_stmt_.get();
+    std::vector<std::string> ips;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        ips.push_back(col_text(stmt, 0));
+    }
+    (void)sqlite3_reset(stmt);
+    return ips;
+}
+
 int Database::prune_unlocked(std::int64_t cutoff_ts) noexcept
 {
     sqlite3_stmt* const stmt = prune_stmt_.get();
     (void)sqlite3_bind_int64(stmt, 1, cutoff_ts);
     (void)sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
-    return sqlite3_changes(db_.get());
+    const int deleted = sqlite3_changes(db_.get());
+    (void)exec(kPruneIpIntelSql);
+    return deleted;
 }
 
 void Database::prune_old() noexcept
@@ -496,8 +581,10 @@ Database::query_connections(const QueryFilters& f) const noexcept
     std::string sql =
         "SELECT ts, src_ip, src_port, dst_ip, dst_port, "
         "proto, tcp_flags, rule, "
-        "country, lat, lon, asn, threat, usage_type, is_tor "
-        "FROM connections";
+        "country, lat, lon, asn, threat, usage_type, "
+        "intel.tor_exit, intel.spamhaus_drop, intel.spamhaus_bcl "
+        "FROM connections "
+        "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
     const WhereInputs inputs{f.src_ip, f.country, f.proto, f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);
@@ -550,8 +637,10 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
     std::string sql =
         "SELECT ts, src_ip, src_port, dst_ip, dst_port, "
         "proto, tcp_flags, rule, "
-        "country, lat, lon, asn, threat, usage_type, is_tor "
-        "FROM connections";
+        "country, lat, lon, asn, threat, usage_type, "
+        "intel.tor_exit, intel.spamhaus_drop, intel.spamhaus_bcl "
+        "FROM connections "
+        "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
     const WhereInputs inputs{f.src_ip, f.country, f.proto, f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);

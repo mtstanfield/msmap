@@ -5,6 +5,7 @@
 #include "geoip.h"
 #include "home_resolver.h"
 #include "http.h"
+#include "ip_intel_cache.h"
 #include "listener.h"
 
 #include <arpa/inet.h>
@@ -27,6 +28,9 @@ constexpr const char* kDefaultAsnMmdb   {"/var/lib/msmap/geoip/GeoLite2-ASN.mmdb
 constexpr int         kDefaultListenPort{5140};
 constexpr int         kDefaultHttpPort  {8080};
 constexpr unsigned int kDefaultHttpThreads{4};
+constexpr std::int64_t kDefaultIntelRefreshSecs{21600};
+constexpr const char*  kDefaultTorExitUrl{"https://check.torproject.org/api/bulk"};
+constexpr const char*  kDefaultSpamhausDropUrl{"https://www.spamhaus.org/drop/drop_v4.json"};
 
 /// Return env var value if set, otherwise the compile-time default.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -102,8 +106,15 @@ int main() {
     const std::string home_host   = env_or("MSMAP_HOME_HOST",    "");
     const int         listen_port = env_int("MSMAP_LISTEN_PORT",  kDefaultListenPort);
     const int         http_port   = env_int("MSMAP_HTTP_PORT",    kDefaultHttpPort);
+    const std::string tor_exit_url = env_or("MSMAP_TOR_EXIT_URL", kDefaultTorExitUrl);
+    const std::string spamhaus_drop_url =
+        env_or("MSMAP_SPAMHAUS_DROP_URL", kDefaultSpamhausDropUrl);
+    const std::string spamhaus_bcl_url = env_or("MSMAP_SPAMHAUS_BCL_URL", "");
     const unsigned int http_threads =
         env_uint_bounded("MSMAP_HTTP_THREADS", kDefaultHttpThreads, 1U, 16U);
+    const auto intel_refresh_secs =
+        static_cast<std::int64_t>(env_int("MSMAP_INTEL_REFRESH_SECS",
+                                          static_cast<int>(kDefaultIntelRefreshSecs)));
     const std::vector<std::uint32_t> allow_ips =
         parse_allow_ips(env_or("MSMAP_INGEST_ALLOW", ""));
 
@@ -111,6 +122,9 @@ int main() {
               << "[INFO] city mmdb : " << city_path   << '\n'
               << "[INFO] asn mmdb  : " << asn_path    << '\n'
               << "[INFO] home host : " << (home_host.empty() ? "(not set)" : home_host) << '\n'
+              << "[INFO] tor intel : " << tor_exit_url << '\n'
+              << "[INFO] drop intel: " << spamhaus_drop_url << '\n'
+              << "[INFO] bcl intel : " << (spamhaus_bcl_url.empty() ? "(disabled)" : spamhaus_bcl_url) << '\n'
               << "[INFO] listen    : 0.0.0.0:"   << listen_port << " (UDP/syslog)\n"
               << "[INFO] http      : 0.0.0.0:"   << http_port   << " threads=" << http_threads << '\n';
 
@@ -161,6 +175,17 @@ int main() {
     }
     msmap::AbuseCache* const abuse_ptr = abuse.valid() ? &abuse : nullptr;
 
+    const msmap::IpIntelSources intel_sources{
+        .tor_url = tor_exit_url,
+        .drop_url = spamhaus_drop_url,
+        .bcl_url = spamhaus_bcl_url,
+    };
+    msmap::IpIntelCache intel_cache{db, intel_sources, intel_refresh_secs};
+    if (!intel_cache.valid()) {
+        std::clog << "[WARN] IpIntelCache failed to initialize; Tor/Spamhaus intel disabled\n";
+    }
+    msmap::IpIntelCache* const intel_ptr = intel_cache.valid() ? &intel_cache : nullptr;
+
     // HTTP server starts its own internal thread; run_listener blocks below.
     // Declaration order is load-bearing: C++ destroys locals in reverse order,
     // so `http` (HttpServer) is destroyed before `home_resolver` and `db`.
@@ -174,7 +199,7 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    msmap::run_listener(listen_port, db, geoip, abuse_ptr,
+    msmap::run_listener(listen_port, db, geoip, abuse_ptr, intel_ptr,
                         home_resolver.get(), allow_ips);
     return EXIT_SUCCESS;
 }

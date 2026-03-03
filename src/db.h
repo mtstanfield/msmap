@@ -17,6 +17,12 @@ struct sqlite3_stmt;
 
 namespace msmap {
 
+struct IpIntel {
+    std::optional<bool> tor_exit;
+    std::optional<bool> spamhaus_drop;
+    std::optional<bool> spamhaus_bcl;
+};
+
 // Full definition in geoip.h; forward declaration is enough for the
 // insert() signature since GeoIpResult is passed by const reference.
 struct GeoIpResult;
@@ -45,7 +51,9 @@ struct ConnectionRow {
     std::string        asn;             // empty string when no GeoIP
     std::optional<int> threat;          // nullopt = not yet enriched
     std::string        usage_type;      // AbuseIPDB usageType; empty when not enriched
-    std::optional<bool> is_tor;         // AbuseIPDB isTor; nullopt when not enriched
+    std::optional<bool> tor_exit;       // Tor Project authoritative signal
+    std::optional<bool> spamhaus_drop;  // Spamhaus DROP membership
+    std::optional<bool> spamhaus_bcl;   // Spamhaus BCL membership
 };
 
 // ── Query filter type ─────────────────────────────────────────────────────────
@@ -86,7 +94,9 @@ struct MapRow {
     std::optional<int>     threat_max;
     std::optional<int>     sample_dst_port;
     std::string            usage_type;
-    std::optional<bool>    is_tor;
+    std::optional<bool>    tor_exit;
+    std::optional<bool>    spamhaus_drop;
+    std::optional<bool>    spamhaus_bcl;
 };
 
 struct DetailPage {
@@ -121,6 +131,12 @@ public:
     /// Thread-safe: acquires an internal mutex before touching SQLite.
     bool insert(const LogEntry& entry, const GeoIpResult& geo,
                 std::optional<int> threat = std::nullopt) noexcept;
+
+    /// Upsert cached source-IP intelligence derived from local/bulk feeds.
+    bool upsert_ip_intel(const std::string& ip, const IpIntel& intel) noexcept;
+
+    /// Distinct source IPs currently present in the retained window.
+    [[nodiscard]] std::vector<std::string> distinct_source_ips() const noexcept;
 
     /// Return up to filters.limit rows matching the given filters.
     /// Rows are ordered newest-first (ORDER BY ts DESC).
@@ -161,6 +177,8 @@ private:
     std::unique_ptr<sqlite3,      SqliteCloser>  db_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> insert_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> prune_stmt_;
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> upsert_ip_intel_stmt_;
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> distinct_source_ips_stmt_;
     std::size_t                                  insert_count_{0};
 };
 

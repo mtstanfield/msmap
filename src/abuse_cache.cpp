@@ -25,22 +25,21 @@ CREATE TABLE IF NOT EXISTS abuse_cache (
     ip           TEXT    PRIMARY KEY,
     score        INTEGER NOT NULL,
     usage_type   TEXT    NOT NULL DEFAULT '',
-    is_tor       INTEGER NOT NULL DEFAULT 0,
     last_checked INTEGER NOT NULL
 ))sql";
 
 constexpr const char* kLookupSql =
-    "SELECT score, last_checked, usage_type, is_tor FROM abuse_cache WHERE ip = ?";
+    "SELECT score, last_checked, usage_type FROM abuse_cache WHERE ip = ?";
 
 constexpr const char* kUpsertSql =
-    "INSERT OR REPLACE INTO abuse_cache(ip, score, usage_type, is_tor, last_checked)"
-    " VALUES(?, ?, ?, ?, ?)";
+    "INSERT OR REPLACE INTO abuse_cache(ip, score, usage_type, last_checked)"
+    " VALUES(?, ?, ?, ?)";
 
 // Patch rows where usage_type IS NULL — covers both freshly-inserted rows and rows
 // where threat was set at insert time but the new fields were not yet available.
 constexpr const char* kUpdateConnSql =
     "UPDATE connections"
-    " SET threat = ?, usage_type = ?, is_tor = ?"
+    " SET threat = ?, usage_type = ?"
     " WHERE src_ip = ? AND usage_type IS NULL";
 
 constexpr const char* kAbuseIpdbEndpoint =
@@ -58,7 +57,7 @@ std::size_t curl_write_cb(const char* ptr, std::size_t /*size*/,
 
 // ── Minimal JSON extractor ────────────────────────────────────────────────────
 
-/// Extract abuseConfidenceScore, usageType, and isTor from the AbuseIPDB response.
+/// Extract abuseConfidenceScore and usageType from the AbuseIPDB response.
 /// Returns nullopt if the score key is absent or its value is not a valid integer.
 std::optional<AbuseResult> extract_abuse(const std::string& json) noexcept
 {
@@ -87,15 +86,6 @@ std::optional<AbuseResult> extract_abuse(const std::string& json) noexcept
         const char* q = start;
         while (*q != '\0' && *q != '"') { ++q; }
         result.usage_type.assign(start, static_cast<std::size_t>(q - start));
-    }
-
-    // ── isTor (optional boolean) ──────────────────────────────────────────────
-    constexpr std::string_view k_tor_key{"\"isTor\":"};
-    const auto tor_pos = json.find(k_tor_key);
-    if (tor_pos != std::string::npos) {
-        const char* tv = json.c_str() + tor_pos + k_tor_key.size();
-        while (*tv == ' ' || *tv == '\t') { ++tv; }
-        result.is_tor = (*tv == 't'); // "true" starts with 't'
     }
 
     return result;
@@ -230,7 +220,6 @@ std::optional<AbuseResult> AbuseCache::lookup(const std::string& ip) const noexc
                     reinterpret_cast<const char*>(ut), // NOLINT(*-reinterpret-cast)
                     static_cast<std::size_t>(sqlite3_column_bytes(stmt, 2)));
             }
-            hit.is_tor = sqlite3_column_int(stmt, 3) != 0;
             result     = std::move(hit);
         }
         // Stale: return nullopt — submit() will re-queue for refresh.
@@ -290,8 +279,7 @@ bool AbuseCache::cache_store(const std::string& ip,
     (void)sqlite3_bind_text( stmt, 1, ip.c_str(),              -1, kStaticText);
     (void)sqlite3_bind_int(  stmt, 2, result.score);
     (void)sqlite3_bind_text( stmt, 3, result.usage_type.c_str(), -1, kStaticText);
-    (void)sqlite3_bind_int(  stmt, 4, result.is_tor ? 1 : 0);
-    (void)sqlite3_bind_int64(stmt, 5, now);
+    (void)sqlite3_bind_int64(stmt, 4, now);
 
     const int rc = sqlite3_step(stmt);
     (void)sqlite3_reset(stmt);
@@ -316,8 +304,7 @@ void AbuseCache::update_connections_abuse(const std::string& ip,
     sqlite3_stmt* const stmt = update_conn_stmt_.get();
     (void)sqlite3_bind_int(  stmt, 1, result.score);
     (void)sqlite3_bind_text( stmt, 2, result.usage_type.c_str(), -1, kStaticText);
-    (void)sqlite3_bind_int(  stmt, 3, result.is_tor ? 1 : 0);
-    (void)sqlite3_bind_text( stmt, 4, ip.c_str(), -1, kStaticText);
+    (void)sqlite3_bind_text( stmt, 3, ip.c_str(), -1, kStaticText);
 
     (void)sqlite3_step(stmt);
     const int patched = sqlite3_changes(db_.get());
@@ -327,8 +314,7 @@ void AbuseCache::update_connections_abuse(const std::string& ip,
         std::clog << "[INFO] AbuseCache: patched " << patched
                   << " row(s) for " << ip
                   << " threat=" << result.score
-                  << " usage=" << result.usage_type
-                  << " tor=" << result.is_tor << '\n';
+                  << " usage=" << result.usage_type << '\n';
     }
 }
 

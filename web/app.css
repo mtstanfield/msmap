@@ -102,6 +102,13 @@ html, body {
     margin-bottom: 4px;
 }
 
+#filter-panel .filter-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#f-legend,
 #f-defaults {
     padding: 4px 7px;
     border-radius: 4px;
@@ -116,6 +123,58 @@ html, body {
 #f-defaults:hover {
     background: #30363d;
     color: #e6edf3;
+}
+
+#f-legend.active,
+#f-legend:hover {
+    background: #30363d;
+    color: #e6edf3;
+}
+
+#filter-legend {
+    margin: 2px 0 6px;
+    padding: 10px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #0d1117;
+}
+
+.legend-title {
+    margin-top: 8px;
+    margin-bottom: 6px;
+    color: #8b949e;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.legend-title:first-child {
+    margin-top: 0;
+}
+
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    color: #c9d1d9;
+    font-size: 12px;
+}
+
+.legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.legend-note {
+    margin-top: 6px;
+    color: #8b949e;
+    font-size: 11px;
+    line-height: 1.45;
 }
 
 .filter-label {
@@ -186,6 +245,67 @@ html, body {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid #30363d;
+}
+
+.popup-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+.popup-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.popup-chip.threat-unknown { color: #8b949e; }
+.popup-chip.threat-clean { color: #3fb950; }
+.popup-chip.threat-low { color: #d29922; }
+.popup-chip.threat-medium { color: #f0883e; }
+.popup-chip.threat-high { color: #f85149; }
+
+.popup-chip-intel {
+    color: #58a6ff;
+}
+
+.popup-linkouts {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.popup-linkout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    background: #0d1117;
+    color: #8b949e;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+}
+
+.popup-linkout:hover {
+    border-color: #58a6ff;
+    color: #58a6ff;
 }
 
 .popup-detail-heading {

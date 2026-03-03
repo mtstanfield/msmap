@@ -28,7 +28,6 @@ inline constexpr int kDailyQuota{1000};
 struct AbuseResult {
     int         score{0};         ///< abuseConfidenceScore (0–100)
     std::string usage_type;       ///< usageType; empty string if not present
-    bool        is_tor{false};    ///< isTor
 };
 
 // ── AbuseCache ────────────────────────────────────────────────────────────────
@@ -83,7 +82,7 @@ public:
     /// Also exposed for testing (cache_store + lookup round-trip).
     bool cache_store(const std::string& ip, const AbuseResult& result) noexcept;
 
-    /// UPDATE connections SET threat, usage_type, is_tor WHERE src_ip=ip AND usage_type IS NULL.
+    /// UPDATE connections SET threat, usage_type WHERE src_ip=ip AND usage_type IS NULL.
     /// Backfills rows that were inserted before the background fetch completed.
     /// Called by the background worker after cache_store().
     void update_connections_abuse(const std::string& ip, const AbuseResult& result) noexcept;
@@ -134,9 +133,9 @@ private:
     // the worker thread. db_mutex_ is never held across a network call.
     mutable std::mutex                           db_mutex_;
     std::unique_ptr<sqlite3,      SqliteCloser>  db_;
-    std::unique_ptr<sqlite3_stmt, StmtFinalizer> lookup_stmt_;       // SELECT score,last_checked,usage_type,is_tor WHERE ip=?
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> lookup_stmt_;       // SELECT score,last_checked,usage_type WHERE ip=?
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> upsert_stmt_;       // INSERT OR REPLACE INTO abuse_cache
-    std::unique_ptr<sqlite3_stmt, StmtFinalizer> update_conn_stmt_;  // UPDATE connections SET threat,usage_type,is_tor
+    std::unique_ptr<sqlite3_stmt, StmtFinalizer> update_conn_stmt_;  // UPDATE connections SET threat,usage_type
 
     // ── Background worker ────────────────────────────────────────────────────
     mutable std::mutex              queue_mutex_;

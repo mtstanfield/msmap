@@ -21,7 +21,25 @@
     <div id="filter-panel">
         <div class="filter-header">
             <div class="filter-title">Filters</div>
-            <button id="f-defaults" type="button">Defaults</button>
+            <div class="filter-header-actions">
+                <button id="f-legend" type="button">Legend</button>
+                <button id="f-defaults" type="button">Defaults</button>
+            </div>
+        </div>
+
+        <div id="filter-legend" style="display:none">
+            <div class="legend-title">Threat</div>
+            <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-low"></span><span>Low</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-medium"></span><span>Medium</span></div>
+            <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
+            <div class="legend-title">Notes</div>
+            <div class="legend-note">All protocol excludes ICMP in the UI.</div>
+            <div class="legend-note">Ripple = first seen in this browser session.</div>
+            <div class="legend-note">Arcs = recent activity toward Home.</div>
+            <div class="legend-note">Tor exit = Tor Project. DROP/BCL = Spamhaus.</div>
+            <div class="legend-note">Network type comes from AbuseIPDB usage.</div>
         </div>
 
         <label class="filter-label" for="f-time">Time range</label>
@@ -50,22 +68,18 @@
         <input id="f-country" type="text" placeholder="US" maxlength="2"
                autocomplete="off" spellcheck="false" style="text-transform:uppercase">
 
-        <label class="filter-label filter-check-row" for="f-animations">
-            <input type="checkbox" id="f-animations">
-            Animations
-        </label>
-        <label class="filter-label filter-check-row" for="f-tor">
-            <input type="checkbox" id="f-tor">
-            Tor exits
-        </label>
-        <label class="filter-label filter-check-row" for="f-datacenter">
-            <input type="checkbox" id="f-datacenter">
-            Datacenter
-        </label>
-        <label class="filter-label filter-check-row" for="f-residential">
-            <input type="checkbox" id="f-residential">
-            Residential
-        </label>
+        <label class="filter-label" for="f-network-type">Network type</label>
+        <select id="f-network-type">
+            <option value="">All</option>
+            <option value="datacenter">Datacenter</option>
+            <option value="residential">Residential</option>
+        </select>
+
+        <label class="filter-label" for="f-animations">Animations</label>
+        <select id="f-animations">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+        </select>
     </div>
 
     <!-- Status bar -->

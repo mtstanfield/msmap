@@ -56,9 +56,15 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         out += "\"asn\":";        json::append_string_or_null(out, row.asn);       out += ',';
         out += "\"threat\":";     json::append_int_or_null(out, row.threat);       out += ',';
         out += "\"usage_type\":"; json::append_string_or_null(out, row.usage_type); out += ',';
-        out += "\"is_tor\":";
-        if (row.is_tor.has_value()) { out += (*row.is_tor ? "true" : "false"); }
-        else                        { out += "null"; }
+        out += "\"tor_exit\":";
+        if (row.tor_exit.has_value()) { out += (*row.tor_exit ? "true" : "false"); }
+        else                          { out += "null"; }
+        out += ",\"spamhaus_drop\":";
+        if (row.spamhaus_drop.has_value()) { out += (*row.spamhaus_drop ? "true" : "false"); }
+        else                               { out += "null"; }
+        out += ",\"spamhaus_bcl\":";
+        if (row.spamhaus_bcl.has_value()) { out += (*row.spamhaus_bcl ? "true" : "false"); }
+        else                              { out += "null"; }
         out += '}';
     }
 
@@ -122,9 +128,15 @@ std::string map_rows_to_json(const std::vector<MapRow>& rows,
         json::append_int_or_null(out, row.sample_dst_port);
         out += ",\"usage_type\":";
         json::append_string_or_null(out, row.usage_type);
-        out += ",\"is_tor\":";
-        if (row.is_tor.has_value()) { out += (*row.is_tor ? "true" : "false"); }
-        else                        { out += "null"; }
+        out += ",\"tor_exit\":";
+        if (row.tor_exit.has_value()) { out += (*row.tor_exit ? "true" : "false"); }
+        else                          { out += "null"; }
+        out += ",\"spamhaus_drop\":";
+        if (row.spamhaus_drop.has_value()) { out += (*row.spamhaus_drop ? "true" : "false"); }
+        else                               { out += "null"; }
+        out += ",\"spamhaus_bcl\":";
+        if (row.spamhaus_bcl.has_value()) { out += (*row.spamhaus_bcl ? "true" : "false"); }
+        else                              { out += "null"; }
         out += '}';
     }
 

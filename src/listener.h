@@ -9,6 +9,7 @@ namespace msmap {
 class Database;
 class GeoIp;
 class AbuseCache;
+class IpIntelCache;
 class HomeResolver;
 
 /// Listen on UDP 0.0.0.0:port for BSD syslog datagrams sent directly by
@@ -35,6 +36,7 @@ class HomeResolver;
 /// `home_resolver` may be null. When non-null and valid, new rows with RFC1918
 /// destination IPv4s are rewritten to the resolved home IP before insert.
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  IpIntelCache* intel_cache = nullptr,
                   const HomeResolver* home_resolver = nullptr,
                   const std::vector<std::uint32_t>& allow_ips = {},
                   const std::stop_token& stoken = {});

@@ -20,10 +20,9 @@ const DEFAULT_FILTERS = Object.freeze({
     ip: '',
     port: '',
     country: '',
-    tor: false,
-    datacenter: false,
-    residential: false,
-    animations: true,
+    networkType: '',
+    animations: 'on',
+    legendOpen: 'off',
 });
 
 const appliedTextFilters = {
@@ -38,14 +37,13 @@ function saveFilters() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             time:        fTime.value,
-            tor:         fTor.checked,
-            datacenter:  fDatacenter.checked,
-            residential: fResidential.checked,
-            animations:  fAnimations.checked,
             proto:       fProto.value,
             ip:          appliedTextFilters.ip,
             port:        appliedTextFilters.port,
             country:     appliedTextFilters.country,
+            networkType: fNetworkType.value,
+            animations:  fAnimations.value,
+            legendOpen:  legendOpen ? 'on' : 'off',
         }));
     } catch (_) {}
 }
@@ -54,21 +52,19 @@ function loadFilters() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-            fAnimations.checked = DEFAULT_FILTERS.animations;
             return;
         }
         const s = JSON.parse(raw);
-        if (s.time        !== undefined) { fTime.value         = s.time; }
-        if (s.tor         !== undefined) { fTor.checked        = s.tor; }
-        if (s.datacenter  !== undefined) { fDatacenter.checked = s.datacenter; }
-        if (s.residential !== undefined) { fResidential.checked = s.residential; }
-        if (s.animations  !== undefined) { fAnimations.checked = s.animations; }
-        else if (s.arcs   !== undefined) { fAnimations.checked = s.arcs; }
-        else                              { fAnimations.checked = DEFAULT_FILTERS.animations; }
-        if (s.proto       !== undefined) { fProto.value        = s.proto; }
-        if (s.ip          !== undefined) { fIp.value           = s.ip; }
-        if (s.port        !== undefined) { fPort.value         = s.port; }
-        if (s.country     !== undefined) { fCountry.value      = s.country; }
+        if (s.time        !== undefined) { fTime.value = s.time; }
+        if (s.proto       !== undefined) { fProto.value = s.proto; }
+        if (s.ip          !== undefined) { fIp.value = s.ip; }
+        if (s.port        !== undefined) { fPort.value = s.port; }
+        if (s.country     !== undefined) { fCountry.value = s.country; }
+        if (s.networkType !== undefined) { fNetworkType.value = s.networkType; }
+        if (s.animations  !== undefined) { fAnimations.value = s.animations; }
+        if (s.legendOpen === 'on') {
+            setLegendOpen(true);
+        }
     } catch (_) {}
 }
 
@@ -134,10 +130,10 @@ const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
-const fTor          = document.getElementById('f-tor');
-const fDatacenter   = document.getElementById('f-datacenter');
-const fResidential  = document.getElementById('f-residential');
+const fNetworkType  = document.getElementById('f-network-type');
 const fAnimations   = document.getElementById('f-animations');
+const fLegend       = document.getElementById('f-legend');
+const filterLegend  = document.getElementById('filter-legend');
 
 filterToggle.classList.add('active');
 filterToggle.addEventListener('click', () => {
@@ -151,12 +147,23 @@ let totalSeen     = 0;
 let lastMapTs     = 0;
 let isInitialLoad = true;
 let pollTimer     = null;
+let legendOpen    = false;
 
 let homePt     = null;
 let homeMarker = null;
 const seenMarkerIps = new Set();
 const detailStateByIp = new Map();
 const activeArcs = new Set();
+
+function animationsEnabled() {
+    return fAnimations.value === 'on';
+}
+
+function setLegendOpen(open) {
+    legendOpen = open;
+    filterLegend.style.display = legendOpen ? '' : 'none';
+    fLegend.classList.toggle('active', legendOpen);
+}
 
 function currentWindowSecs() {
     const n = parseInt(fTime.value, 10);
@@ -314,15 +321,14 @@ function resetToDefaults() {
         clearTimeout(textApplyTimer);
         textApplyTimer = null;
     }
-    fTime.value          = DEFAULT_FILTERS.time;
-    fProto.value         = DEFAULT_FILTERS.proto;
-    fTor.checked         = DEFAULT_FILTERS.tor;
-    fDatacenter.checked  = DEFAULT_FILTERS.datacenter;
-    fResidential.checked = DEFAULT_FILTERS.residential;
-    fAnimations.checked  = DEFAULT_FILTERS.animations;
-    fIp.value            = DEFAULT_FILTERS.ip;
-    fPort.value          = DEFAULT_FILTERS.port;
-    fCountry.value       = DEFAULT_FILTERS.country;
+    fTime.value         = DEFAULT_FILTERS.time;
+    fProto.value        = DEFAULT_FILTERS.proto;
+    fNetworkType.value  = DEFAULT_FILTERS.networkType;
+    fAnimations.value   = DEFAULT_FILTERS.animations;
+    fIp.value           = DEFAULT_FILTERS.ip;
+    fPort.value         = DEFAULT_FILTERS.port;
+    fCountry.value      = DEFAULT_FILTERS.country;
+    setLegendOpen(DEFAULT_FILTERS.legendOpen === 'on');
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -340,12 +346,14 @@ function applyNonTextFilters() {
 }
 
 document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
+fLegend.addEventListener('click', () => {
+    setLegendOpen(!legendOpen);
+    saveFilters();
+});
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
-fTor.addEventListener('change', applyNonTextFilters);
-fDatacenter.addEventListener('change', applyNonTextFilters);
-fResidential.addEventListener('change', applyNonTextFilters);
 fAnimations.addEventListener('change', applyNonTextFilters);
+fNetworkType.addEventListener('change', applyNonTextFilters);
 
 [fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('input', () => {
@@ -409,15 +417,15 @@ function escapeHtml(s) {
 }
 
 function passesFilters(r) {
-    const torActive  = fTor.checked;
-    const dcActive   = fDatacenter.checked;
-    const resActive  = fResidential.checked;
-    if (!torActive && !dcActive && !resActive) { return true; }
-    if (torActive && r.is_tor === true) { return true; }
+    if (!fNetworkType.value) { return true; }
     const ut = r.usage_type ? r.usage_type.toLowerCase() : '';
-    if (dcActive && (ut.includes('data center') || ut.includes('content delivery network'))) { return true; }
-    if (resActive && (ut.includes('fixed line isp') || ut.includes('mobile isp'))) { return true; }
-    return false;
+    if (fNetworkType.value === 'datacenter') {
+        return ut.includes('data center') || ut.includes('content delivery network');
+    }
+    if (fNetworkType.value === 'residential') {
+        return ut.includes('fixed line isp') || ut.includes('mobile isp');
+    }
+    return true;
 }
 
 function detailSlotId(srcIp) {
@@ -462,6 +470,53 @@ function buildMapQueryString() {
     return '?' + params.toString();
 }
 
+function buildThreatChip(score) {
+    if (score === null || score === undefined) { return ''; }
+    return '<span class="popup-chip ' + threatClass(score) + '">Threat ' + score + '</span>';
+}
+
+function buildIntelBadges(r) {
+    const chips = [];
+    const threat = buildThreatChip(r.threat_max);
+    if (threat) { chips.push(threat); }
+    if (r.tor_exit === true) {
+        chips.push('<span class="popup-chip popup-chip-intel">Tor exit</span>');
+    }
+    if (r.spamhaus_drop === true) {
+        chips.push('<span class="popup-chip popup-chip-intel">DROP</span>');
+    }
+    if (r.spamhaus_bcl === true) {
+        chips.push('<span class="popup-chip popup-chip-intel">BCL</span>');
+    }
+    if (!chips.length) { return ''; }
+    return '<div class="popup-chip-row">' + chips.join('') + '</div>';
+}
+
+function buildLinkouts(srcIp) {
+    const safeIp = encodeURIComponent(srcIp);
+    const links = [
+        {
+            href: 'https://viz.greynoise.io/ip/' + safeIp,
+            label: 'GN',
+            title: 'Open GreyNoise',
+        },
+        {
+            href: 'https://www.abuseipdb.com/check/' + safeIp,
+            label: 'AB',
+            title: 'Open AbuseIPDB',
+        },
+        {
+            href: 'https://otx.alienvault.com/indicator/ip/' + safeIp,
+            label: 'OTX',
+            title: 'Open AlienVault OTX',
+        },
+    ];
+    return '<div class="popup-linkouts">' + links.map((link) =>
+        '<a class="popup-linkout" href="' + link.href + '" target="_blank" rel="noopener noreferrer" title="' +
+        link.title + '" aria-label="' + link.title + '">' + link.label + '</a>'
+    ).join('') + '</div>';
+}
+
 function buildAggregateSummary(r) {
     return [
         '<span class="ip">' + escapeHtml(r.src_ip) + '</span><br>',
@@ -473,14 +528,9 @@ function buildAggregateSummary(r) {
             : '',
         r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
         r.asn ? '<span class="label">asn </span>' + escapeHtml(r.asn) + '<br>' : '',
-        (r.threat_max !== null && r.threat_max !== undefined)
-            ? '<span class="label">max threat </span><span class="' + threatClass(r.threat_max) + '">'
-              + threatLabel(r.threat_max) + '</span><br>'
-            : '',
+        buildIntelBadges(r),
         r.usage_type ? '<span class="label">usage </span>' + escapeHtml(r.usage_type) + '<br>' : '',
-        (r.is_tor !== null && r.is_tor !== undefined)
-            ? '<span class="label">tor </span>' + (r.is_tor ? '<span class="threat-high">yes</span>' : 'no') + '<br>'
-            : '',
+        buildLinkouts(r.src_ip),
     ].join('');
 }
 
@@ -722,7 +772,7 @@ lmap.on('zoomstart', clearActiveArcs);
 function shouldCandidateArc(row) {
     return !isInitialLoad &&
         homePt &&
-        fAnimations.checked &&
+        animationsEnabled() &&
         typeof row.last_ts === 'number' &&
         row.last_ts > lastMapTs &&
         Number.isFinite(row.lat) &&
@@ -903,7 +953,7 @@ function bindPopupControls(marker, row) {
 }
 
 function maybeAnimateMarker(marker, srcIp) {
-    if (seenMarkerIps.has(srcIp) || !fAnimations.checked) { return; }
+    if (seenMarkerIps.has(srcIp) || !animationsEnabled()) { return; }
     const el = marker.getElement();
     if (!el) { return; }
 
@@ -1014,6 +1064,7 @@ document.addEventListener('visibilitychange', () => {
 
 fetchHome().then(() => {
     addHomeMarker();
+    setLegendOpen(DEFAULT_FILTERS.legendOpen === 'on');
     loadFilters();
     appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
     appliedTextFilters.port    = validatePortValue(fPort.value).normalized;

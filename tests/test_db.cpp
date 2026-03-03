@@ -365,3 +365,29 @@ TEST_CASE("query_detail_page: returns next cursor when another page exists")
     REQUIRE(page.next_cursor.has_value());
     CHECK(*page.next_cursor == 2);
 }
+
+TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.src_ip = "198.51.100.10";
+    entry.ts = 1000;
+
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}, 42));
+    REQUIRE(db.upsert_ip_intel(entry.src_ip, msmap::IpIntel{
+        .tor_exit = true,
+        .spamhaus_drop = false,
+        .spamhaus_bcl = true,
+    }));
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    REQUIRE(rows.size() == 1);
+    REQUIRE(rows.front().tor_exit.has_value());
+    REQUIRE(*rows.front().tor_exit);
+    REQUIRE(rows.front().spamhaus_drop.has_value());
+    REQUIRE_FALSE(*rows.front().spamhaus_drop);
+    REQUIRE(rows.front().spamhaus_bcl.has_value());
+    REQUIRE(*rows.front().spamhaus_bcl);
+}
