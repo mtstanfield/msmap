@@ -13,6 +13,7 @@
 #
 # Usage (release):
 #   docker build -t msmap .
+#   docker build --build-arg MSMAP_CPU_TARGET=generic -t msmap:generic .
 # -----------------------------------------------------------------------------
 
 ARG LLVM_VER=18
@@ -105,6 +106,8 @@ CMD ["/bin/bash"]
 # -----------------------------------------------------------------------------
 # Stage 2: builder
 # Compiles the release binary.
+# Default release builds target x86-64-v3 for modern servers. Override with
+# --build-arg MSMAP_CPU_TARGET=generic for a portable image.
 # Semi-static: libgcc + libstdc++ linked statically; glibc stays dynamic
 # (fully static glibc has known NSS/getaddrinfo runtime issues).
 # Project libs (sqlite, libmaxminddb, libmicrohttpd, curl) are linked as .a.
@@ -113,6 +116,7 @@ FROM dev AS builder
 
 # Re-declare so ARG values are available in this stage's RUN commands.
 ARG LLVM_VER=18
+ARG MSMAP_CPU_TARGET=x86-64-v3
 
 # ── Minimal static libcurl ────────────────────────────────────────────────────
 # The Debian system libcurl4-openssl-dev links against nghttp2, rtmp, ssh2,
@@ -160,6 +164,7 @@ RUN cmake -B build -G Ninja \
         -DCMAKE_CXX_COMPILER=clang++-${LLVM_VER} \
         -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
         -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+        -DMSMAP_CPU_TARGET=${MSMAP_CPU_TARGET} \
         -DMSMAP_LINK_STATIC=ON \
         -DCMAKE_PREFIX_PATH=/opt/curl-static \
     && ninja -C build msmap

@@ -44,7 +44,7 @@ msmap binary
 | Layer | Choice | Notes |
 |---|---|---|
 | Language | C++23 | `clang-18`, `-std=c++23` |
-| Build | CMake 3.29+ (supported 3.x) + Ninja | run inside the dev container |
+| Build | CMake 3.29+ (supported 3.x) + Ninja | source builds default to a generic CPU target; release image defaults to `x86-64-v3` |
 | HTTP server | `libmicrohttpd` | embedded, no framework |
 | Database | SQLite | WAL mode, parameterized queries only |
 | GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups |
@@ -52,6 +52,10 @@ msmap binary
 | Source intel | Tor Project + Spamhaus DROP | background-refreshed local cache |
 | Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
 | Runtime | `distroless/cc-debian12:nonroot` | static-ish binary, uid 65532 |
+
+The published release container is built for `x86-64-v3` class CPUs. If you
+need an image that runs on older x86-64 hardware, rebuild with
+`--build-arg MSMAP_CPU_TARGET=generic`.
 
 ---
 
@@ -94,6 +98,8 @@ docker run -d \
   -e MSMAP_INGEST_ALLOW=192.168.88.1 \
   ghcr.io/mtstanfield/msmap:latest
 ```
+
+`ghcr.io/mtstanfield/msmap:latest` assumes an `x86-64-v3` capable CPU.
 
 With AbuseIPDB threat scoring:
 
@@ -508,6 +514,9 @@ RFC 3339 format (produced by an rsyslog relay) is also accepted automatically:
 docker build --target dev -t msmap-dev .
 ```
 
+The dev image keeps source builds generic by default. To test modern-server
+flags in a source build, configure CMake with `-DMSMAP_CPU_TARGET=x86-64-v3`.
+
 ### Dev shell (live source mount)
 
 ```bash
@@ -522,7 +531,8 @@ cmake -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_STANDARD=23 \
   -DCMAKE_CXX_EXTENSIONS=OFF \
-  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DMSMAP_CPU_TARGET=generic
 
 # Build
 ninja -C build msmap
@@ -566,6 +576,14 @@ docker run --rm -v "$PWD:/workspace" msmap-dev \
 ```bash
 docker build -t msmap .
 docker run --rm -p 8080:8080 msmap
+```
+
+The default release build targets modern servers with `x86-64-v3`. To build a
+portable image for older x86-64 machines:
+
+```bash
+docker build --build-arg MSMAP_CPU_TARGET=generic -t msmap:generic .
+docker run --rm -p 8080:8080 msmap:generic
 ```
 
 ---

@@ -17,6 +17,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(MSMAP_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(MSMAP_ENABLE_CLANG_TIDY  "Run clang-tidy during build"       OFF)
 option(MSMAP_ENABLE_CPPCHECK    "Run cppcheck during build"         OFF)
+set(MSMAP_CPU_TARGET "generic" CACHE STRING
+    "CPU target for compiled binaries: generic or x86-64-v3")
+set_property(CACHE MSMAP_CPU_TARGET PROPERTY STRINGS generic x86-64-v3)
 # Prefer .a over .so for app libraries. Set ON in release/distroless builds.
 option(MSMAP_LINK_STATIC        "Link app libraries statically"     OFF)
 # ASan + UBSan: default ON for non-Release builds, OFF for Release.
@@ -37,6 +40,19 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Sanitizers)
 include(StaticAnalyzers)
+
+function(msmap_apply_cpu_target target_name)
+    if(MSMAP_CPU_TARGET STREQUAL "generic")
+        return()
+    endif()
+
+    if(MSMAP_CPU_TARGET STREQUAL "x86-64-v3")
+        target_compile_options(${target_name} PRIVATE -march=x86-64-v3 -mtune=generic)
+        return()
+    endif()
+
+    message(FATAL_ERROR "Unsupported MSMAP_CPU_TARGET: ${MSMAP_CPU_TARGET}")
+endfunction()
 
 # ── Dependencies ───────────────────────────────────────────────────────────
 find_package(PkgConfig  REQUIRED)
@@ -134,6 +150,7 @@ add_executable(msmap
     src/status_cache.cpp)
 
 target_compile_features(msmap PRIVATE cxx_std_23)
+msmap_apply_cpu_target(msmap)
 
 msmap_set_warnings(msmap)
 msmap_enable_sanitizers(msmap)
@@ -171,6 +188,7 @@ if(MSMAP_ENABLE_TESTS)
         src/parser.cpp)
 
     target_compile_features(test_parser PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_parser)
     target_include_directories(test_parser PRIVATE src)
     # Apply warnings but not static-analysis tools to the test target;
     # Catch2 macros generate code that confuses clang-tidy/cppcheck.
@@ -187,6 +205,7 @@ if(MSMAP_ENABLE_TESTS)
         src/parser.cpp)
 
     target_compile_features(test_db PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_db)
     target_include_directories(test_db PRIVATE src)
     msmap_set_warnings(test_db)
     msmap_enable_sanitizers(test_db)
@@ -202,6 +221,7 @@ if(MSMAP_ENABLE_TESTS)
         src/geoip.cpp)
 
     target_compile_features(test_geoip PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_geoip)
     target_include_directories(test_geoip PRIVATE src)
     msmap_set_warnings(test_geoip)
     msmap_enable_sanitizers(test_geoip)
@@ -220,6 +240,7 @@ if(MSMAP_ENABLE_TESTS)
         src/parser.cpp)
 
     target_compile_features(test_http PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_http)
     target_include_directories(test_http PRIVATE src)
     msmap_set_warnings(test_http)
     msmap_enable_sanitizers(test_http)
@@ -242,6 +263,7 @@ if(MSMAP_ENABLE_TESTS)
         src/parser.cpp)
 
     target_compile_features(test_status_cache PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_status_cache)
     target_include_directories(test_status_cache PRIVATE src)
     msmap_set_warnings(test_status_cache)
     msmap_enable_sanitizers(test_status_cache)
@@ -263,6 +285,7 @@ if(MSMAP_ENABLE_TESTS)
         src/parser.cpp)
 
     target_compile_features(test_abuse_cache PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_abuse_cache)
     target_include_directories(test_abuse_cache PRIVATE src)
     msmap_set_warnings(test_abuse_cache)
     msmap_enable_sanitizers(test_abuse_cache)
@@ -287,6 +310,7 @@ if(MSMAP_ENABLE_TESTS)
         src/status_cache.cpp)
 
     target_compile_features(test_integration PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_integration)
     target_include_directories(test_integration PRIVATE src)
     msmap_set_warnings(test_integration)
     msmap_enable_sanitizers(test_integration)
@@ -306,6 +330,7 @@ if(MSMAP_ENABLE_TESTS)
   # libFuzzer parser fuzz
   add_executable(fuzz_parser src/fuzz_parser.cpp src/parser.cpp)
   target_compile_features(fuzz_parser PRIVATE cxx_std_23)
+  msmap_apply_cpu_target(fuzz_parser)
   target_include_directories(fuzz_parser PRIVATE src)
   msmap_set_warnings(fuzz_parser)
   msmap_enable_sanitizers(fuzz_parser)
