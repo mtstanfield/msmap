@@ -122,6 +122,9 @@ lmap.addLayer(cluster);
 const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
 const statTime      = document.getElementById('stat-time');
+const statMappedValue = document.getElementById('stat-mapped-value');
+const statTotalValue  = document.getElementById('stat-total-value');
+const statTimeValue   = document.getElementById('stat-time-value');
 const statError     = document.getElementById('stat-error');
 const filterPanel   = document.getElementById('filter-panel');
 const filterToggle  = document.getElementById('filter-toggle');
@@ -440,6 +443,15 @@ function detailStateLabel(state) {
     return total + '+';
 }
 
+function setStatusCounts(mapped, total) {
+    statMappedValue.textContent = mapped.toLocaleString();
+    statTotalValue.textContent = total.toLocaleString();
+}
+
+function setStatusFreshness(text) {
+    statTimeValue.textContent = text;
+}
+
 function ensureDetailState(srcIp) {
     const windowSecs = currentWindowSecs();
     const existing = detailStateByIp.get(srcIp);
@@ -517,33 +529,58 @@ function buildLinkouts(srcIp) {
     ).join('') + '</div>';
 }
 
-function buildAggregateSummary(r) {
+function buildSummaryItem(label, value, wide = false) {
+    if (!value) { return ''; }
     return [
-        '<span class="ip">' + escapeHtml(r.src_ip) + '</span><br>',
-        '<span class="label">hits </span>' + r.count + '<br>',
-        '<span class="label">first seen </span>' + fmtTs(r.first_ts) + '<br>',
-        '<span class="label">last seen </span>' + fmtTs(r.last_ts) + '<br>',
-        r.sample_dst_port !== null && r.sample_dst_port !== undefined
-            ? '<span class="label">sample dst port </span>' + r.sample_dst_port + '<br>'
-            : '',
-        r.country ? '<span class="label">country </span>' + escapeHtml(r.country) + '<br>' : '',
-        r.asn ? '<span class="label">asn </span>' + escapeHtml(r.asn) + '<br>' : '',
+        '<div class="popup-meta-item',
+        wide ? ' popup-meta-item-wide' : '',
+        '">',
+        '<span class="label">', label, '</span>',
+        '<div class="popup-meta-value">', value, '</div>',
+        '</div>',
+    ].join('');
+}
+
+function buildAggregateSummary(r) {
+    const metaItems = [
+        buildSummaryItem('Hits', escapeHtml(String(r.count))),
+        buildSummaryItem(
+            'Sample dst port',
+            r.sample_dst_port !== null && r.sample_dst_port !== undefined
+                ? escapeHtml(String(r.sample_dst_port))
+                : ''
+        ),
+        buildSummaryItem('First seen', escapeHtml(fmtTs(r.first_ts))),
+        buildSummaryItem('Last seen', escapeHtml(fmtTs(r.last_ts))),
+        buildSummaryItem('Country', r.country ? escapeHtml(r.country) : ''),
+        buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : '', true),
+    ].filter(Boolean).join('');
+
+    return [
+        '<div class="popup-summary">',
+        '<div class="popup-header">',
+        '<span class="ip">' + escapeHtml(r.src_ip) + '</span>',
+        '<div class="popup-subtitle">Aggregate source activity in the selected window</div>',
+        '</div>',
+        '<div class="popup-meta-grid">' + metaItems + '</div>',
         buildIntelBadges(r),
-        r.usage_type ? '<span class="label">usage </span>' + escapeHtml(r.usage_type) + '<br>' : '',
+        r.usage_type ? '<div class="popup-usage"><span class="label">usage </span>' +
+            escapeHtml(r.usage_type) + '</div>' : '',
         buildLinkouts(r.src_ip),
+        '</div>',
     ].join('');
 }
 
 function buildDetailCard(row) {
     return [
         '<div class="popup-detail-card">',
-        '<div><span class="label">time </span>' + fmtTs(row.ts) + '</div>',
-        '<div><span class="label">flow </span><span class="mono">' + escapeHtml(row.src_ip) +
+        '<div class="popup-detail-row"><span class="label">time </span>' + fmtTs(row.ts) + '</div>',
+        '<div class="popup-detail-row popup-flow"><span class="label">flow </span><span class="mono">' + escapeHtml(row.src_ip) +
             fmtPort(row.src_port) + '</span> &rarr; <span class="mono">' +
             escapeHtml(row.dst_ip) + fmtPort(row.dst_port) + '</span></div>',
-        '<div><span class="label">proto </span><span class="mono">' + escapeHtml(row.proto || '?') +
+        '<div class="popup-detail-row"><span class="label">proto </span><span class="mono">' + escapeHtml(row.proto || '?') +
             (row.tcp_flags ? ' (' + escapeHtml(row.tcp_flags) + ')' : '') + '</span></div>',
-        '<div><span class="label">rule </span>' + escapeHtml(row.rule) + '</div>',
+        '<div class="popup-detail-row"><span class="label">rule </span>' + escapeHtml(row.rule) + '</div>',
         '</div>',
     ].join('');
 }
@@ -1037,9 +1074,8 @@ async function poll() {
             }
         }
         lastMapTs = newestTs;
-        statMapped.textContent = mappedCount.toLocaleString() + ' mapped';
-        statTotal.textContent  = totalSeen.toLocaleString() + ' total';
-        statTime.textContent   = 'updated ' + new Date().toLocaleTimeString();
+        setStatusCounts(mappedCount, totalSeen);
+        setStatusFreshness('Updated ' + new Date().toLocaleTimeString());
         isInitialLoad = false;
 
         scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
@@ -1053,8 +1089,8 @@ function pollNow() {
     clearActiveArcs();
     isInitialLoad = true;
     lastMapTs = 0;
-    statMapped.textContent = '0 mapped';
-    statTotal.textContent  = '0 total';
+    setStatusCounts(0, 0);
+    setStatusFreshness('Refreshing...');
     void poll();
 }
 

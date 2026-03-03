@@ -84,12 +84,29 @@
 
     <!-- Status bar -->
     <div id="status-bar">
-        <span id="stat-mapped">0 mapped</span>
-        <span id="stat-total">0 total</span>
-        <span id="stat-time">&ndash;</span>
-        <span id="stat-error" style="display:none"></span>
-        <span id="stat-spacer"></span>
-        <span id="stat-meta">msmap &middot; <a href="https://github.com/mtstanfield/msmap" target="_blank" rel="noopener noreferrer">GitHub</a> &middot; MIT License &middot; built {{BUILD_DATE}}</span>
+        <div id="status-left">
+            <div id="stat-mapped" class="status-pill">
+                <span class="status-label">Mapped</span>
+                <span id="stat-mapped-value" class="status-value">0</span>
+            </div>
+            <div id="stat-total" class="status-pill">
+                <span class="status-label">Hits</span>
+                <span id="stat-total-value" class="status-value">0</span>
+            </div>
+            <div id="stat-time" class="status-freshness">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="stat-time-value">Waiting for data</span>
+            </div>
+            <span id="stat-error" style="display:none"></span>
+        </div>
+        <div id="status-right">
+            <span id="stat-brand">
+                <span class="brand-mark" aria-hidden="true">🌐</span>
+                <span class="brand-name">msmap</span>
+            </span>
+            <a href="https://github.com/mtstanfield/msmap" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span id="stat-built">built {{BUILD_DATE}}</span>
+        </div>
     </div>
 
     <script>{{LEAFLET_JS}}</script>

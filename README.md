@@ -1,14 +1,20 @@
 # msmap – Mikrotik Firewall Log Viewer
 
-A lightweight, self-contained C++23 application that ingests Mikrotik firewall
-logs directly via syslog UDP, enriches them with GeoIP and OSINT data, and serves
-a single-page web UI showing inbound connections on a world map.
+`msmap` is a self-contained C++23 application that ingests Mikrotik firewall
+logs over syslog UDP, enriches them with GeoIP and cached threat intelligence,
+and serves a single-page world map for live inbound traffic triage.
 
-Ships as a single binary in a distroless container. No runtime filesystem
-dependencies — all web assets are embedded at compile time.
+The current architecture is:
 
-Follows the [C++ Best Practices](https://github.com/cpp-best-practices/cppbestpractices)
-guidelines throughout.
+- 24-hour retention only
+- aggregate-first map rendering via `GET /api/map`
+- lazy raw-event drilldown via `GET /api/detail`
+- AbuseIPDB for threat score and usage classification
+- Tor Project and Spamhaus enrichment for popup/source intel
+- distroless runtime with embedded web assets
+
+TLS termination, caching, and rate limiting are expected to live in front of
+the binary (typically nginx).
 
 ---
 
@@ -19,32 +25,33 @@ Mikrotik router
     │ syslog UDP 514 (BSD syslog, direct)
     ▼
 msmap binary
-    ├── parser        (hand-written tokenizer, fuzz-tested)
-    ├── SQLite DB     (WAL mode, 24h retention)
-    ├── GeoIP         (libmaxminddb + local GeoLite2-City.mmdb)
-    ├── OSINT cache   (AbuseIPDB results cached in SQLite)
-    └── HTTP server   (libmicrohttpd, port 8080)
-            │ serves embedded assets + REST API
+    ├── parser          (hand-written tokenizer, fuzz-tested)
+    ├── SQLite DB       (WAL mode, 24h retention)
+    ├── GeoIP           (libmaxminddb + local GeoLite2 City/ASN mmdb)
+    ├── Abuse cache     (AbuseIPDB score + usage_type, SQLite-backed)
+    ├── Intel cache     (Tor Project + Spamhaus, background refreshed)
+    ├── Home resolver   (optional home marker / arcs / RFC1918 dst rewrite)
+    └── HTTP server     (libmicrohttpd, embedded assets + JSON API)
+            │
             ▼
-        browser (Leaflet.js map, vanilla JS, no framework)
+        browser (Leaflet.js map, vanilla JS)
 ```
-
-TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 
 ---
 
 ## Stack
 
-| Layer       | Choice                           | Notes                                  |
-|-------------|----------------------------------|----------------------------------------|
-| Language    | C++23                            | `clang-18`, `-std=c++23`               |
-| Build       | CMake 3.29+ + Ninja              | cmake via pip in dev container         |
-| HTTP server | `libmicrohttpd` (GNU LGPL)       | Embedded, no framework overhead        |
-| Database    | SQLite (WAL mode)                | Single file, parameterized queries only|
-| GeoIP       | `libmaxminddb` + GeoLite2-City   | Local `.mmdb`, no external calls       |
-| OSINT       | AbuseIPDB (cached)               | Score, usageType, isTor; 30-day SQLite cache; 1000 checks/day (free tier) |
-| Frontend    | Leaflet.js + MarkerCluster       | Local copies, vanilla JS, no bundler   |
-| Runtime     | `distroless/cc-debian12:nonroot` | Semi-static binary, uid 65532          |
+| Layer | Choice | Notes |
+|---|---|---|
+| Language | C++23 | `clang-18`, `-std=c++23` |
+| Build | CMake 3.29+ + Ninja | run inside the dev container |
+| HTTP server | `libmicrohttpd` | embedded, no framework |
+| Database | SQLite | WAL mode, parameterized queries only |
+| GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups |
+| Threat / usage | AbuseIPDB | 30-day SQLite cache, optional API key |
+| Source intel | Tor Project + Spamhaus | background-refreshed local cache |
+| Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
+| Runtime | `distroless/cc-debian12:nonroot` | static-ish binary, uid 65532 |
 
 ---
 
@@ -62,13 +69,17 @@ TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 | `MSMAP_HTTP_THREADS` | `4` | libmicrohttpd thread-pool size (`1`-`16`) |
 | `MSMAP_INGEST_ALLOW` | _(empty — accept all)_ | Comma-separated IPv4 allowlist for ingest |
 | `ABUSEIPDB_API_KEY` | _(empty — disabled)_ | AbuseIPDB free-tier API key |
-| `MSMAP_HOME_HOST` | _(empty — disabled)_ | Hostname or IPv4 address of your public-facing host; resolved at startup via GeoIP to place a home marker and enable arc animation |
+| `MSMAP_HOME_HOST` | _(empty — disabled)_ | Hostname or IPv4 address of your public-facing host; enables the home marker, home-directed arcs, and RFC1918 destination rewrite for newly ingested rows |
+| `MSMAP_INTEL_REFRESH_SECS` | `21600` | Refresh interval for Tor Project / Spamhaus source intel |
+| `MSMAP_TOR_EXIT_URL` | `https://check.torproject.org/api/bulk` | Tor Project bulk exit source |
+| `MSMAP_SPAMHAUS_DROP_URL` | `https://www.spamhaus.org/drop/drop_v4.json` | Spamhaus DROP source |
+| `MSMAP_SPAMHAUS_BCL_URL` | _(empty — disabled)_ | Optional Spamhaus BCL source |
 
 ### Volumes
 
 | Path | Purpose |
 |---|---|
-| `/data` | SQLite database — persist this across restarts |
+| `/data` | SQLite database and caches — persist this across restarts |
 | `/var/lib/msmap/geoip` | MaxMind `.mmdb` files — optional, mount read-only |
 
 ### docker run
@@ -100,6 +111,22 @@ docker run -d \
   ghcr.io/mtstanfield/msmap:latest
 ```
 
+With optional home marker and source-intel overrides:
+
+```bash
+docker run -d \
+  --name msmap \
+  --restart unless-stopped \
+  -p 5140:5140/udp \
+  -p 8080:8080 \
+  -v msmap-data:/data \
+  -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -e MSMAP_INGEST_ALLOW=192.168.88.1 \
+  -e MSMAP_HOME_HOST=your.public.hostname.or.ip \
+  -e MSMAP_INTEL_REFRESH_SECS=21600 \
+  ghcr.io/mtstanfield/msmap:latest
+```
+
 ### docker-compose.yml
 
 ```yaml
@@ -126,13 +153,27 @@ services:
       - geoip-data:/var/lib/msmap/geoip:ro
     environment:
       MSMAP_INGEST_ALLOW: "192.168.88.1"
+      MSMAP_HTTP_THREADS: "4"
+      MSMAP_INTEL_REFRESH_SECS: "21600"
       # ABUSEIPDB_API_KEY: "your_key_here"
       # MSMAP_HOME_HOST: "your.public.hostname.or.ip"
+      # MSMAP_TOR_EXIT_URL: "https://check.torproject.org/api/bulk"
+      # MSMAP_SPAMHAUS_DROP_URL: "https://www.spamhaus.org/drop/drop_v4.json"
+      # MSMAP_SPAMHAUS_BCL_URL: "https://..."
 
 volumes:
   msmap-data:
   geoip-data:
 ```
+
+Notes:
+
+- `geoipupdate` is optional, but recommended if you want country/ASN lookups.
+- `ABUSEIPDB_API_KEY` is optional; without it, existing cached AbuseIPDB data is
+  still readable but new threat/usage lookups are disabled.
+- `MSMAP_HOME_HOST` is optional; without it, the home marker, home-directed
+  arcs, and RFC1918 destination rewrite are disabled.
+- `MSMAP_SPAMHAUS_BCL_URL` is optional and disabled by default.
 
 ### GeoLite2 databases (optional, recommended)
 
@@ -174,13 +215,14 @@ should not be cached.
 Sanitized example:
 
 ```nginx
-proxy_cache_path /var/cache/nginx/msmap_api levels=1:2 keys_zone=msmap_api:64m max_size=4g inactive=10m use_temp_path=off;
+proxy_cache_path /config/nginx/cache/msmap_api levels=1:2 keys_zone=msmap_api:64m max_size=4g inactive=10m use_temp_path=off;
 limit_req_zone $binary_remote_addr zone=msmap_api_ratelimit:10m rate=1r/s;
 limit_conn_zone $binary_remote_addr zone=msmap_api_conn:10m;
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
 
     server_name map.example.invalid;
 
@@ -191,59 +233,43 @@ server {
     gzip_min_length 1024;
     gzip_types application/json text/plain text/css application/javascript text/javascript text/html image/svg+xml;
 
-    location / {
+    location = /api/map {
         include /config/nginx/proxy.conf;
-        include /config/nginx/resolver.conf;
-        set $upstream_app 192.0.2.10;
-        set $upstream_port 8080;
-        set $upstream_proto http;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_connect_timeout 2s;
-        proxy_send_timeout 15s;
-        proxy_read_timeout 15s;
-        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
-    }
-
-    location /api/map {
-        include /config/nginx/proxy.conf;
-        include /config/nginx/resolver.conf;
-        set $upstream_app 192.0.2.10;
-        set $upstream_port 8080;
-        set $upstream_proto http;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
         proxy_cache msmap_api;
         proxy_cache_lock on;
         proxy_cache_background_update on;
         proxy_cache_use_stale updating error timeout invalid_header http_500 http_502 http_503 http_504;
         proxy_cache_valid 200 30s;
         proxy_cache_valid 404 10s;
-        proxy_buffering on;
-        proxy_buffers 32 16k;
-        proxy_busy_buffers_size 256k;
+        proxy_ignore_headers Set-Cookie;
         limit_req zone=msmap_api_ratelimit burst=20 nodelay;
         limit_conn msmap_api_conn 20;
         add_header X-Cache-Status $upstream_cache_status always;
-        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+        proxy_pass http://192.0.2.10:8080;
     }
 
-    location /api/detail {
+    location = /api/home {
         include /config/nginx/proxy.conf;
-        include /config/nginx/resolver.conf;
-        set $upstream_app 192.0.2.10;
-        set $upstream_port 8080;
-        set $upstream_proto http;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
+        proxy_cache msmap_api;
+        proxy_cache_lock on;
+        proxy_cache_valid 200 300s;
+        proxy_cache_valid 404 30s;
+        add_header X-Cache-Status $upstream_cache_status always;
+        proxy_pass http://192.0.2.10:8080;
+    }
+
+    location = /api/detail {
+        include /config/nginx/proxy.conf;
         proxy_no_cache 1;
         proxy_cache_bypass 1;
         limit_req zone=msmap_api_ratelimit burst=5 nodelay;
         limit_conn msmap_api_conn 5;
-        proxy_connect_timeout 2s;
-        proxy_send_timeout 15s;
-        proxy_read_timeout 15s;
-        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+        proxy_pass http://192.0.2.10:8080;
+    }
+
+    location / {
+        include /config/nginx/proxy.conf;
+        proxy_pass http://192.0.2.10:8080;
     }
 }
 ```
@@ -254,9 +280,9 @@ server {
 
 The UI is a single-page Leaflet.js map served at port 8080. The main map polls
 `GET /api/map`, which returns one aggregate marker per source IP for the
-selected window. This lets the browser render the complete 24h view without the
-old 25,000-raw-row ceiling. Clicking a marker then lazy-loads recent raw events
-from `GET /api/detail`.
+selected window. This lets the browser render the complete 24-hour view without
+trying to plot every raw event. Clicking a marker then lazy-loads recent raw
+events from `GET /api/detail`.
 
 ### Filter panel
 
@@ -267,8 +293,8 @@ from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Network type | All / Datacenter / Residential from AbuseIPDB `usageType` |
-| Animations | Toggle marker ripple and home-directed arc animation on/off |
+| Network type | All / Datacenter / Residential from AbuseIPDB `usage_type` |
+| Animations | On / Off for marker ripple and home-directed arcs |
 | Legend | Inline explanation of threat colours, animation semantics, and intel badges |
 
 All selects apply immediately. Text filters auto-apply once the value is
@@ -327,10 +353,77 @@ The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup.
 
-Threat colour and `usageType` still come from AbuseIPDB. Tor status comes from
+Threat colour and `usage_type` still come from AbuseIPDB. Tor status comes from
 Tor Project bulk exit data, and Spamhaus DROP/BCL badges come from locally
 cached list lookups. AbuseIPDB results are cached for 30 days; an API key is
 not required to view previously cached data.
+
+### Status bar
+
+The bottom status bar shows the current operational state of the map:
+
+- `Mapped`: aggregate markers currently rendered
+- `Hits`: total matching event volume represented by the visible aggregate rows
+- `Updated`: freshness of the last successful poll
+- inline error text when the most recent poll failed
+
+The footer metadata on the right shows `🌐 msmap`, the GitHub link, and the
+embedded build timestamp.
+
+---
+
+## HTTP API
+
+### `GET /`
+
+Returns the embedded single-page web UI.
+
+### `GET /api/map`
+
+Returns aggregate map rows for the requested window and filters.
+
+Supported query parameters:
+
+| Parameter | Description |
+|---|---|
+| `window` | `900`, `3600`, `21600`, or `86400` |
+| `proto` | optional exact protocol filter: `TCP`, `UDP`, or `ICMP` |
+| `ip` | optional exact source IP filter |
+| `port` | optional exact destination port filter |
+| `country` | optional 2-letter country filter |
+
+Notes:
+
+- If `proto` is omitted, the UI/default API behavior excludes ICMP.
+- Response rows are aggregate markers, not raw events.
+- Responses include threat, usage, and source-intel flags.
+
+### `GET /api/detail`
+
+Returns raw connection rows for a narrowed drilldown query.
+
+Supported query parameters:
+
+| Parameter | Description |
+|---|---|
+| `ip` | exact source IP filter |
+| `since` | lower timestamp bound |
+| `until` | optional upper timestamp bound |
+| `proto` | optional exact protocol filter |
+| `port` | optional exact destination port filter |
+| `limit` | page size, capped server-side |
+| `cursor` | opaque pagination cursor from the previous page |
+
+Notes:
+
+- The popup uses this endpoint lazily.
+- If `proto` is omitted, default behavior excludes ICMP.
+- Responses include `next_cursor` when older pages are available.
+
+### `GET /api/home`
+
+Returns the resolved home coordinates when `MSMAP_HOME_HOST` is configured and
+GeoIP successfully locates the resolved IP. Otherwise returns `404`.
 
 ---
 
@@ -362,7 +455,7 @@ RFC 3339 format (produced by an rsyslog relay) is also accepted automatically:
 
 ## Development Environment
 
-**All builds and dev work run inside Docker.** The host is Windows.
+**All builds and dev work run inside Docker.**
 
 ### First-time setup
 
@@ -374,7 +467,7 @@ docker build --target dev -t msmap-dev .
 ### Dev shell (live source mount)
 
 ```bash
-docker run -it --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev
+docker run -it --rm -v "$PWD:/workspace" msmap-dev
 ```
 
 ### Inside the container
@@ -384,6 +477,7 @@ docker run -it --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev
 cmake -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_STANDARD=23 \
+  -DCMAKE_CXX_EXTENSIONS=OFF \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build
@@ -391,14 +485,16 @@ ninja -C build msmap
 
 # Run static analysis
 run-clang-tidy-18 -p build '/workspace/src/.*'
-    cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+ctest --test-dir build --output-on-failure
+```
 
 ### Fuzzer (libFuzzer on syslog parser)
 
 Run interactively:
 
 ```bash
-docker run -it --rm -v "${PWD}:/workspace" msmap-dev ninja -C build fuzz_parser
+docker run -it --rm -v "$PWD:/workspace" msmap-dev ninja -C build fuzz_parser
 ```
 
 Generates `build/corpus/` (seed crashes/hangs) and `build/fuzz_cov.html` (coverage report).
@@ -406,7 +502,7 @@ Generates `build/corpus/` (seed crashes/hangs) and `build/fuzz_cov.html` (covera
 ### One-off commands (non-interactive)
 
 ```bash
-docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
+docker run --rm -v "$PWD:/workspace" msmap-dev \
   ninja -C build msmap
 ```
 
@@ -437,6 +533,8 @@ docker run --rm -p 8080:8080 msmap
 │   ├── db.cpp/.h           # SQLite WAL database, schema, queries
 │   ├── geoip.cpp/.h        # MaxMind GeoLite2 enrichment
 │   ├── abuse_cache.cpp/.h  # AbuseIPDB cache (SQLite-backed, background refresh)
+│   ├── ip_intel_cache.cpp/.h # Tor Project + Spamhaus source-intel cache
+│   ├── home_resolver.cpp/.h  # Home marker resolver and periodic refresh
 │   ├── http.cpp/.h         # libmicrohttpd HTTP server + REST API
 │   └── json.h              # Hand-rolled JSON serializer
 ├── web/
