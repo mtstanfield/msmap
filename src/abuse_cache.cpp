@@ -1,4 +1,5 @@
 #include "abuse_cache.h"
+#include "curl_global.h"
 
 #include <curl/curl.h>
 #include <sqlite3.h>
@@ -108,9 +109,8 @@ AbuseCache::AbuseCache(const std::string& db_path,
     : db_path_(db_path), api_key_(api_key),
       rate_reset_day_(epoch_day())
 {
-    // Initialise libcurl once for the lifetime of this object.
-    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
-        std::clog << "[WARN] AbuseCache: curl_global_init failed\n";
+    if (!ensure_curl_global_init()) {
+        std::clog << "[WARN] AbuseCache: curl global init failed\n";
         return;
     }
 
@@ -132,7 +132,6 @@ AbuseCache::~AbuseCache() noexcept
         worker_thread_.join();
     }
     // db_ unique_ptr destructor finalises statements and closes the connection.
-    curl_global_cleanup();
 }
 
 // ── open() ────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 #include "ip_intel_cache.h"
+#include "curl_global.h"
 
 #include <arpa/inet.h>
 #include <curl/curl.h>
@@ -225,10 +226,10 @@ IpIntelCache::IpIntelCache(Database& db, const IpIntelSources& sources,
       tor_url_(sources.tor_url),
       drop_url_(sources.drop_url),
       refresh_secs_(refresh_secs > 0 ? refresh_secs : 21600),
-      valid_(curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK)
+      valid_(ensure_curl_global_init())
 {
     if (!valid_) {
-        std::clog << "[WARN] IpIntelCache: curl_global_init failed\n";
+        std::clog << "[WARN] IpIntelCache: curl global init failed\n";
         return;
     }
     worker_thread_ = std::thread{[this]() noexcept { worker(); }};
@@ -243,9 +244,6 @@ IpIntelCache::~IpIntelCache() noexcept
     queue_cv_.notify_all();
     if (worker_thread_.joinable()) {
         worker_thread_.join();
-    }
-    if (valid_) {
-        curl_global_cleanup();
     }
 }
 

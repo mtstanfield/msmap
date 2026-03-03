@@ -122,6 +122,7 @@ add_custom_target(web_bundle DEPENDS "${INDEX_HTML_H}")
 # ── Target ─────────────────────────────────────────────────────────────────
 add_executable(msmap
     src/main.cpp
+    src/curl_global.cpp
     src/ip_intel_cache.cpp
     src/db.cpp
     src/geoip.cpp
@@ -229,6 +230,7 @@ if(MSMAP_ENABLE_TESTS)
 
     add_executable(test_abuse_cache
         tests/test_abuse_cache.cpp
+        src/curl_global.cpp
         src/abuse_cache.cpp
         src/db.cpp
         src/geoip.cpp
@@ -248,6 +250,7 @@ if(MSMAP_ENABLE_TESTS)
 
     add_executable(test_integration
         tests/test_integration.cpp
+        src/curl_global.cpp
         src/listener.cpp
         src/abuse_cache.cpp
         src/ip_intel_cache.cpp

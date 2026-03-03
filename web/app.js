@@ -55,13 +55,13 @@ function loadFilters() {
             return;
         }
         const s = JSON.parse(raw);
-        if (s.time        !== undefined) { fTime.value = s.time; }
-        if (s.proto       !== undefined) { fProto.value = s.proto; }
+        if (s.time        !== undefined) { setSelectValue(fTime, s.time, DEFAULT_FILTERS.time); }
+        if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
         if (s.ip          !== undefined) { fIp.value = s.ip; }
         if (s.port        !== undefined) { fPort.value = s.port; }
         if (s.country     !== undefined) { fCountry.value = s.country; }
-        if (s.networkType !== undefined) { fNetworkType.value = s.networkType; }
-        if (s.animations  !== undefined) { fAnimations.value = s.animations; }
+        if (s.networkType !== undefined) { setSelectValue(fNetworkType, s.networkType, DEFAULT_FILTERS.networkType); }
+        if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
         if (s.legendOpen === 'on') {
             setLegendOpen(true);
         }
@@ -171,6 +171,12 @@ function setLegendOpen(open) {
 function currentWindowSecs() {
     const n = parseInt(fTime.value, 10);
     return (n === 900 || n === 3600 || n === 21600 || n === 86400) ? n : 900;
+}
+
+function setSelectValue(el, value, fallback) {
+    const normalized = String(value);
+    const allowed = Array.from(el.options, (option) => option.value);
+    el.value = allowed.includes(normalized) ? normalized : fallback;
 }
 
 function setInputValidity(el, valid) {
@@ -527,7 +533,7 @@ function buildLinkouts(srcIp) {
 }
 
 function buildSummaryItem(label, value, wide = false) {
-    if (!value) { return ''; }
+    if (value === null || value === undefined || value === '') { return ''; }
     return [
         '<div class="popup-meta-item',
         wide ? ' popup-meta-item-wide' : '',
@@ -905,7 +911,9 @@ async function loadDetail(marker, row, cursor) {
             state.rows = rows;
             state.selectedIndex = 0;
         }
-        state.nextCursor = typeof body.next_cursor === 'string' ? body.next_cursor : '';
+        state.nextCursor = Number.isInteger(body.next_cursor) && body.next_cursor >= 0
+            ? String(body.next_cursor)
+            : '';
         state.loaded = true;
     } catch (_) {
         state.error = 'Could not load recent events.';
@@ -1004,11 +1012,11 @@ function renderMap(rows) {
     const arcCandidates = [];
 
     for (const r of rows) {
-        totalSeen += r.count;
         if (!passesFilters(r)) { continue; }
         if (r.lat === null || r.lon === null || r.lat === undefined || r.lon === undefined) {
             continue;
         }
+        totalSeen += Number.isFinite(r.count) ? r.count : 0;
 
         const threat = (r.threat_max !== undefined) ? r.threat_max : null;
         const color = markerColor(threat);
