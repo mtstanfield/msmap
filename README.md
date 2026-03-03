@@ -514,7 +514,7 @@ RFC 3339 format (produced by an rsyslog relay) is also accepted automatically:
 
 ---
 
-## Development Environment
+## Testing and Development
 
 **All builds and dev work run inside Docker.**
 
@@ -599,52 +599,21 @@ docker run --rm -p 8080:8080 msmap:generic
 
 ---
 
-## Project Structure
+### Test and analysis commands
 
-```
-.
-├── Dockerfile              # Multi-stage: dev → builder → distroless:nonroot
-├── CMakeLists.txt          # Build system (supported CMake 3.x, Ninja, clang-18)
-├── PLAN.md                 # Feature plan and todo list
-├── CLAUDE.md               # Instructions for Claude Code
-├── FINDINGS.md             # Issues log for remediation tracking
-├── rsyslog.conf            # Optional rsyslog forwarding config (reference only)
-├── schema.sql              # SQLite schema (reference copy; applied in db.cpp)
-├── src/
-│   ├── main.cpp            # Entry point, signal handling, startup
-│   ├── listener.cpp/.h     # UDP listener on port 5140
-│   ├── parser.cpp/.h       # Hand-written BSD syslog + RFC 3339 tokenizer
-│   ├── db.cpp/.h           # SQLite WAL database, schema, queries
-│   ├── geoip.cpp/.h        # MaxMind GeoLite2 enrichment
-│   ├── abuse_cache.cpp/.h  # AbuseIPDB cache (SQLite-backed, background refresh)
-│   ├── ip_intel_cache.cpp/.h # Tor Project + Spamhaus DROP source-intel cache
-│   ├── home_resolver.cpp/.h  # Home marker resolver and periodic refresh
-│   ├── http.cpp/.h         # libmicrohttpd HTTP server + REST API
-│   └── json.h              # Hand-rolled JSON serializer
-├── web/
-│   ├── index.html          # Single-page app shell
-│   ├── app.js              # Leaflet map + filter panel
-│   ├── app.css             # Styles
-│   ├── bundle.py           # CMake step: inlines all assets → index_html.h
-│   └── vendor/             # Leaflet.js, MarkerCluster (local copies)
-├── tests/
-│   ├── test_parser.cpp
-│   ├── test_db.cpp
-│   ├── test_geoip.cpp
-│   ├── test_http.cpp
-│   ├── test_abuse_cache.cpp
-│   └── test_integration.cpp  # End-to-end: UDP socket → DB → query
-├── cmake/
-│   ├── CompilerWarnings.cmake
-│   ├── Sanitizers.cmake
-│   └── StaticAnalyzers.cmake
-└── scripts/
-    └── smoke_test.sh       # Manual smoke test (listener + DB + HTTP)
+```bash
+# Full test suite
+docker run --rm -v "$PWD:/workspace" msmap-dev \
+  ctest --test-dir build --output-on-failure
+
+# Static analysis
+docker run --rm -v "$PWD:/workspace" msmap-dev \
+  run-clang-tidy-18 -p build '/workspace/src/.*'
+docker run --rm -v "$PWD:/workspace" msmap-dev \
+  cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 ```
 
----
-
-## Quality Standards
+### Hardening approach
 
 Follows [cpp-best-practices/cppbestpractices](https://github.com/cpp-best-practices/cppbestpractices):
 
@@ -656,4 +625,3 @@ Follows [cpp-best-practices/cppbestpractices](https://github.com/cpp-best-practi
 - Catch2 unit tests
 - All SQL via parameterized queries — no string concatenation
 - Distroless nonroot runtime
-- Issues tracked in `FINDINGS.md`; reviewed before each feature increment

@@ -136,10 +136,20 @@ html, body {
     transition: opacity 120ms ease-out, transform 120ms ease-out;
 }
 
+.status-tooltip-align-left::after {
+    left: 0;
+    transform: translateY(4px);
+}
+
 .status-tooltip-target:hover::after,
 .status-tooltip-target:focus-visible::after {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+.status-tooltip-align-left:hover::after,
+.status-tooltip-align-left:focus-visible::after {
+    transform: translateY(0);
 }
 
 .status-item-ops {
