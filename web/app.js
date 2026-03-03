@@ -177,6 +177,12 @@ const cluster = L.markerClusterGroup({
     },
 });
 lmap.addLayer(cluster);
+lmap.on('popupclose', (event) => {
+    if (activePopup && event.popup === activePopup) {
+        activePopup = null;
+        activePopupIp = '';
+    }
+});
 cluster.on('spiderfied', (event) => {
     if (!animationsEnabled()) { return; }
     setTimeout(() => {
@@ -229,7 +235,7 @@ let pollTimer     = null;
 let pollInFlight  = false;
 let pollQueued    = false;
 let activePopupIp = '';
-let suppressPopupAutoClose = false;
+let activePopup   = null;
 let lastMapSuccessAt = 0;
 let mapFeedState = 'unknown';
 let lastStatus = null;
@@ -1131,19 +1137,58 @@ function renderArcBatch(candidates) {
 }
 
 function buildAggregatePopup(r) {
+    const detail = isMobileMapUi() ? '' : buildDetailPane(r.src_ip);
     return [
         '<div class="popup-row">',
         buildAggregateSummary(r),
-        buildDetailPane(r.src_ip),
+        detail,
         '</div>',
     ].join('');
 }
 
-function updatePopupContent(marker, row) {
-    marker.setPopupContent(buildAggregatePopup(row));
-    if (marker.isPopupOpen()) {
-        bindPopupControls(marker, row);
+function createPopupOptions() {
+    const mobileUi = isMobileMapUi();
+    return {
+        maxWidth: 360,
+        autoPan: true,
+        keepInView: true,
+        autoPanPaddingTopLeft: L.point(16, 16),
+        autoPanPaddingBottomRight: L.point(16, mobileUi ? 24 : 16),
+    };
+}
+
+function updatePopupContent(row, latlng = null) {
+    if (!activePopup || activePopupIp !== row.src_ip) { return; }
+    if (latlng) {
+        activePopup.setLatLng(latlng);
     }
+    activePopup.setContent(buildAggregatePopup(row));
+    activePopup.update();
+    bindPopupControls(row);
+}
+
+function openAggregatePopup(marker, row) {
+    activePopupIp = row.src_ip;
+    if (!activePopup) {
+        activePopup = L.popup(createPopupOptions());
+    } else {
+        Object.assign(activePopup.options, createPopupOptions());
+    }
+    activePopup.setLatLng(marker.getLatLng());
+    activePopup.setContent(buildAggregatePopup(row));
+    activePopup.openOn(lmap);
+    bindPopupControls(row);
+
+    if (isMobileMapUi()) {
+        return;
+    }
+
+    const state = ensureDetailState(row.src_ip);
+    if (!state.rows.length && !state.loading) {
+        void loadDetail(row, '');
+        return;
+    }
+    updatePopupContent(row, marker.getLatLng());
 }
 
 async function fetchDetailPage(srcIp, cursor) {
@@ -1162,13 +1207,13 @@ async function fetchDetailPage(srcIp, cursor) {
     return resp.json();
 }
 
-async function loadDetail(marker, row, cursor) {
+async function loadDetail(row, cursor) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
 
     state.loading = true;
     state.error = '';
-    updatePopupContent(marker, row);
+    updatePopupContent(row);
     try {
         const body = await fetchDetailPage(row.src_ip, cursor);
         const rows = Array.isArray(body.rows) ? body.rows : [];
@@ -1187,38 +1232,37 @@ async function loadDetail(marker, row, cursor) {
         state.loaded = true;
     } finally {
         state.loading = false;
-        updatePopupContent(marker, row);
+        updatePopupContent(row);
     }
 }
 
-async function showOlderDetail(marker, row) {
+async function showOlderDetail(row) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
     if (state.selectedIndex < state.rows.length - 1) {
         state.selectedIndex++;
-        updatePopupContent(marker, row);
+        updatePopupContent(row);
         return;
     }
     if (!state.nextCursor) { return; }
 
     const priorLength = state.rows.length;
-    await loadDetail(marker, row, state.nextCursor);
+    await loadDetail(row, state.nextCursor);
     if (state.rows.length > priorLength) {
         state.selectedIndex = priorLength;
-        updatePopupContent(marker, row);
+        updatePopupContent(row);
     }
 }
 
-function showNewerDetail(marker, row) {
+function showNewerDetail(row) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading || state.selectedIndex === 0) { return; }
     state.selectedIndex--;
-    updatePopupContent(marker, row);
+    updatePopupContent(row);
 }
 
-function bindPopupControls(marker, row) {
-    const popup = marker.getPopup();
-    const popupEl = popup ? popup.getElement() : null;
+function bindPopupControls(row) {
+    const popupEl = activePopup ? activePopup.getElement() : null;
     if (!popupEl) { return; }
 
     if (popupEl.dataset.mmPopupControlsBound === '1') { return; }
@@ -1248,15 +1292,15 @@ function bindPopupControls(marker, row) {
             state.selectedIndex = 0;
             state.nextCursor = '';
             state.loaded = false;
-            void loadDetail(marker, row, '');
+            void loadDetail(row, '');
             return;
         }
         if (action === 'older') {
-            void showOlderDetail(marker, row);
+            void showOlderDetail(row);
             return;
         }
         if (action === 'newer') {
-            showNewerDetail(marker, row);
+            showNewerDetail(row);
         }
     });
 }
@@ -1322,7 +1366,6 @@ function renderMap(rows) {
     let reopenMarker = null;
     let reopenRow = null;
 
-    suppressPopupAutoClose = true;
     cluster.clearLayers();
     mappedCount = 0;
     totalSeen = 0;
@@ -1351,26 +1394,13 @@ function renderMap(rows) {
             spiking:     spiking,
             srcIp:       r.src_ip,
         });
-        marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
         marker.on('add', () => {
             setTimeout(() => {
                 applySpikeMarkerState(marker, spiking);
             }, 0);
         });
-        marker.on('popupopen', () => {
-            activePopupIp = r.src_ip;
-            bindPopupControls(marker, r);
-            const state = ensureDetailState(r.src_ip);
-            if (!state.rows.length && !state.loading) {
-                void loadDetail(marker, r, '');
-            } else {
-                updatePopupContent(marker, r);
-            }
-        });
-        marker.on('popupclose', () => {
-            if (!suppressPopupAutoClose && activePopupIp === r.src_ip) {
-                activePopupIp = '';
-            }
+        marker.on('click', () => {
+            openAggregatePopup(marker, r);
         });
         cluster.addLayer(marker);
         mappedCount++;
@@ -1390,11 +1420,10 @@ function renderMap(rows) {
 
     renderArcBatch(arcCandidates);
     if (reopenMarker && reopenRow) {
-        reopenMarker.openPopup();
-        updatePopupContent(reopenMarker, reopenRow);
-        bindPopupControls(reopenMarker, reopenRow);
+        updatePopupContent(reopenRow, reopenMarker.getLatLng());
+    } else if (activePopup) {
+        lmap.closePopup(activePopup);
     }
-    suppressPopupAutoClose = false;
 }
 
 function scheduleNextPoll(delayMs) {
