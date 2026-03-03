@@ -316,7 +316,7 @@ events from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Animations | On / Off for marker ripple and home-directed arcs |
+| Animations | On / Off for cluster-reveal ripple and home-directed arcs |
 | Legend | Always-visible reference block under the filters |
 
 All selects apply immediately. Text filters auto-apply once the value is
@@ -347,9 +347,9 @@ browser then:
 5. Clears stale arcs on zoom, filter changes, animation-toggle changes, and
    home-point changes.
 
-Marker circles also apply a one-shot ripple animation the first time a source IP
-appears in the current browser session. The ripple does not replay on later
-polls for the same IP.
+When a cluster opens, newly revealed source markers apply a one-shot ripple the
+first time that source IP is revealed in the current browser session. The
+ripple does not replay on later cluster opens for the same IP.
 
 In the `15m` and `1h` views, sources with a dense short-window burst of hits
 also get a stronger marker pulse so obvious spikes stand out without waiting
@@ -357,7 +357,7 @@ for a popup drilldown.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
-`Animations` toggle still controls marker ripple.
+`Animations` toggle still controls the cluster-reveal ripple.
 
 When home resolution succeeds, newly ingested RFC1918 destination IPs are
 rewritten to the resolved home IP before storage so popup detail and raw drill

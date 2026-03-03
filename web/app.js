@@ -155,6 +155,17 @@ const cluster = L.markerClusterGroup({
     },
 });
 lmap.addLayer(cluster);
+cluster.on('spiderfied', (event) => {
+    if (!animationsEnabled()) { return; }
+    setTimeout(() => {
+        for (const marker of event.markers || []) {
+            const srcIp = marker?.options?.srcIp;
+            if (typeof srcIp === 'string' && srcIp) {
+                maybeAnimateMarker(marker, srcIp);
+            }
+        }
+    }, 0);
+});
 
 const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
@@ -1249,11 +1260,11 @@ function renderMap(rows) {
             fillOpacity: 0.75,
             weight:      mobileUi ? (spiking ? 2.5 : 2) : (spiking ? 2 : 1),
             severity:    severity,
+            srcIp:       r.src_ip,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
         marker.on('add', () => {
             setTimeout(() => {
-                maybeAnimateMarker(marker, r.src_ip);
                 applySpikeMarkerState(marker, spiking);
             }, 0);
         });
