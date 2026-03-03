@@ -94,11 +94,7 @@ const cluster = L.markerClusterGroup({
     iconCreateFunction(clusterMarker) {
         const children = clusterMarker.getAllChildMarkers();
         const total = children.length;
-        const nHigh = children.filter(
-            m => m.options.threat !== null &&
-                 m.options.threat !== undefined &&
-                 m.options.threat >= 67
-        ).length;
+        const nHigh = children.filter(m => m.options.severity === 'high').length;
         const ratio = total > 0 ? nHigh / total : 0;
         let cls;
         if      (ratio === 0)  { cls = 'safe'; }
@@ -144,6 +140,8 @@ let totalSeen     = 0;
 let lastMapTs     = 0;
 let isInitialLoad = true;
 let pollTimer     = null;
+let pollInFlight  = false;
+let pollQueued    = false;
 let activePopupIp = '';
 let suppressPopupAutoClose = false;
 let lastMapSuccessAt = 0;
@@ -151,6 +149,8 @@ let mapFeedState = 'unknown';
 
 let homePt     = null;
 let homeMarker = null;
+// Stop retrying /api/home after a stable 404; the config only changes on reload.
+let homeFetchDisabled = false;
 const seenMarkerIps = new Set();
 const detailStateByIp = new Map();
 const activeArcs = new Set();
@@ -390,6 +390,16 @@ function markerColor(threat) {
     return '#f85149';
 }
 
+function markerSeverity(row) {
+    if (row.spamhaus_drop === true) { return 'high'; }
+    const threat = row.threat_max;
+    if (threat === null || threat === undefined) { return 'unknown'; }
+    if (threat === 0)   { return 'clean'; }
+    if (threat <= 33)   { return 'low'; }
+    if (threat <= 66)   { return 'medium'; }
+    return 'high';
+}
+
 function threatClass(score) {
     if (score === null || score === undefined) { return 'threat-unknown'; }
     if (score === 0)   { return 'threat-clean'; }
@@ -415,10 +425,17 @@ function passesFilters(r) {
     if (!fNetworkType.value) { return true; }
     const ut = r.usage_type ? r.usage_type.toLowerCase() : '';
     if (fNetworkType.value === 'datacenter') {
-        return ut.includes('data center') || ut.includes('content delivery network');
+        return ut.includes('data center') ||
+            ut.includes('web hosting') ||
+            ut.includes('transit') ||
+            ut.includes('content delivery network');
     }
     if (fNetworkType.value === 'residential') {
-        return ut.includes('fixed line isp') || ut.includes('mobile isp');
+        return (ut.includes('isp') || ut.includes('consumer')) &&
+            !ut.includes('data center') &&
+            !ut.includes('web hosting') &&
+            !ut.includes('transit') &&
+            !ut.includes('content delivery network');
     }
     return true;
 }
@@ -655,6 +672,9 @@ function setError(msg) {
 }
 
 async function fetchHome() {
+    if (homeFetchDisabled) {
+        return;
+    }
     try {
         const resp = await fetch('/api/home');
         if (!resp.ok) {
@@ -662,9 +682,11 @@ async function fetchHome() {
                 clearActiveArcs();
                 homePt = null;
                 if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+                homeFetchDisabled = true;
             }
             return;
         }
+        homeFetchDisabled = false;
         const fresh = await resp.json();
         if (!fresh || !Number.isFinite(fresh.lat) || !Number.isFinite(fresh.lon)) {
             return;
@@ -1040,15 +1062,17 @@ function renderMap(rows) {
         }
         totalSeen += Number.isFinite(r.count) ? r.count : 0;
 
-        const threat = (r.threat_max !== undefined) ? r.threat_max : null;
-        const color = markerColor(threat);
+        const severity = markerSeverity(r);
+        const color = severity === 'high'
+            ? '#f85149'
+            : markerColor((r.threat_max !== undefined) ? r.threat_max : null);
         const marker = L.circleMarker([r.lat, r.lon], {
             radius:      5,
             color:       color,
             fillColor:   color,
             fillOpacity: 0.75,
             weight:      1,
-            threat:      threat,
+            severity:    severity,
         });
         marker.bindPopup(buildAggregatePopup(r), { maxWidth: 360 });
         marker.on('add', () => { setTimeout(() => { maybeAnimateMarker(marker, r.src_ip); }, 0); });
@@ -1096,10 +1120,31 @@ function scheduleNextPoll(delayMs) {
     if (pollTimer !== null) {
         clearTimeout(pollTimer);
     }
-    pollTimer = setTimeout(() => { void poll(); }, delayMs);
+    pollTimer = setTimeout(() => {
+        pollTimer = null;
+        void poll();
+    }, delayMs);
+}
+
+function requestPollNow() {
+    if (pollTimer !== null) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+    }
+    // Keep one queued refresh rather than overlapping fetch/render cycles.
+    if (pollInFlight) {
+        pollQueued = true;
+        return;
+    }
+    void poll();
 }
 
 async function poll() {
+    if (pollInFlight) {
+        pollQueued = true;
+        return;
+    }
+    pollInFlight = true;
     await fetchHome();
     updateMapFeedIndicator();
     try {
@@ -1134,25 +1179,31 @@ async function poll() {
         setError(err.message);
         updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
         scheduleNextPoll(ERROR_REFRESH_MS);
+    } finally {
+        pollInFlight = false;
+        if (pollQueued) {
+            pollQueued = false;
+            requestPollNow();
+        }
     }
 }
 
 function pollNow() {
-    if (pollTimer !== null) {
-        clearTimeout(pollTimer);
-        pollTimer = null;
-    }
     clearActiveArcs();
     isInitialLoad = true;
     lastMapTs = 0;
     setStatusCounts(0, 0);
     setStatusFreshness('Refreshing...');
-    void poll();
+    requestPollNow();
 }
 
 document.addEventListener('visibilitychange', () => {
     updateMapFeedIndicator();
-    scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
+    if (document.visibilityState === 'visible') {
+        requestPollNow();
+        return;
+    }
+    scheduleNextPoll(HIDDEN_REFRESH_MS);
 });
 
 fetchHome().then(() => {
