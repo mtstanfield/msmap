@@ -745,6 +745,28 @@ html, body {
     border-top-color: #30363d;
 }
 
+.leaflet-tooltip.spike-node-badge {
+    background: #f0f6fc;
+    border: 1px solid rgba(139, 148, 158, 0.9);
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px rgba(13, 17, 23, 0.35);
+    color: #0d1117;
+    font-size: 9px;
+    font-weight: 800;
+    height: 11px;
+    line-height: 11px;
+    min-width: 11px;
+    padding: 0;
+    text-align: center;
+}
+
+.leaflet-tooltip-top.spike-node-badge::before,
+.leaflet-tooltip-bottom.spike-node-badge::before,
+.leaflet-tooltip-left.spike-node-badge::before,
+.leaflet-tooltip-right.spike-node-badge::before {
+    display: none;
+}
+
 /* ── New-marker ripple animation ─────────────────────────────────────────── */
 
 @keyframes marker-ripple {

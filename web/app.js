@@ -31,6 +31,14 @@ const appliedTextFilters = {
 };
 
 let textApplyTimer = null;
+let animationPreferenceExplicit = false;
+const reducedMotionQuery = (typeof window.matchMedia === 'function')
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : null;
+
+function systemAnimationsDefault() {
+    return reducedMotionQuery?.matches ? 'off' : 'on';
+}
 
 function currentFilterState() {
     return {
@@ -51,7 +59,7 @@ function writeFiltersToUrl() {
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
-    if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
+    if (animationPreferenceExplicit)                       { params.set('animations', state.animations); }
     const next = params.toString();
     const base = window.location.pathname || '/';
     const target = next ? (base + '?' + next) : base;
@@ -61,7 +69,11 @@ function writeFiltersToUrl() {
 function saveFilters() {
     writeFiltersToUrl();
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentFilterState()));
+        const state = currentFilterState();
+        if (!animationPreferenceExplicit) {
+            delete state.animations;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (_) {}
 }
 
@@ -98,6 +110,8 @@ function readStoredFilters() {
 function loadFilters() {
     const s = parseUrlFilterState() || readStoredFilters();
     if (!s) {
+        fAnimations.value = systemAnimationsDefault();
+        animationPreferenceExplicit = false;
         return;
     }
 
@@ -106,7 +120,14 @@ function loadFilters() {
     if (s.ip          !== undefined) { fIp.value = s.ip; }
     if (s.port        !== undefined) { fPort.value = s.port; }
     if (s.country     !== undefined) { fCountry.value = s.country; }
-    if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
+    if (s.animations  !== undefined) {
+        setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations);
+        animationPreferenceExplicit = true;
+        return;
+    }
+
+    fAnimations.value = systemAnimationsDefault();
+    animationPreferenceExplicit = false;
 }
 
 const lmap = L.map('map', {
@@ -395,10 +416,11 @@ function resetToDefaults() {
     }
     fTime.value         = DEFAULT_FILTERS.time;
     fProto.value        = DEFAULT_FILTERS.proto;
-    fAnimations.value   = DEFAULT_FILTERS.animations;
+    fAnimations.value   = systemAnimationsDefault();
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
+    animationPreferenceExplicit = false;
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -415,10 +437,28 @@ function applyNonTextFilters() {
     pollNow();
 }
 
+function handleReducedMotionPreferenceChange() {
+    if (animationPreferenceExplicit) { return; }
+    const next = systemAnimationsDefault();
+    if (fAnimations.value === next) { return; }
+    fAnimations.value = next;
+    applyNonTextFilters();
+}
+
 document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
-fAnimations.addEventListener('change', applyNonTextFilters);
+fAnimations.addEventListener('change', () => {
+    animationPreferenceExplicit = true;
+    applyNonTextFilters();
+});
+if (reducedMotionQuery) {
+    if (typeof reducedMotionQuery.addEventListener === 'function') {
+        reducedMotionQuery.addEventListener('change', handleReducedMotionPreferenceChange);
+    } else if (typeof reducedMotionQuery.addListener === 'function') {
+        reducedMotionQuery.addListener(handleReducedMotionPreferenceChange);
+    }
+}
 
 [fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('input', () => {
@@ -1228,6 +1268,26 @@ function applySpikeMarkerState(marker, spiking) {
     const el = marker.getElement();
     if (!el) { return; }
     el.classList.toggle('marker-spike', spiking && animationsEnabled());
+
+    const tooltip = marker.getTooltip();
+    if (spiking && !animationsEnabled()) {
+        if (!tooltip) {
+            marker.bindTooltip('!', {
+                permanent: true,
+                direction: 'top',
+                offset: [8, -8],
+                className: 'spike-node-badge',
+                opacity: 1,
+            });
+        }
+        marker.openTooltip();
+        return;
+    }
+
+    if (tooltip) {
+        marker.closeTooltip();
+        marker.unbindTooltip();
+    }
 }
 
 function renderMap(rows) {
