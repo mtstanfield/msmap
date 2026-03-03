@@ -546,6 +546,28 @@ function setStatusFreshness(text) {
     statTimeValue.textContent = text;
 }
 
+function formatMapFreshness(generatedAt, nowMs = Date.now()) {
+    if (!Number.isFinite(generatedAt) || generatedAt <= 0) {
+        return 'Updated';
+    }
+
+    const ageSecs = Math.max(0, Math.floor((nowMs / 1000) - generatedAt));
+    if (ageSecs < 5) {
+        return 'Updated just now';
+    }
+    if (ageSecs < 60) {
+        return 'Updated ' + ageSecs + 's ago';
+    }
+
+    const ageMins = Math.floor(ageSecs / 60);
+    if (ageMins < 60) {
+        return 'Updated ' + ageMins + 'm ago';
+    }
+
+    const ageHours = Math.floor(ageMins / 60);
+    return 'Updated ' + ageHours + 'h ago';
+}
+
 function formatCompactCount(value) {
     return new Intl.NumberFormat(undefined, {
         notation: 'compact',
@@ -1451,7 +1473,7 @@ async function poll() {
         lastMapSuccessAt = Date.now();
         updateMapFeedIndicator(lastMapSuccessAt);
         setStatusCounts(mappedCount, totalSeen);
-        setStatusFreshness('Updated ' + new Date().toLocaleTimeString());
+        setStatusFreshness(formatMapFreshness(body.generated_at, lastMapSuccessAt));
         isInitialLoad = false;
 
         scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
