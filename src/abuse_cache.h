@@ -92,6 +92,9 @@ public:
     /// Current number of API calls remaining today.
     [[nodiscard]] int rate_remaining() const noexcept;
 
+    /// Number of rows currently stored in the abuse cache table.
+    [[nodiscard]] std::optional<std::int64_t> cache_row_count() const noexcept;
+
     /// Reset the daily counter if the UTC day has rolled over.
     /// Returns true if a reset occurred.
     bool rate_limit_reset_if_new_day() noexcept;

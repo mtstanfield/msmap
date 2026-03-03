@@ -231,6 +231,12 @@ void IpIntelCache::submit(const std::string& ip) noexcept
     queue_cv_.notify_one();
 }
 
+std::optional<std::int64_t> IpIntelCache::last_refresh_ts() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+    return last_refresh_ts_;
+}
+
 void IpIntelCache::worker() noexcept
 {
     auto next_refresh = std::chrono::steady_clock::now();
@@ -262,6 +268,7 @@ void IpIntelCache::worker() noexcept
 
 void IpIntelCache::refresh_sources() noexcept
 {
+    bool refreshed = false;
     if (!tor_url_.empty()) {
         if (const auto body = fetch_body(tor_url_); body.has_value()) {
             auto nets = parse_line_oriented_nets(*body);
@@ -270,6 +277,7 @@ void IpIntelCache::refresh_sources() noexcept
             const std::lock_guard<std::mutex> lock{snapshot_mutex_};
             snapshot_.tor_nets = std::move(nets);
             snapshot_.tor_loaded = true;
+            refreshed = true;
         }
     }
 
@@ -280,7 +288,13 @@ void IpIntelCache::refresh_sources() noexcept
             const std::lock_guard<std::mutex> lock{snapshot_mutex_};
             snapshot_.drop_nets = std::move(nets);
             snapshot_.drop_loaded = true;
+            refreshed = true;
         }
+    }
+
+    if (refreshed) {
+        const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+        last_refresh_ts_ = static_cast<std::int64_t>(std::time(nullptr));
     }
 }
 

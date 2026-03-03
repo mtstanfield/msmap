@@ -62,6 +62,17 @@ html, body {
     color: #e6edf3;
 }
 
+#filter-toggle:focus-visible,
+#f-defaults:focus-visible,
+#filter-panel select:focus-visible,
+#filter-panel input:focus-visible,
+.popup-detail-button:focus-visible,
+.popup-linkout:focus-visible,
+#status-right a:focus-visible {
+    outline: 2px solid #58a6ff;
+    outline-offset: 2px;
+}
+
 .status-label {
     color: #8b949e;
     font-size: 10px;
@@ -77,6 +88,11 @@ html, body {
     font-variant-numeric: tabular-nums;
 }
 
+.status-value-ops {
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .status-item {
     display: inline-flex;
     align-items: baseline;
@@ -84,9 +100,17 @@ html, body {
     min-width: 0;
 }
 
+.status-item-ops {
+    color: #8b949e;
+}
+
 .status-sep {
     color: #484f58;
     flex-shrink: 0;
+}
+
+.status-sep-ops {
+    color: #30363d;
 }
 
 #stat-mapped .status-value {
@@ -119,6 +143,18 @@ html, body {
 #stat-time-value {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+}
+
+#stat-intel-value.status-state-ok {
+    color: #3fb950;
+}
+
+#stat-intel-value.status-state-stale {
+    color: #f85149;
+}
+
+#stat-intel-value.status-state-off {
+    color: #8b949e;
 }
 
 #stat-error {
@@ -719,5 +755,10 @@ html, body {
 
     #status-right {
         font-size: 11px;
+    }
+
+    .status-item-ops,
+    .status-sep-ops {
+        display: none;
     }
 }

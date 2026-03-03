@@ -101,6 +101,15 @@ struct DetailPage {
     std::optional<int>         next_cursor;
 };
 
+struct StatusSnapshot {
+    bool                          ok{false};
+    std::int64_t                  now{};
+    std::optional<std::int64_t>   latest_event_ts;
+    std::int64_t                  rows_24h{};
+    std::int64_t                  distinct_sources_24h{};
+    std::optional<std::uintmax_t> db_size_bytes;
+};
+
 // ── Database class ────────────────────────────────────────────────────────────
 
 class Database {
@@ -150,6 +159,9 @@ public:
     /// Return one bounded detail page for a drilldown query.
     [[nodiscard]] DetailPage
         query_detail_page(const QueryFilters& filters) const noexcept;
+
+    /// Return a lightweight operational snapshot for the retained 24h window.
+    [[nodiscard]] std::optional<StatusSnapshot> status_snapshot() const noexcept;
 
     /// Delete all rows with ts < cutoff_ts and return the count removed.
     /// Thread-safe: acquires an internal mutex.

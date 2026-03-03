@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <ctime>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -612,6 +613,56 @@ DetailPage Database::query_detail_page(const QueryFilters& f) const noexcept
         result.next_cursor = page.offset + page.limit;
     }
     return result;
+}
+
+std::optional<StatusSnapshot> Database::status_snapshot() const noexcept
+{
+    if (!db_) {
+        return std::nullopt;
+    }
+
+    const std::lock_guard<std::mutex> lock{mutex_};
+
+    StatusSnapshot snapshot;
+    snapshot.ok = true;
+    snapshot.now = static_cast<std::int64_t>(std::time(nullptr));
+
+    constexpr const char* k_status_sql =
+        "SELECT "
+        "(SELECT MAX(ts) FROM connections), "
+        "(SELECT COUNT(*) FROM connections), "
+        "(SELECT COUNT(DISTINCT src_ip) FROM connections)";
+
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db_.get(), k_status_sql, -1, &raw, nullptr) != SQLITE_OK) {
+        std::clog << "[WARN] status_snapshot prepare: "
+                  << sqlite3_errmsg(db_.get()) << '\n';
+        return std::nullopt;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        return std::nullopt;
+    }
+
+    if (sqlite3_column_type(stmt.get(), 0) != SQLITE_NULL) {
+        snapshot.latest_event_ts = sqlite3_column_int64(stmt.get(), 0);
+    }
+    snapshot.rows_24h = sqlite3_column_int64(stmt.get(), 1);
+    snapshot.distinct_sources_24h = sqlite3_column_int64(stmt.get(), 2);
+
+    if (const char* db_filename = sqlite3_db_filename(db_.get(), "main");
+        db_filename != nullptr) {
+        std::error_code ec;
+        const auto path = std::filesystem::path{db_filename};
+        if (!path.empty() && std::filesystem::exists(path, ec) && !ec) {
+            snapshot.db_size_bytes = std::filesystem::file_size(path, ec);
+            if (ec) {
+                snapshot.db_size_bytes.reset();
+            }
+        }
+    }
+
+    return snapshot;
 }
 
 std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept

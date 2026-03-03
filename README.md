@@ -295,7 +295,12 @@ events from `GET /api/detail`.
 | Legend | Always-visible reference block under the filters |
 
 All selects apply immediately. Text filters auto-apply once the value is
-valid, and `Defaults` resets the panel to the standard 15-minute view.
+valid, and `Defaults` resets the panel to the standard 15-minute view. Applied
+filter state is mirrored into sparse query parameters, so copied URLs and
+bookmarks reopen the same view.
+
+The legend also makes the GeoIP precision explicit: map locations are
+approximate and should be read as placement hints, not exact device locations.
 
 ### Animations
 
@@ -365,6 +370,9 @@ The bottom status bar shows the current operational state of the map:
 - `Updated`: freshness of the last successful poll, with a dot that reflects
   live `/api/map` freshness (`unknown` on startup, green when current, red when
   stale or failing)
+- `Events`: total retained connection rows in the current 24-hour window
+- `Sources`: distinct retained source IPs in that window
+- `Intel`: compact Tor/DROP refresh state (`ok`, `stale`, or `off`)
 - inline error text when the most recent poll failed
 
 The footer metadata on the right shows `🌐 msmap`, the GitHub link, and the
@@ -424,6 +432,28 @@ Notes:
 
 Returns the resolved home coordinates when `MSMAP_HOME_HOST` is configured and
 GeoIP successfully locates the resolved IP. Otherwise returns `404`.
+
+### `GET /api/status`
+
+Returns a lightweight operator snapshot for the footer/status UI.
+
+Response fields include:
+
+- `ok`
+- `now`
+- `latest_event_ts`
+- `rows_24h`
+- `distinct_sources_24h`
+- `abuse_enabled`
+- `intel_enabled`
+- `home_configured`
+- `home_valid`
+- `intel_last_refresh_ts`
+- `abuse_cache_rows`
+- `db_size_bytes`
+
+This endpoint is informational, uncached (`Cache-Control: no-store`), and is
+polled much less frequently than `GET /api/map`.
 
 ---
 

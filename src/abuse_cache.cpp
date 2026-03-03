@@ -325,6 +325,25 @@ int AbuseCache::rate_remaining() const noexcept
     return rate_remaining_;
 }
 
+std::optional<std::int64_t> AbuseCache::cache_row_count() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{db_mutex_};
+    if (!db_) {
+        return std::nullopt;
+    }
+
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db_.get(), "SELECT COUNT(*) FROM abuse_cache", -1, &raw, nullptr)
+            != SQLITE_OK) {
+        return std::nullopt;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        return std::nullopt;
+    }
+    return sqlite3_column_int64(stmt.get(), 0);
+}
+
 bool AbuseCache::rate_limit_reset_if_new_day() noexcept
 {
     // Caller must hold queue_mutex_.

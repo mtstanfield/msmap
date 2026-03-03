@@ -6,6 +6,7 @@
 const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
 const ERROR_REFRESH_MS  = 60000;
+const STATUS_REFRESH_MS = 60000;
 const DETAIL_PAGE_SIZE  = 20;
 const TEXT_FILTER_DEBOUNCE_MS = 400;
 
@@ -32,35 +33,85 @@ const appliedTextFilters = {
 
 let textApplyTimer = null;
 
+function currentFilterState() {
+    return {
+        time:        fTime.value,
+        proto:       fProto.value,
+        ip:          appliedTextFilters.ip,
+        port:        appliedTextFilters.port,
+        country:     appliedTextFilters.country,
+        networkType: fNetworkType.value,
+        animations:  fAnimations.value,
+    };
+}
+
+function writeFiltersToUrl() {
+    const state = currentFilterState();
+    const params = new URLSearchParams();
+    if (state.time !== DEFAULT_FILTERS.time)               { params.set('window', state.time); }
+    if (state.proto)                                       { params.set('proto', state.proto); }
+    if (state.ip)                                          { params.set('ip', state.ip); }
+    if (state.port)                                        { params.set('port', state.port); }
+    if (state.country)                                     { params.set('country', state.country); }
+    if (state.networkType !== DEFAULT_FILTERS.networkType) { params.set('network_type', state.networkType); }
+    if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
+    const next = params.toString();
+    const base = window.location.pathname || '/';
+    const target = next ? (base + '?' + next) : base;
+    history.replaceState(null, '', target);
+}
+
 function saveFilters() {
+    writeFiltersToUrl();
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            time:        fTime.value,
-            proto:       fProto.value,
-            ip:          appliedTextFilters.ip,
-            port:        appliedTextFilters.port,
-            country:     appliedTextFilters.country,
-            networkType: fNetworkType.value,
-            animations:  fAnimations.value,
-        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentFilterState()));
     } catch (_) {}
 }
 
-function loadFilters() {
+function parseUrlFilterState() {
+    const params = new URLSearchParams(window.location.search);
+    const state = {};
+    let found = false;
+
+    const setIfPresent = (param, key) => {
+        if (!params.has(param)) { return; }
+        state[key] = params.get(param) ?? '';
+        found = true;
+    };
+
+    setIfPresent('window', 'time');
+    setIfPresent('proto', 'proto');
+    setIfPresent('ip', 'ip');
+    setIfPresent('port', 'port');
+    setIfPresent('country', 'country');
+    setIfPresent('network_type', 'networkType');
+    setIfPresent('animations', 'animations');
+
+    return found ? state : null;
+}
+
+function readStoredFilters() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-            return;
-        }
-        const s = JSON.parse(raw);
-        if (s.time        !== undefined) { setSelectValue(fTime, s.time, DEFAULT_FILTERS.time); }
-        if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
-        if (s.ip          !== undefined) { fIp.value = s.ip; }
-        if (s.port        !== undefined) { fPort.value = s.port; }
-        if (s.country     !== undefined) { fCountry.value = s.country; }
-        if (s.networkType !== undefined) { setSelectValue(fNetworkType, s.networkType, DEFAULT_FILTERS.networkType); }
-        if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
-    } catch (_) {}
+        return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function loadFilters() {
+    const s = parseUrlFilterState() || readStoredFilters();
+    if (!s) {
+        return;
+    }
+
+    if (s.time        !== undefined) { setSelectValue(fTime, s.time, DEFAULT_FILTERS.time); }
+    if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
+    if (s.ip          !== undefined) { fIp.value = s.ip; }
+    if (s.port        !== undefined) { fPort.value = s.port; }
+    if (s.country     !== undefined) { fCountry.value = s.country; }
+    if (s.networkType !== undefined) { setSelectValue(fNetworkType, s.networkType, DEFAULT_FILTERS.networkType); }
+    if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
 }
 
 const lmap = L.map('map', {
@@ -113,9 +164,15 @@ lmap.addLayer(cluster);
 const statMapped    = document.getElementById('stat-mapped');
 const statTotal     = document.getElementById('stat-total');
 const statTime      = document.getElementById('stat-time');
+const statEvents    = document.getElementById('stat-events');
+const statSources   = document.getElementById('stat-sources');
+const statIntel     = document.getElementById('stat-intel');
 const statMappedValue = document.getElementById('stat-mapped-value');
 const statTotalValue  = document.getElementById('stat-total-value');
 const statTimeValue   = document.getElementById('stat-time-value');
+const statEventsValue = document.getElementById('stat-events-value');
+const statSourcesValue = document.getElementById('stat-sources-value');
+const statIntelValue = document.getElementById('stat-intel-value');
 const statError     = document.getElementById('stat-error');
 const filterPanel   = document.getElementById('filter-panel');
 const filterToggle  = document.getElementById('filter-toggle');
@@ -127,6 +184,7 @@ const fCountry      = document.getElementById('f-country');
 const fNetworkType  = document.getElementById('f-network-type');
 const fAnimations   = document.getElementById('f-animations');
 const statDot       = statTime.querySelector('.status-dot');
+const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 
 filterToggle.classList.add('active');
 filterToggle.addEventListener('click', () => {
@@ -146,6 +204,9 @@ let activePopupIp = '';
 let suppressPopupAutoClose = false;
 let lastMapSuccessAt = 0;
 let mapFeedState = 'unknown';
+let lastStatus = null;
+let statusPollTimer = null;
+let statusInFlight = false;
 
 let homePt     = null;
 let homeMarker = null;
@@ -461,6 +522,53 @@ function setStatusFreshness(text) {
     statTimeValue.textContent = text;
 }
 
+function formatCompactCount(value) {
+    return new Intl.NumberFormat(undefined, {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+    }).format(value);
+}
+
+function setOperatorStatus(status) {
+    lastStatus = status;
+    if (!status || status.ok !== true) {
+        statEvents.style.display = 'none';
+        statSources.style.display = 'none';
+        statIntel.style.display = 'none';
+        statusOpSeparators.forEach((el) => {
+            el.style.display = 'none';
+        });
+        return;
+    }
+
+    statEvents.style.display = '';
+    statSources.style.display = '';
+    statIntel.style.display = '';
+    statusOpSeparators.forEach((el) => {
+        el.style.display = '';
+    });
+
+    statEventsValue.textContent = formatCompactCount(status.rows_24h ?? 0);
+    statSourcesValue.textContent = formatCompactCount(status.distinct_sources_24h ?? 0);
+
+    statIntelValue.classList.remove('status-state-ok', 'status-state-stale', 'status-state-off');
+    if (status.intel_enabled !== true) {
+        statIntelValue.textContent = 'off';
+        statIntelValue.classList.add('status-state-off');
+        return;
+    }
+
+    const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
+    const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
+    if (refreshTs > 0 && (now - refreshTs) <= (12 * 3600)) {
+        statIntelValue.textContent = 'ok';
+        statIntelValue.classList.add('status-state-ok');
+    } else {
+        statIntelValue.textContent = 'stale';
+        statIntelValue.classList.add('status-state-stale');
+    }
+}
+
 function setMapFeedState(nextState) {
     mapFeedState = nextState;
     statDot.classList.remove('is-unknown', 'is-healthy', 'is-stale');
@@ -469,6 +577,38 @@ function setMapFeedState(nextState) {
         nextState === 'stale' ? 'is-stale' :
         'is-unknown'
     );
+}
+
+async function fetchStatus() {
+    if (statusInFlight) {
+        return;
+    }
+    statusInFlight = true;
+    try {
+        const resp = await fetch('/api/status', { cache: 'no-store' });
+        if (!resp.ok) {
+            setOperatorStatus(null);
+            return;
+        }
+        const body = await resp.json();
+        setOperatorStatus(body);
+    } catch (_) {
+        setOperatorStatus(null);
+    } finally {
+        statusInFlight = false;
+    }
+}
+
+function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
+    if (statusPollTimer !== null) {
+        clearTimeout(statusPollTimer);
+    }
+    statusPollTimer = setTimeout(() => {
+        statusPollTimer = null;
+        void fetchStatus().then(() => {
+            scheduleStatusPoll(STATUS_REFRESH_MS);
+        });
+    }, delayMs);
 }
 
 function updateMapFeedIndicator(now = Date.now()) {
@@ -1152,6 +1292,7 @@ async function poll() {
         if (!resp.ok) {
             setError('API ' + resp.status);
             updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
+            void fetchStatus();
             scheduleNextPoll(ERROR_REFRESH_MS);
             return;
         }
@@ -1178,6 +1319,7 @@ async function poll() {
     } catch (err) {
         setError(err.message);
         updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
+        void fetchStatus();
         scheduleNextPoll(ERROR_REFRESH_MS);
     } finally {
         pollInFlight = false;
@@ -1212,7 +1354,14 @@ fetchHome().then(() => {
     appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
     appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
     appliedTextFilters.country = validateCountryValue(fCountry.value).normalized;
+    fIp.value = appliedTextFilters.ip;
+    fPort.value = appliedTextFilters.port;
+    fCountry.value = appliedTextFilters.country;
     updateTextValidity();
+    saveFilters();
+    setOperatorStatus(null);
     updateMapFeedIndicator();
+    void fetchStatus();
+    scheduleStatusPoll();
     pollNow();
 });

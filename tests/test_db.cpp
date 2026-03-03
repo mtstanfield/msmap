@@ -254,6 +254,45 @@ TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
     CHECK(rows.size() == 2);
 }
 
+TEST_CASE("status_snapshot: empty retention window reports zero counts")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    const auto snapshot = db.status_snapshot();
+    REQUIRE(snapshot.has_value());
+    CHECK(snapshot->ok);
+    CHECK_FALSE(snapshot->latest_event_ts.has_value());
+    CHECK(snapshot->rows_24h == 0);
+    CHECK(snapshot->distinct_sources_24h == 0);
+}
+
+TEST_CASE("status_snapshot: reports latest event and distinct sources")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.ts = 1000;
+    entry.src_ip = "198.51.100.10";
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    entry.ts = 2000;
+    entry.src_ip = "198.51.100.10";
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    entry.ts = 3000;
+    entry.src_ip = "203.0.113.25";
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    const auto snapshot = db.status_snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->latest_event_ts.has_value());
+    CHECK(*snapshot->latest_event_ts == 3000);
+    CHECK(snapshot->rows_24h == 3);
+    CHECK(snapshot->distinct_sources_24h == 2);
+}
+
 TEST_CASE("prune_expired: removes rows older than 24h relative to now")
 {
     msmap::Database db{":memory:"};

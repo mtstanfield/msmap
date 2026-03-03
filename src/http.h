@@ -11,12 +11,18 @@ struct MHD_Daemon; // NOLINT(readability-identifier-naming) — third-party C na
 namespace msmap {
 
 class Database;
+class AbuseCache;
+class IpIntelCache;
 
 /// Context bundle passed to the MHD request callback as `cls`.
-/// Groups the two pieces of state the callback needs.
+/// Groups the server-owned state the callback needs.
 struct HandlerCtx {
     Database*            db;
     const HomeResolver*  home_resolver;  // null when MSMAP_HOME_HOST is unset
+    const AbuseCache*    abuse_cache;    // null when AbuseIPDB is disabled
+    const IpIntelCache*  intel_cache;    // null when Tor/DROP intel is disabled
+    bool                 abuse_enabled;
+    bool                 intel_enabled;
 };
 
 /// Custom deleter: calls MHD_stop_daemon, which stops libmicrohttpd's internal
@@ -36,6 +42,7 @@ struct MhdDaemonCloser {
 ///   GET /api/map           — aggregate JSON object for the requested window
 ///   GET /api/detail        — paginated raw rows for popup drilldown
 ///   GET /api/home          — JSON {lat,lon} if MSMAP_HOME_HOST is set, else 404
+///   GET /api/status        — lightweight operator status snapshot
 ///   GET /                  — full map UI (HTML)
 class HttpServer {
 public:
@@ -44,6 +51,10 @@ public:
     HttpServer(std::uint16_t       port,
                Database&           db,
                const HomeResolver* home_resolver,
+               const AbuseCache*   abuse_cache,
+               const IpIntelCache* intel_cache,
+               bool                abuse_enabled,
+               bool                intel_enabled,
                unsigned int        thread_pool_size = 4) noexcept;
 
     // Destructor defined in http.cpp (stops MHD daemon, joins thread).

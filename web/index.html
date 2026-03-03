@@ -90,6 +90,10 @@
                     <span class="legend-note-label">Type</span>
                     <span class="legend-note-value">Network type comes from AbuseIPDB usage.</span>
                 </div>
+                <div class="legend-note">
+                    <span class="legend-note-label">GeoIP</span>
+                    <span class="legend-note-value">Map locations are approximate, not exact device locations.</span>
+                </div>
             </div>
         </div>
     </div>
@@ -111,6 +115,21 @@
                 <span class="status-dot is-unknown" aria-hidden="true"></span>
                 <span id="stat-time-value">Waiting for data</span>
             </div>
+            <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-events" class="status-item status-item-ops" style="display:none">
+                <span class="status-label">Events</span>
+                <span id="stat-events-value" class="status-value status-value-ops">--</span>
+            </span>
+            <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-sources" class="status-item status-item-ops" style="display:none">
+                <span class="status-label">Sources</span>
+                <span id="stat-sources-value" class="status-value status-value-ops">--</span>
+            </span>
+            <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-intel" class="status-item status-item-ops" style="display:none">
+                <span class="status-label">Intel</span>
+                <span id="stat-intel-value" class="status-value status-value-ops">--</span>
+            </span>
             <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">

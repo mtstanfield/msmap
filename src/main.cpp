@@ -191,7 +191,12 @@ int main() {
     // HttpServer's destructor calls MHD_stop_daemon which joins its thread
     // before returning — ensuring no handler can dereference a stale pointer.
     msmap::HttpServer const http{static_cast<std::uint16_t>(http_port), db,
-                                 home_resolver.get(), http_threads};
+                                 home_resolver.get(),
+                                 abuse_ptr,
+                                 intel_ptr,
+                                 abuse_ptr != nullptr && !abuse_key.empty(),
+                                 intel_ptr != nullptr,
+                                 http_threads};
     if (!http.valid()) {
         std::clog << "[FATAL] HTTP server failed to start on port "
                   << http_port << '\n';
