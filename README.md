@@ -4,6 +4,8 @@
 logs over syslog UDP, enriches them with GeoIP and cached threat intelligence,
 and serves a single-page world map for live inbound traffic triage.
 
+Live deployment: <https://map.thetaxi.space>
+
 The current architecture is:
 
 - 24-hour retention only
