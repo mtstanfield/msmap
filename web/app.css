@@ -141,6 +141,12 @@ html, body {
     transform: translateY(4px);
 }
 
+.status-tooltip-align-right::after {
+    left: auto;
+    right: 0;
+    transform: translateY(4px);
+}
+
 .status-tooltip-target:hover::after,
 .status-tooltip-target:focus-visible::after {
     opacity: 1;
@@ -149,6 +155,11 @@ html, body {
 
 .status-tooltip-align-left:hover::after,
 .status-tooltip-align-left:focus-visible::after {
+    transform: translateY(0);
+}
+
+.status-tooltip-align-right:hover::after,
+.status-tooltip-align-right:focus-visible::after {
     transform: translateY(0);
 }
 
@@ -772,15 +783,23 @@ html, body {
 .marker-cluster-spike div {
     position: relative;
 }
-.cluster-spike-dot {
+.cluster-spike-badge {
     position: absolute;
     top: 3px;
     right: 3px;
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
+    width: 11px;
+    height: 11px;
     background: #f0f6fc;
-    box-shadow: 0 0 0 1px rgba(201, 209, 217, 0.7), 0 0 10px rgba(240, 246, 252, 0.2);
+    color: #0d1117;
+    border: 1px solid rgba(139, 148, 158, 0.9);
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 0 0 1px rgba(13, 17, 23, 0.35);
 }
 
 @media (max-width: 900px) {
