@@ -21,7 +21,6 @@ const DEFAULT_FILTERS = Object.freeze({
     ip: '',
     port: '',
     country: '',
-    networkType: '',
     animations: 'on',
 });
 
@@ -40,7 +39,6 @@ function currentFilterState() {
         ip:          appliedTextFilters.ip,
         port:        appliedTextFilters.port,
         country:     appliedTextFilters.country,
-        networkType: fNetworkType.value,
         animations:  fAnimations.value,
     };
 }
@@ -53,7 +51,6 @@ function writeFiltersToUrl() {
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
-    if (state.networkType !== DEFAULT_FILTERS.networkType) { params.set('network_type', state.networkType); }
     if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
     const next = params.toString();
     const base = window.location.pathname || '/';
@@ -84,7 +81,6 @@ function parseUrlFilterState() {
     setIfPresent('ip', 'ip');
     setIfPresent('port', 'port');
     setIfPresent('country', 'country');
-    setIfPresent('network_type', 'networkType');
     setIfPresent('animations', 'animations');
 
     return found ? state : null;
@@ -110,7 +106,6 @@ function loadFilters() {
     if (s.ip          !== undefined) { fIp.value = s.ip; }
     if (s.port        !== undefined) { fPort.value = s.port; }
     if (s.country     !== undefined) { fCountry.value = s.country; }
-    if (s.networkType !== undefined) { setSelectValue(fNetworkType, s.networkType, DEFAULT_FILTERS.networkType); }
     if (s.animations  !== undefined) { setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations); }
 }
 
@@ -181,7 +176,6 @@ const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
-const fNetworkType  = document.getElementById('f-network-type');
 const fAnimations   = document.getElementById('f-animations');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
@@ -384,7 +378,6 @@ function resetToDefaults() {
     }
     fTime.value         = DEFAULT_FILTERS.time;
     fProto.value        = DEFAULT_FILTERS.proto;
-    fNetworkType.value  = DEFAULT_FILTERS.networkType;
     fAnimations.value   = DEFAULT_FILTERS.animations;
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
@@ -409,7 +402,6 @@ document.getElementById('f-defaults').addEventListener('click', resetToDefaults)
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
 fAnimations.addEventListener('change', applyNonTextFilters);
-fNetworkType.addEventListener('change', applyNonTextFilters);
 
 [fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('input', () => {
@@ -483,21 +475,6 @@ function escapeHtml(s) {
 }
 
 function passesFilters(r) {
-    if (!fNetworkType.value) { return true; }
-    const ut = r.usage_type ? r.usage_type.toLowerCase() : '';
-    if (fNetworkType.value === 'datacenter') {
-        return ut.includes('data center') ||
-            ut.includes('web hosting') ||
-            ut.includes('transit') ||
-            ut.includes('content delivery network');
-    }
-    if (fNetworkType.value === 'residential') {
-        return (ut.includes('isp') || ut.includes('consumer')) &&
-            !ut.includes('data center') &&
-            !ut.includes('web hosting') &&
-            !ut.includes('transit') &&
-            !ut.includes('content delivery network');
-    }
     return true;
 }
 

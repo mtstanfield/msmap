@@ -308,7 +308,6 @@ events from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Network type | All / Datacenter / Residential from AbuseIPDB `usage_type` |
 | Animations | On / Off for marker ripple and home-directed arcs |
 | Legend | Always-visible reference block under the filters |
 
@@ -374,10 +373,11 @@ the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup, and it stays open across normal map refreshes
 while the same source IP remains visible in the current filtered view.
 
-Threat colour and `usage_type` still come from AbuseIPDB. Tor status comes from
-Tor Project bulk exit data, and Spamhaus DROP badges come from locally
-cached list lookups. AbuseIPDB results are cached for 30 days; an API key is
-not required to view previously cached data.
+Threat colour still comes from AbuseIPDB, and the popup keeps AbuseIPDB
+`usage_type` as compact context only. Tor status comes from Tor Project bulk
+exit data, and Spamhaus DROP badges come from locally cached list lookups.
+AbuseIPDB results are cached for 30 days; an API key is not required to view
+previously cached data.
 
 ### Status bar
 
