@@ -354,7 +354,7 @@ browser then:
 In the `15m` and `1h` views, sources with a dense short-window burst of hits
 also get a stronger marker pulse so obvious spikes stand out without waiting
 for a popup drilldown. Clusters containing at least one such source get a
-small light dot so they read as worth opening before spiderfying.
+small light diamond so they read as worth opening before spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
