@@ -592,7 +592,7 @@ use `ctest -j 2`.
 
 ### Frontend mockups
 
-For fast popup/UI iteration without running the full app, open
+For fast popup and spiderfy/UI iteration without running the full app, open
 `web/popup_mock.html` directly in a browser or serve the `web/` directory:
 
 ```bash
@@ -601,6 +601,9 @@ python3 -m http.server 8081
 ```
 
 Then visit `http://localhost:8081/popup_mock.html`.
+The mock page includes the current legend, desktop/mobile popup states, long-
+string stress coverage, and spiderfy layout demos for small through very large
+clusters.
 
 ### Fuzzer (libFuzzer on the syslog parser)
 
