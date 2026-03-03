@@ -526,6 +526,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 1px;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -647,9 +648,12 @@ html, body {
 }
 
 .popup-linkouts {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, 24px);
+    grid-auto-rows: 24px;
     gap: 4px;
     flex-shrink: 0;
+    align-self: flex-start;
 }
 
 .popup-linkout {
