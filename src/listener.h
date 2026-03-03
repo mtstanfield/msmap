@@ -9,6 +9,7 @@ namespace msmap {
 class Database;
 class GeoIp;
 class AbuseCache;
+class HomeResolver;
 
 /// Listen on UDP 0.0.0.0:port for BSD syslog datagrams sent directly by
 /// Mikrotik (native format; no rsyslog intermediary required).
@@ -30,7 +31,11 @@ class AbuseCache;
 ///
 /// `allow_ips` is a list of network-byte-order IPv4 addresses that are
 /// allowed to send datagrams. Empty = accept from any source.
+///
+/// `home_resolver` may be null. When non-null and valid, new rows with RFC1918
+/// destination IPv4s are rewritten to the resolved home IP before insert.
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  const HomeResolver* home_resolver = nullptr,
                   const std::vector<std::uint32_t>& allow_ips = {},
                   const std::stop_token& stoken = {});
 

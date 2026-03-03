@@ -7,12 +7,32 @@ const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
 const ERROR_REFRESH_MS  = 60000;
 const DETAIL_PAGE_SIZE  = 20;
+const TEXT_FILTER_DEBOUNCE_MS = 400;
 
 const ARC_DRAW_MS   = 1200;
 const ARC_FADE_MS   =  500;
 const MAX_ARCS_POLL =   15;
 
 const STORAGE_KEY = 'msmap_filters';
+const DEFAULT_FILTERS = Object.freeze({
+    time: '900',
+    proto: '',
+    ip: '',
+    port: '',
+    country: '',
+    tor: false,
+    datacenter: false,
+    residential: false,
+    animations: true,
+});
+
+const appliedTextFilters = {
+    ip: DEFAULT_FILTERS.ip,
+    port: DEFAULT_FILTERS.port,
+    country: DEFAULT_FILTERS.country,
+};
+
+let textApplyTimer = null;
 
 function saveFilters() {
     try {
@@ -21,11 +41,11 @@ function saveFilters() {
             tor:         fTor.checked,
             datacenter:  fDatacenter.checked,
             residential: fResidential.checked,
-            arcs:        fArcs.checked,
+            animations:  fAnimations.checked,
             proto:       fProto.value,
-            ip:          fIp.value,
-            port:        fPort.value,
-            country:     fCountry.value,
+            ip:          appliedTextFilters.ip,
+            port:        appliedTextFilters.port,
+            country:     appliedTextFilters.country,
         }));
     } catch (_) {}
 }
@@ -33,13 +53,18 @@ function saveFilters() {
 function loadFilters() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) { return; }
+        if (!raw) {
+            fAnimations.checked = DEFAULT_FILTERS.animations;
+            return;
+        }
         const s = JSON.parse(raw);
         if (s.time        !== undefined) { fTime.value         = s.time; }
         if (s.tor         !== undefined) { fTor.checked        = s.tor; }
         if (s.datacenter  !== undefined) { fDatacenter.checked = s.datacenter; }
         if (s.residential !== undefined) { fResidential.checked = s.residential; }
-        if (s.arcs        !== undefined) { fArcs.checked       = s.arcs; }
+        if (s.animations  !== undefined) { fAnimations.checked = s.animations; }
+        else if (s.arcs   !== undefined) { fAnimations.checked = s.arcs; }
+        else                              { fAnimations.checked = DEFAULT_FILTERS.animations; }
         if (s.proto       !== undefined) { fProto.value        = s.proto; }
         if (s.ip          !== undefined) { fIp.value           = s.ip; }
         if (s.port        !== undefined) { fPort.value         = s.port; }
@@ -112,45 +137,13 @@ const fCountry      = document.getElementById('f-country');
 const fTor          = document.getElementById('f-tor');
 const fDatacenter   = document.getElementById('f-datacenter');
 const fResidential  = document.getElementById('f-residential');
-const fArcs         = document.getElementById('f-arcs');
+const fAnimations   = document.getElementById('f-animations');
 
 filterToggle.classList.add('active');
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
     filterPanel.style.display = nowOpen ? 'none' : '';
     filterToggle.classList.toggle('active', !nowOpen);
-});
-
-document.getElementById('f-apply').addEventListener('click', () => {
-    saveFilters();
-    pollNow();
-});
-
-document.getElementById('f-clear').addEventListener('click', () => {
-    fTime.value          = '900';
-    fTor.checked         = false;
-    fDatacenter.checked  = false;
-    fResidential.checked = false;
-    fArcs.checked        = true;
-    fProto.value         = '';
-    fIp.value            = '';
-    fPort.value          = '';
-    fCountry.value       = '';
-    saveFilters();
-    pollNow();
-});
-
-fTor.addEventListener('change',         () => { saveFilters(); pollNow(); });
-fDatacenter.addEventListener('change',  () => { saveFilters(); pollNow(); });
-fResidential.addEventListener('change', () => { saveFilters(); pollNow(); });
-
-[fIp, fPort, fCountry].forEach((el) => {
-    el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            saveFilters();
-            pollNow();
-        }
-    });
 });
 
 let mappedCount   = 0;
@@ -169,6 +162,212 @@ function currentWindowSecs() {
     const n = parseInt(fTime.value, 10);
     return (n === 900 || n === 3600 || n === 21600 || n === 86400) ? n : 900;
 }
+
+function setInputValidity(el, valid) {
+    el.classList.toggle('filter-input-invalid', !valid);
+    if (valid) {
+        el.removeAttribute('title');
+        return;
+    }
+    el.title = 'Enter a complete valid value or clear the field.';
+}
+
+function isValidIpv4(value) {
+    const parts = value.split('.');
+    if (parts.length !== 4) { return false; }
+    return parts.every((part) => {
+        if (!/^\d{1,3}$/.test(part)) { return false; }
+        const num = Number(part);
+        return num >= 0 && num <= 255;
+    });
+}
+
+function isValidIpv6(value) {
+    if (!/^[0-9A-Fa-f:.]+$/.test(value) || value.includes(':::')) {
+        return false;
+    }
+
+    const doubleColon = value.indexOf('::');
+    if (doubleColon !== -1 && value.indexOf('::', doubleColon + 1) !== -1) {
+        return false;
+    }
+
+    const groups = [];
+    const addGroups = (segment) => {
+        if (!segment) { return true; }
+        for (const part of segment.split(':')) {
+            if (!part) { return false; }
+            if (part.includes('.')) {
+                if (part !== segment.split(':').at(-1) || !isValidIpv4(part)) {
+                    return false;
+                }
+                groups.push('ipv4');
+                continue;
+            }
+            if (!/^[0-9A-Fa-f]{1,4}$/.test(part)) { return false; }
+            groups.push(part);
+        }
+        return true;
+    };
+
+    if (doubleColon === -1) {
+        if (!addGroups(value)) { return false; }
+        const count = groups.reduce((sum, group) => sum + (group === 'ipv4' ? 2 : 1), 0);
+        return count === 8;
+    }
+
+    const left = value.slice(0, doubleColon);
+    const right = value.slice(doubleColon + 2);
+    if (!addGroups(left) || !addGroups(right)) { return false; }
+    const count = groups.reduce((sum, group) => sum + (group === 'ipv4' ? 2 : 1), 0);
+    return count < 8;
+}
+
+function validateIpValue(value) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return { valid: true, normalized: '' };
+    }
+    const valid = isValidIpv4(trimmed) || isValidIpv6(trimmed);
+    return { valid, normalized: valid ? trimmed : appliedTextFilters.ip };
+}
+
+function validatePortValue(value) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return { valid: true, normalized: '' };
+    }
+    if (!/^\d+$/.test(trimmed)) {
+        return { valid: false, normalized: appliedTextFilters.port };
+    }
+    const port = Number(trimmed);
+    if (port < 1 || port > 65535) {
+        return { valid: false, normalized: appliedTextFilters.port };
+    }
+    return { valid: true, normalized: String(port) };
+}
+
+function validateCountryValue(value) {
+    const trimmed = value.trim().toUpperCase();
+    if (!trimmed) {
+        return { valid: true, normalized: '' };
+    }
+    const valid = /^[A-Z]{2}$/.test(trimmed);
+    return { valid, normalized: valid ? trimmed : appliedTextFilters.country };
+}
+
+function updateTextValidity() {
+    const ip = validateIpValue(fIp.value);
+    const port = validatePortValue(fPort.value);
+    const country = validateCountryValue(fCountry.value);
+    setInputValidity(fIp, ip.valid);
+    setInputValidity(fPort, port.valid);
+    setInputValidity(fCountry, country.valid);
+    return { ip, port, country };
+}
+
+function applyTextFilters() {
+    const validation = updateTextValidity();
+    let changed = false;
+
+    if (validation.ip.valid && appliedTextFilters.ip !== validation.ip.normalized) {
+        appliedTextFilters.ip = validation.ip.normalized;
+        changed = true;
+    }
+    if (validation.port.valid && appliedTextFilters.port !== validation.port.normalized) {
+        appliedTextFilters.port = validation.port.normalized;
+        changed = true;
+    }
+    if (validation.country.valid && appliedTextFilters.country !== validation.country.normalized) {
+        appliedTextFilters.country = validation.country.normalized;
+        changed = true;
+    }
+
+    if (validation.ip.valid) {
+        fIp.value = validation.ip.normalized;
+    }
+    if (validation.port.valid) {
+        fPort.value = validation.port.normalized;
+    }
+    if (validation.country.valid) {
+        fCountry.value = validation.country.normalized;
+    }
+
+    if (changed) {
+        saveFilters();
+        pollNow();
+    }
+}
+
+function scheduleTextApply() {
+    if (textApplyTimer !== null) {
+        clearTimeout(textApplyTimer);
+    }
+    textApplyTimer = setTimeout(() => {
+        textApplyTimer = null;
+        applyTextFilters();
+    }, TEXT_FILTER_DEBOUNCE_MS);
+}
+
+function resetToDefaults() {
+    if (textApplyTimer !== null) {
+        clearTimeout(textApplyTimer);
+        textApplyTimer = null;
+    }
+    fTime.value          = DEFAULT_FILTERS.time;
+    fProto.value         = DEFAULT_FILTERS.proto;
+    fTor.checked         = DEFAULT_FILTERS.tor;
+    fDatacenter.checked  = DEFAULT_FILTERS.datacenter;
+    fResidential.checked = DEFAULT_FILTERS.residential;
+    fAnimations.checked  = DEFAULT_FILTERS.animations;
+    fIp.value            = DEFAULT_FILTERS.ip;
+    fPort.value          = DEFAULT_FILTERS.port;
+    fCountry.value       = DEFAULT_FILTERS.country;
+
+    appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
+    appliedTextFilters.port    = DEFAULT_FILTERS.port;
+    appliedTextFilters.country = DEFAULT_FILTERS.country;
+    updateTextValidity();
+    saveFilters();
+    pollNow();
+}
+
+function applyNonTextFilters() {
+    saveFilters();
+    pollNow();
+}
+
+document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
+fTime.addEventListener('change', applyNonTextFilters);
+fProto.addEventListener('change', applyNonTextFilters);
+fTor.addEventListener('change', applyNonTextFilters);
+fDatacenter.addEventListener('change', applyNonTextFilters);
+fResidential.addEventListener('change', applyNonTextFilters);
+fAnimations.addEventListener('change', applyNonTextFilters);
+
+[fIp, fPort, fCountry].forEach((el) => {
+    el.addEventListener('input', () => {
+        updateTextValidity();
+        scheduleTextApply();
+    });
+    el.addEventListener('blur', () => {
+        if (textApplyTimer !== null) {
+            clearTimeout(textApplyTimer);
+            textApplyTimer = null;
+        }
+        applyTextFilters();
+    });
+    el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (textApplyTimer !== null) {
+                clearTimeout(textApplyTimer);
+                textApplyTimer = null;
+            }
+            applyTextFilters();
+        }
+    });
+});
 
 function fmtTs(ts) {
     return new Date(ts * 1000).toLocaleString();
@@ -254,10 +453,10 @@ function ensureDetailState(srcIp) {
 function buildMapQueryString() {
     const params = new URLSearchParams();
     params.set('window', String(currentWindowSecs()));
-    if (fProto.value)          { params.set('proto', fProto.value); }
-    if (fIp.value.trim())      { params.set('ip', fIp.value.trim()); }
-    if (fPort.value)           { params.set('port', fPort.value); }
-    if (fCountry.value.trim()) { params.set('country', fCountry.value.trim().toUpperCase()); }
+    if (fProto.value)               { params.set('proto', fProto.value); }
+    if (appliedTextFilters.ip)      { params.set('ip', appliedTextFilters.ip); }
+    if (appliedTextFilters.port)    { params.set('port', appliedTextFilters.port); }
+    if (appliedTextFilters.country) { params.set('country', appliedTextFilters.country); }
     return '?' + params.toString();
 }
 
@@ -366,7 +565,6 @@ async function fetchHome() {
             homePt = fresh;
             if (homeMarker) { homeMarker.remove(); homeMarker = null; }
             addHomeMarker();
-            fArcs.disabled = false;
         }
     } catch (_) {}
 }
@@ -594,7 +792,7 @@ function bindPopupControls(marker, row) {
 }
 
 function maybeAnimateMarker(marker, srcIp) {
-    if (seenMarkerIps.has(srcIp)) { return; }
+    if (seenMarkerIps.has(srcIp) || !fAnimations.checked) { return; }
     const el = marker.getElement();
     if (!el) { return; }
 
@@ -641,7 +839,8 @@ function renderMap(rows) {
         cluster.addLayer(marker);
         mappedCount++;
 
-        if (!isInitialLoad && homePt && fArcs.checked && arcsFired < MAX_ARCS_POLL && r.last_ts > lastMapTs) {
+        if (!isInitialLoad && homePt && fAnimations.checked &&
+            arcsFired < MAX_ARCS_POLL && r.last_ts > lastMapTs) {
             fireArc(r.lat, r.lon, color);
             arcsFired++;
         }
@@ -704,18 +903,9 @@ document.addEventListener('visibilitychange', () => {
 fetchHome().then(() => {
     addHomeMarker();
     loadFilters();
-
-    if (!homePt) {
-        fArcs.checked  = false;
-        fArcs.disabled = true;
-    } else {
-        let hasSavedPref = false;
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            hasSavedPref = raw !== null && JSON.parse(raw).arcs !== undefined;
-        } catch (_) {}
-        if (!hasSavedPref) { fArcs.checked = true; }
-    }
-
+    appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
+    appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
+    appliedTextFilters.country = validateCountryValue(fCountry.value).normalized;
+    updateTextValidity();
     pollNow();
 });

@@ -145,7 +145,8 @@ int main() {
         home_resolver = std::make_unique<msmap::HomeResolver>(home_host, geoip);
         const msmap::HomePoint hp = home_resolver->get();
         if (hp.valid) {
-            std::clog << "[INFO] home geo   : " << hp.lat << ", " << hp.lon << '\n';
+            std::clog << "[INFO] home ip    : " << hp.resolved_ip << '\n'
+                      << "[INFO] home geo   : " << hp.lat << ", " << hp.lon << '\n';
         }
         // Resolution failure warnings are emitted inside HomeResolver.
     }
@@ -173,6 +174,7 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    msmap::run_listener(listen_port, db, geoip, abuse_ptr, allow_ips);
+    msmap::run_listener(listen_port, db, geoip, abuse_ptr,
+                        home_resolver.get(), allow_ips);
     return EXIT_SUCCESS;
 }

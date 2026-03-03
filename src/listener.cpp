@@ -2,6 +2,8 @@
 #include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
+#include "home_resolver.h"
+#include "ip_utils.h"
 #include "parser.h"
 
 #include <arpa/inet.h>
@@ -57,15 +59,22 @@ constexpr std::size_t kRecvBufSize{4096};
 // ── Per-datagram handler ──────────────────────────────────────────────────────
 
 void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
-                      AbuseCache* abuse) {
+                      AbuseCache* abuse, const HomeResolver* home_resolver) {
     // Strip any trailing CR / LF that Mikrotik may append.
     while (!data.empty() && (data.back() == '\n' || data.back() == '\r')) {
         data.remove_suffix(1);
     }
     if (data.empty()) { return; } // discard blank datagrams
 
-    const ParseResult result = parse_log(data);
+    ParseResult result = parse_log(data);
     if (result.ok()) {
+        if (home_resolver != nullptr) {
+            const HomePoint hp = home_resolver->get();
+            if (hp.valid && !hp.resolved_ip.empty() &&
+                is_private_rfc1918_ipv4(result.entry.dst_ip)) {
+                result.entry.dst_ip = hp.resolved_ip;
+            }
+        }
         const GeoIpResult        geo       = geoip.lookup(result.entry.src_ip);
         const std::optional<int> threat = [&]() noexcept -> std::optional<int> {
             if (abuse == nullptr) { return std::nullopt; }
@@ -87,6 +96,7 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
+                  const HomeResolver* home_resolver,
                   const std::vector<std::uint32_t>& allow_ips,
                   const std::stop_token& stoken) {
     const ScopedFd sock{socket(AF_INET, SOCK_DGRAM, 0)};
@@ -152,7 +162,7 @@ void run_listener(int port, Database& db, GeoIp& geoip, AbuseCache* abuse,
 
         // Each UDP datagram is one complete syslog message.
         process_datagram(std::string_view{buf.data(), static_cast<std::size_t>(n)},
-                         db, geoip, abuse);
+                         db, geoip, abuse, home_resolver);
     }
 }
 

@@ -92,7 +92,30 @@ html, body {
     color: #8b949e;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 4px;
+}
+
+#f-defaults {
+    padding: 4px 7px;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #8b949e;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#f-defaults:hover {
+    background: #30363d;
+    color: #e6edf3;
 }
 
 .filter-label {
@@ -121,6 +144,11 @@ html, body {
     border-color: #58a6ff;
 }
 
+#filter-panel .filter-input-invalid {
+    border-color: #f85149;
+    box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.2);
+}
+
 .filter-check-row {
     display: flex;
     align-items: center;
@@ -130,35 +158,6 @@ html, body {
 }
 
 .filter-check-row input[type="checkbox"] { width: auto; margin: 0; }
-
-.filter-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.filter-actions button {
-    flex: 1;
-    padding: 6px 0;
-    border-radius: 4px;
-    border: 1px solid #30363d;
-    font-size: 13px;
-    cursor: pointer;
-    font-family: inherit;
-}
-
-#f-apply {
-    background: #1f6feb;
-    color: #fff;
-    border-color: #1f6feb;
-}
-#f-apply:hover { background: #388bfd; }
-
-#f-clear {
-    background: #21262d;
-    color: #8b949e;
-}
-#f-clear:hover { background: #30363d; color: #e6edf3; }
 
 /* ── Popup content ────────────────────────────────────────────────────────── */
 
@@ -278,7 +277,7 @@ html, body {
 .leaflet-popup-close-button        { color: #8b949e !important; }
 .leaflet-popup-close-button:hover  { color: #e6edf3 !important; }
 
-/* ── Arc animation – arrival pulse ring ──────────────────────────────────── */
+/* ── Marker animation – arrival pulse ring ───────────────────────────────── */
 
 @keyframes arc-arrive {
     from { transform: scale(1); opacity: 0.8; }

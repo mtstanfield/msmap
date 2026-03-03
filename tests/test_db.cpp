@@ -1,5 +1,6 @@
 #include "db.h"
 #include "geoip.h"
+#include "ip_utils.h"
 #include "parser.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -271,6 +272,18 @@ TEST_CASE("prune_expired: removes rows older than 24h relative to now")
     CHECK(rows.at(0).ts == entry.ts);
 }
 
+TEST_CASE("is_private_rfc1918_ipv4: matches RFC1918 ranges only")
+{
+    CHECK(msmap::is_private_rfc1918_ipv4("10.0.0.1"));
+    CHECK(msmap::is_private_rfc1918_ipv4("172.16.4.9"));
+    CHECK(msmap::is_private_rfc1918_ipv4("172.31.255.255"));
+    CHECK(msmap::is_private_rfc1918_ipv4("192.168.1.42"));
+    CHECK_FALSE(msmap::is_private_rfc1918_ipv4("172.15.0.1"));
+    CHECK_FALSE(msmap::is_private_rfc1918_ipv4("172.32.0.1"));
+    CHECK_FALSE(msmap::is_private_rfc1918_ipv4("8.8.8.8"));
+    CHECK_FALSE(msmap::is_private_rfc1918_ipv4("not-an-ip"));
+}
+
 TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
 {
     msmap::Database db{":memory:"};
@@ -304,6 +317,33 @@ TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
     CHECK(rows.at(1).count == 2);
     REQUIRE(rows.at(1).threat_max.has_value());
     CHECK(*rows.at(1).threat_max == 75);
+}
+
+TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto tcp = make_tcp_entry();
+    tcp.ts = 1000;
+    auto icmp = make_icmp_entry();
+    icmp.ts = 2000;
+
+    REQUIRE(db.insert(tcp, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(icmp, msmap::GeoIpResult{}));
+
+    msmap::QueryFilters filtered;
+    filtered.exclude_icmp = true;
+    const auto rows = db.query_connections(filtered);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows.front().proto == "TCP");
+
+    msmap::QueryFilters icmp_only;
+    icmp_only.exclude_icmp = true;
+    icmp_only.proto = "ICMP";
+    const auto icmp_rows = db.query_connections(icmp_only);
+    REQUIRE(icmp_rows.size() == 1);
+    CHECK(icmp_rows.front().proto == "ICMP");
 }
 
 TEST_CASE("query_detail_page: returns next cursor when another page exists")

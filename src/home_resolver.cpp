@@ -83,7 +83,7 @@ HomePoint HomeResolver::resolve_once() const noexcept
         return {};
     }
 
-    return HomePoint{true, geo.lat, geo.lon};
+    return HomePoint{true, geo.lat, geo.lon, resolved};
 }
 
 void HomeResolver::worker() noexcept
@@ -111,13 +111,14 @@ void HomeResolver::worker() noexcept
         // Detect IP change by comparing coordinates (sufficient proxy — same
         // IP always produces the same GeoIP result).
         const bool changed = (!result_.valid ||
+                              fresh.resolved_ip != result_.resolved_ip ||
                               fresh.lat != result_.lat ||
                               fresh.lon != result_.lon);
         result_ = fresh;
 
         if (changed) {
             std::clog << "[INFO] HomeResolver: '" << hostname_
-                      << "' re-resolved to new location ("
+                      << "' re-resolved to " << fresh.resolved_ip << " ("
                       << fresh.lat << ", " << fresh.lon << ")\n";
         }
     }

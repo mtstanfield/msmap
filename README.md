@@ -263,19 +263,21 @@ from `GET /api/detail`.
 | Filter | Description |
 |---|---|
 | Time range | Last 15 min / 1 h / 6 h / 24 h |
-| Protocol | All / TCP / UDP / ICMP |
+| Protocol | All / TCP / UDP |
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
 | Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
 | Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
 | Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
-| Arc animation | Toggle arc animation on/off (requires `MSMAP_HOME_HOST`) |
+| Animations | Toggle marker ripple and home-directed arc animation on/off |
 
 The Tor/datacenter/residential toggles are OR-combined when multiple are active.
 When none are checked all connections are shown regardless of enrichment status.
+Selects and toggles apply immediately. Text filters auto-apply once the value is
+valid, and `Defaults` resets the panel to the standard 15-minute view.
 
-### Arc animation
+### Animations
 
 When `MSMAP_HOME_HOST` is set, msmap resolves the hostname to an IPv4 address at
 startup, GeoIP-locates it, and serves the coordinates via `GET /api/home`.  The
@@ -296,8 +298,13 @@ appears in the current browser session. The ripple does not replay on later
 polls for the same IP.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
-`[WARN]` is logged at startup and the feature is silently disabled — the toggle
-is still present in the filter panel but has no effect.
+`[WARN]` is logged at startup and only the home-directed arcs are disabled. The
+`Animations` toggle still controls marker ripple.
+
+When home resolution succeeds, newly ingested RFC1918 destination IPs are
+rewritten to the resolved home IP before storage so popup detail and raw drill
+downs show the public home target instead of private LAN addresses. Existing
+stored rows are left unchanged and age out normally.
 
 ### Connection popup
 

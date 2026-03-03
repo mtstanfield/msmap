@@ -17,6 +17,7 @@ struct HomePoint {
     bool   valid{false};
     double lat{0.0};
     double lon{0.0};
+    std::string resolved_ip;
 };
 
 // ── HomeResolver ──────────────────────────────────────────────────────────────

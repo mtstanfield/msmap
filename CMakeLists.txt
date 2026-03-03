@@ -251,6 +251,7 @@ if(MSMAP_ENABLE_TESTS)
         src/abuse_cache.cpp
         src/db.cpp
         src/geoip.cpp
+        src/home_resolver.cpp
         src/parser.cpp)
 
     target_compile_features(test_integration PRIVATE cxx_std_23)

@@ -19,7 +19,10 @@
 
     <!-- Filter panel (open by default) -->
     <div id="filter-panel">
-        <div class="filter-title">Filters</div>
+        <div class="filter-header">
+            <div class="filter-title">Filters</div>
+            <button id="f-defaults" type="button">Defaults</button>
+        </div>
 
         <label class="filter-label" for="f-time">Time range</label>
         <select id="f-time">
@@ -34,7 +37,6 @@
             <option value="">All</option>
             <option value="TCP">TCP</option>
             <option value="UDP">UDP</option>
-            <option value="ICMP">ICMP</option>
         </select>
 
         <label class="filter-label" for="f-ip">Source IP</label>
@@ -48,9 +50,9 @@
         <input id="f-country" type="text" placeholder="US" maxlength="2"
                autocomplete="off" spellcheck="false" style="text-transform:uppercase">
 
-        <label class="filter-label filter-check-row" for="f-arcs">
-            <input type="checkbox" id="f-arcs">
-            Arc animation
+        <label class="filter-label filter-check-row" for="f-animations">
+            <input type="checkbox" id="f-animations">
+            Animations
         </label>
         <label class="filter-label filter-check-row" for="f-tor">
             <input type="checkbox" id="f-tor">
@@ -64,11 +66,6 @@
             <input type="checkbox" id="f-residential">
             Residential
         </label>
-
-        <div class="filter-actions">
-            <button id="f-apply">Apply</button>
-            <button id="f-clear">Clear</button>
-        </div>
     </div>
 
     <!-- Status bar -->

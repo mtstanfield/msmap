@@ -152,6 +152,7 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
 {
     QueryFilters f;
     f.limit = 100;
+    f.exclude_icmp = true;
 
     const char* v = nullptr;
 
@@ -217,6 +218,7 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
 MapFilters parse_map_filters(MHD_Connection* conn)
 {
     MapFilters f;
+    f.exclude_icmp = true;
 
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
     std::int64_t window_secs = 900;

@@ -181,7 +181,8 @@ docker build -t msmap .
       CartoDB Dark Matter tiles; CircleMarker → no icon image assets needed)
 - [x] Filter/time-range panel: time range (15 min–24 h), protocol, src IP, dst port,
       country; client-side enrichment toggles: Tor exits, Datacenter, Residential,
-      Arc animation; map polls aggregate markers instead of capped raw rows
+      Animations; auto-apply with a Defaults reset; map polls aggregate markers
+      instead of capped raw rows
 - [x] Marker popup: aggregate summary plus condensed raw-event history viewer with
       older/newer navigation and lazy paging
 - [x] Marker motion: one-shot ripple for source IPs first seen in the current
