@@ -105,6 +105,53 @@
 <body>
     <div class="mock-stage">
         <section class="mock-panel">
+            <h1>Legend</h1>
+            <p>Current filter-panel legend with live symbol key styling.</p>
+            <div class="mock-map" style="min-height: 0;">
+                <div id="filter-legend" style="width: 200px; margin-top: 0;">
+                    <div id="legend-home">
+                        <div class="legend-title">Home</div>
+                        <div class="legend-row">
+                            <span class="legend-home-swatch" aria-hidden="true"></span>
+                            <span>Configured home location</span>
+                        </div>
+                    </div>
+                    <div class="legend-title">Threat</div>
+                    <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
+                    <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
+                    <div class="legend-row"><span class="legend-swatch threat-low"></span><span>Low</span></div>
+                    <div class="legend-row"><span class="legend-swatch threat-medium"></span><span>Medium</span></div>
+                    <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
+                    <div class="legend-title">Spikes</div>
+                    <div class="legend-notes">
+                        <div class="legend-note">
+                            <span class="legend-symbol legend-symbol-cluster" aria-hidden="true">
+                                <span class="legend-symbol-cluster-core"></span>
+                                <i class="cluster-spike-badge">!</i>
+                            </span>
+                            <span class="legend-note-value">Cluster spike</span>
+                        </div>
+                        <div class="legend-note">
+                            <span class="legend-symbol legend-symbol-node" aria-hidden="true">!</span>
+                            <span class="legend-note-value">Node spike</span>
+                        </div>
+                    </div>
+                    <div class="legend-title">Intel</div>
+                    <div class="legend-notes">
+                        <div class="legend-note">
+                            <span class="popup-chip popup-chip-intel">Tor</span>
+                            <span class="legend-note-value">Tor exit</span>
+                        </div>
+                        <div class="legend-note">
+                            <span class="popup-chip popup-chip-intel">DROP</span>
+                            <span class="legend-note-value">Spamhaus DROP</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel">
             <h1>Desktop Popup</h1>
             <p>Representative drilldown content at typical popup width.</p>
             <div class="mock-map">

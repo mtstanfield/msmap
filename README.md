@@ -329,9 +329,6 @@ filter state is mirrored into sparse query parameters, so copied URLs and
 bookmarks reopen the same view. On mobile-sized coarse-pointer UIs, the
 filter/legend panel starts closed behind the gear toggle to keep the map clear.
 
-The legend also makes the GeoIP precision explicit: map locations are
-approximate and should be read as placement hints, not exact device locations.
-
 ### Animations
 
 When `MSMAP_HOME_HOST` is set, msmap resolves the hostname to an IPv4 address at
@@ -353,9 +350,10 @@ browser then:
    home-point changes.
 
 In the `15m` and `1h` views, sources with a dense short-window burst of hits
-also get a stronger marker pulse so obvious spikes stand out without waiting
-for a popup drilldown. Clusters containing at least one such source get a
-small light `!` badge so they read as worth opening before spiderfying.
+also get a stronger marker pulse plus a centred `!` marker overlay so obvious
+spikes stand out without waiting for a popup drilldown. Clusters containing at
+least one such source get a small light `!` badge so they read as worth
+opening before spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
@@ -373,6 +371,8 @@ Clicking a marker shows:
 - First/last seen timestamps for the aggregate source IP marker
 - Hit count within the selected window
 - Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
+  Marker placement remains approximate and should be read as a location hint,
+  not an exact device position.
 - **Threat score** chip from AbuseIPDB
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** badge from Tor Project bulk exit data
