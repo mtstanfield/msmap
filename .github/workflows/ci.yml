@@ -7,6 +7,8 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  schedule:
+    - cron: '0 6 * * 6'
 
 # Minimal permissions at the workflow level; 'publish' overrides with packages:write.
 permissions:
@@ -119,7 +121,9 @@ jobs:
     needs: [build-test, lint]
     # Only push images for commits that reach master; never for PRs
     # (forks cannot access GITHUB_TOKEN secrets for the target repo).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      github.event_name == 'schedule'
     runs-on: ubuntu-latest
 
     permissions:
