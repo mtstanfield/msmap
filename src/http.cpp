@@ -5,8 +5,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <microhttpd.h>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,7 +28,6 @@ namespace {
 
 // ── JSON serialisation ────────────────────────────────────────────────────────
 
-/// Serialise a vector of ConnectionRow objects as a JSON array.
 std::string connections_to_json(const std::vector<ConnectionRow>& rows)
 {
     std::string out;
@@ -65,6 +66,72 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
     return out;
 }
 
+std::string detail_page_to_json(const DetailPage& page)
+{
+    std::string out;
+    out.reserve(page.rows.size() * 256 + 64);
+    out += "{\"rows\":";
+    out += connections_to_json(page.rows);
+    out += ",\"next_cursor\":";
+    json::append_int_or_null(out, page.next_cursor);
+    out += '}';
+    return out;
+}
+
+std::string map_rows_to_json(const std::vector<MapRow>& rows,
+                             std::int64_t window_secs,
+                             std::int64_t generated_at)
+{
+    std::string out;
+    out.reserve(rows.size() * 160 + 128);
+    out += R"({"mode":"aggregate","window":)";
+    out += std::to_string(window_secs);
+    out += ",\"generated_at\":";
+    out += std::to_string(generated_at);
+    out += ",\"rows\":[";
+
+    bool first = true;
+    for (const MapRow& row : rows) {
+        if (!first) {
+            out += ',';
+        }
+        first = false;
+
+        out += '{';
+        out += "\"src_ip\":";
+        json::append_string(out, row.src_ip);
+        out += ",\"first_ts\":";
+        out += std::to_string(row.first_ts);
+        out += ",\"last_ts\":";
+        out += std::to_string(row.last_ts);
+        out += ",\"count\":";
+        out += std::to_string(row.count);
+        out += ",\"lat\":";
+        json::append_double_or_null(out, row.lat);
+        out += ",\"lon\":";
+        json::append_double_or_null(out, row.lon);
+        out += ",\"country\":";
+        json::append_string_or_null(out, row.country);
+        out += ",\"asn\":";
+        json::append_string_or_null(out, row.asn);
+        out += ",\"threat_latest\":";
+        json::append_int_or_null(out, row.threat_latest);
+        out += ",\"threat_max\":";
+        json::append_int_or_null(out, row.threat_max);
+        out += ",\"sample_dst_port\":";
+        json::append_int_or_null(out, row.sample_dst_port);
+        out += ",\"usage_type\":";
+        json::append_string_or_null(out, row.usage_type);
+        out += ",\"is_tor\":";
+        if (row.is_tor.has_value()) { out += (*row.is_tor ? "true" : "false"); }
+        else                        { out += "null"; }
+        out += '}';
+    }
+
+    out += "]}";
+    return out;
+}
+
 // ── Query-parameter parsing ────────────────────────────────────────────────────
 
 /// Return a string from a raw C param value only if it fits within max_len.
@@ -81,9 +148,10 @@ std::string safe_param(const char* v, std::size_t max_len)
 /// Parse URL query parameters from an MHD connection into a QueryFilters.
 /// All fields are validated and range-checked; invalid values are silently
 /// discarded (treated as "no constraint") rather than propagated.
-QueryFilters parse_filters(MHD_Connection* conn)
+QueryFilters parse_connection_filters(MHD_Connection* conn)
 {
     QueryFilters f;
+    f.limit = 100;
 
     const char* v = nullptr;
 
@@ -126,16 +194,93 @@ QueryFilters parse_filters(MHD_Connection* conn)
         }
     }
 
-    // Row limit: cap at the documented maximum of 25 000.
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "cursor");
+    if (v != nullptr) {
+        const int n = static_cast<int>(std::strtol(v, nullptr, 10));
+        if (n >= 0) {
+            f.offset = n;
+        }
+    }
+
+    // Row limit: cap detail pages to 500.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
     if (v != nullptr) {
         const int n = static_cast<int>(std::strtol(v, nullptr, 10));
-        if (n > 0 && n <= 25000) {
+        if (n > 0 && n <= 500) {
             f.limit = n;
         }
     }
 
     return f;
+}
+
+MapFilters parse_map_filters(MHD_Connection* conn)
+{
+    MapFilters f;
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    std::int64_t window_secs = 900;
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "window");
+        v != nullptr) {
+        const std::int64_t n = std::strtoll(v, nullptr, 10);
+        if (n == 900 || n == 3600 || n == 21600 || n == 86400) {
+            window_secs = n;
+        }
+    }
+    f.since = now - window_secs;
+    f.until = now;
+
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
+        v != nullptr) {
+        f.src_ip = safe_param(v, 45);
+    }
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
+        v != nullptr) {
+        f.country = safe_param(v, 2);
+    }
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
+        v != nullptr) {
+        const std::string raw = safe_param(v, 4);
+        if (raw == "TCP" || raw == "UDP" || raw == "ICMP") {
+            f.proto = raw;
+        }
+    }
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");
+        v != nullptr) {
+        const long n = std::strtol(v, nullptr, 10);
+        if (n >= 1 && n <= 65535) {
+            f.dst_port = static_cast<int>(n);
+        }
+    }
+
+    return f;
+}
+
+std::int64_t map_window_from_request(MHD_Connection* conn)
+{
+    const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "window");
+    if (v == nullptr) {
+        return 900;
+    }
+    const std::int64_t n = std::strtoll(v, nullptr, 10);
+    return (n == 900 || n == 3600 || n == 21600 || n == 86400) ? n : 900;
+}
+
+std::string make_etag(std::string_view body)
+{
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const char c : body) {
+        const auto byte = static_cast<unsigned char>(c);
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+    }
+    return "\"" + std::to_string(hash) + "\"";
+}
+
+bool client_has_etag(MHD_Connection* conn, std::string_view etag)
+{
+    const char* raw = MHD_lookup_connection_value(conn, MHD_HEADER_KIND, "If-None-Match");
+    return raw != nullptr && std::string_view{raw} == etag;
 }
 
 // ── Response helper ────────────────────────────────────────────────────────────
@@ -144,7 +289,9 @@ QueryFilters parse_filters(MHD_Connection* conn)
 MHD_Result send_response(MHD_Connection*    conn,
                           unsigned int       status,
                           const char*        content_type,
-                          std::string_view   body)
+                          std::string_view   body,
+                          std::string_view   cache_control = "no-store",
+                          std::string_view   etag = {})
 {
     // MHD_create_response_from_buffer takes non-const void* (C API wart).
     // MHD_RESPMEM_MUST_COPY means MHD copies the buffer before returning, so
@@ -163,13 +310,10 @@ MHD_Result send_response(MHD_Connection*    conn,
     (void)MHD_add_response_header(resp, "X-Frame-Options",           "SAMEORIGIN");
     (void)MHD_add_response_header(resp, "Referrer-Policy",
                                         "strict-origin-when-cross-origin");
-    // HTML: allow proxy/browser revalidation but not indefinite caching.
-    // All other responses (API, errors): never cache — live data changes.
-    const char* const cache =
-        (std::string_view{content_type}.starts_with("text/html"))
-            ? "no-cache"
-            : "no-store";
-    (void)MHD_add_response_header(resp, "Cache-Control", cache);
+    (void)MHD_add_response_header(resp, "Cache-Control", cache_control.data());
+    if (!etag.empty()) {
+        (void)MHD_add_response_header(resp, "ETag", etag.data());
+    }
     const MHD_Result ret = MHD_queue_response(conn, status, resp);
     MHD_destroy_response(resp);
     return ret;
@@ -199,11 +343,28 @@ MHD_Result handle_request(void*            cls,
 
     const std::string_view url_sv{url};
 
-    if (url_sv == "/api/connections") {
-        const QueryFilters filters  = parse_filters(conn);
-        const auto         rows     = ctx->db->query_connections(filters);
+    if (url_sv == "/api/map") {
+        const std::int64_t window_secs = map_window_from_request(conn);
+        const auto rows = ctx->db->query_map_rows(parse_map_filters(conn));
+        const std::string body = map_rows_to_json(
+            rows, window_secs, static_cast<std::int64_t>(std::time(nullptr)));
+        const std::string etag = make_etag(body);
+        if (client_has_etag(conn, etag)) {
+            return send_response(conn, MHD_HTTP_NOT_MODIFIED,
+                                 "application/json", {},
+                                 "public, max-age=30, stale-while-revalidate=60, stale-if-error=300",
+                                 etag);
+        }
+        return send_response(conn, MHD_HTTP_OK, "application/json", body,
+                             "public, max-age=30, stale-while-revalidate=60, stale-if-error=300",
+                             etag);
+    }
+
+    if (url_sv == "/api/detail") {
+        const QueryFilters filters  = parse_connection_filters(conn);
+        const DetailPage   page     = ctx->db->query_detail_page(filters);
         return send_response(conn, MHD_HTTP_OK,
-                             "application/json", connections_to_json(rows));
+                             "application/json", detail_page_to_json(page));
     }
 
     if (url_sv == "/api/home") {
@@ -223,13 +384,22 @@ MHD_Result handle_request(void*            cls,
         body += ",\"lon\":";
         json::append_double_or_null(body, std::optional<double>{hp.lon});
         body += '}';
-        return send_response(conn, MHD_HTTP_OK, "application/json", body);
+        return send_response(conn, MHD_HTTP_OK, "application/json", body,
+                             "public, max-age=300");
     }
 
     if (url_sv == "/" || url_sv == "/index.html") {
+        static const std::string k_index_etag = make_etag(msmap::web::kIndexHtml);
+        if (client_has_etag(conn, k_index_etag)) {
+            return send_response(conn, MHD_HTTP_NOT_MODIFIED,
+                                 "text/html; charset=utf-8", {},
+                                 "public, max-age=300", k_index_etag);
+        }
         return send_response(conn, MHD_HTTP_OK,
                              "text/html; charset=utf-8",
-                             msmap::web::kIndexHtml);
+                             msmap::web::kIndexHtml,
+                             "public, max-age=300",
+                             k_index_etag);
     }
 
     return send_response(conn, MHD_HTTP_NOT_FOUND,
@@ -242,7 +412,8 @@ MHD_Result handle_request(void*            cls,
 
 HttpServer::HttpServer(std::uint16_t       port,
                        Database&           db,
-                       const HomeResolver* home_resolver) noexcept
+                       const HomeResolver* home_resolver,
+                       unsigned int        thread_pool_size) noexcept
     : db_(db), ctx_{&db_, home_resolver}
 {
     // Pass &ctx_ as cls so handle_request can reach both the database and the
@@ -256,6 +427,9 @@ HttpServer::HttpServer(std::uint16_t       port,
         port,
         nullptr, nullptr,         // no access-policy callback
         handle_request, &ctx_,    // request handler + cls
+        MHD_OPTION_THREAD_POOL_SIZE, thread_pool_size,
+        MHD_OPTION_CONNECTION_TIMEOUT, 10U,
+        MHD_OPTION_CONNECTION_LIMIT, 1024U,
         MHD_OPTION_END);
 
     if (raw == nullptr) {

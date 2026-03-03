@@ -26,6 +26,7 @@ constexpr const char* kDefaultCityMmdb  {"/var/lib/msmap/geoip/GeoLite2-City.mmd
 constexpr const char* kDefaultAsnMmdb   {"/var/lib/msmap/geoip/GeoLite2-ASN.mmdb"};
 constexpr int         kDefaultListenPort{5140};
 constexpr int         kDefaultHttpPort  {8080};
+constexpr unsigned int kDefaultHttpThreads{4};
 
 /// Return env var value if set, otherwise the compile-time default.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -76,6 +77,20 @@ int env_int(const char* var, int fallback)
         : fallback;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+unsigned int env_uint_bounded(const char* var, unsigned int fallback,
+                              unsigned int min_val, unsigned int max_val)
+{
+    const char* val = std::getenv(var); // NOLINT(concurrency-mt-unsafe)
+    if (val == nullptr || *val == '\0') { return fallback; }
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(val, &end, 10);
+    if (*end != '\0' || parsed < min_val || parsed > max_val) {
+        return fallback;
+    }
+    return static_cast<unsigned int>(parsed);
+}
+
 } // namespace
 
 int main() {
@@ -87,6 +102,8 @@ int main() {
     const std::string home_host   = env_or("MSMAP_HOME_HOST",    "");
     const int         listen_port = env_int("MSMAP_LISTEN_PORT",  kDefaultListenPort);
     const int         http_port   = env_int("MSMAP_HTTP_PORT",    kDefaultHttpPort);
+    const unsigned int http_threads =
+        env_uint_bounded("MSMAP_HTTP_THREADS", kDefaultHttpThreads, 1U, 16U);
     const std::vector<std::uint32_t> allow_ips =
         parse_allow_ips(env_or("MSMAP_INGEST_ALLOW", ""));
 
@@ -95,7 +112,7 @@ int main() {
               << "[INFO] asn mmdb  : " << asn_path    << '\n'
               << "[INFO] home host : " << (home_host.empty() ? "(not set)" : home_host) << '\n'
               << "[INFO] listen    : 0.0.0.0:"   << listen_port << " (UDP/syslog)\n"
-              << "[INFO] http      : 0.0.0.0:"   << http_port   << '\n';
+              << "[INFO] http      : 0.0.0.0:"   << http_port   << " threads=" << http_threads << '\n';
 
     if (allow_ips.empty()) {
         std::clog << "[INFO] ingest    : open (no allowlist)\n";
@@ -114,6 +131,7 @@ int main() {
         std::clog << "[FATAL] failed to open database: " << db_path << '\n';
         return EXIT_FAILURE;
     }
+    (void)db.prune_expired();
 
     // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
     msmap::GeoIp geoip{city_path, asn_path};
@@ -148,7 +166,7 @@ int main() {
     // HttpServer's destructor calls MHD_stop_daemon which joins its thread
     // before returning — ensuring no handler can dereference a stale pointer.
     msmap::HttpServer const http{static_cast<std::uint16_t>(http_port), db,
-                                 home_resolver.get()};
+                                 home_resolver.get(), http_threads};
     if (!http.valid()) {
         std::clog << "[FATAL] HTTP server failed to start on port "
                   << http_port << '\n';

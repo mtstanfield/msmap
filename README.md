@@ -20,7 +20,7 @@ Mikrotik router
     ▼
 msmap binary
     ├── parser        (hand-written tokenizer, fuzz-tested)
-    ├── SQLite DB     (WAL mode, 30-day retention)
+    ├── SQLite DB     (WAL mode, 24h retention)
     ├── GeoIP         (libmaxminddb + local GeoLite2-City.mmdb)
     ├── OSINT cache   (AbuseIPDB results cached in SQLite)
     └── HTTP server   (libmicrohttpd, port 8080)
@@ -59,6 +59,7 @@ TLS termination and auth live outside the binary (nginx/Caddy reverse proxy).
 | `MSMAP_ASN_MMDB` | `/var/lib/msmap/geoip/GeoLite2-ASN.mmdb` | GeoIP ASN database |
 | `MSMAP_LISTEN_PORT` | `5140` | UDP syslog ingest port |
 | `MSMAP_HTTP_PORT` | `8080` | Web UI / API port |
+| `MSMAP_HTTP_THREADS` | `4` | libmicrohttpd thread-pool size (`1`-`16`) |
 | `MSMAP_INGEST_ALLOW` | _(empty — accept all)_ | Comma-separated IPv4 allowlist for ingest |
 | `ABUSEIPDB_API_KEY` | _(empty — disabled)_ | AbuseIPDB free-tier API key |
 | `MSMAP_HOME_HOST` | _(empty — disabled)_ | Hostname or IPv4 address of your public-facing host; resolved at startup via GeoIP to place a home marker and enable arc animation |
@@ -163,12 +164,99 @@ Then under **System → Logging**, add a rule:
 Set `MSMAP_INGEST_ALLOW` to the router's LAN IP to reject syslog from
 unexpected sources.
 
+### nginx reference config
+
+Production should put nginx in front of `msmap` for TLS termination, gzip,
+microcaching, request coalescing, and basic rate limiting. The public hot path
+is `GET /` plus `GET /api/map`; the raw drilldown endpoint `GET /api/detail`
+should not be cached.
+
+Sanitized example:
+
+```nginx
+proxy_cache_path /var/cache/nginx/msmap_api levels=1:2 keys_zone=msmap_api:64m max_size=4g inactive=10m use_temp_path=off;
+limit_req_zone $binary_remote_addr zone=msmap_api_ratelimit:10m rate=1r/s;
+limit_conn_zone $binary_remote_addr zone=msmap_api_conn:10m;
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    server_name map.example.invalid;
+
+    include /config/nginx/ssl.conf;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json text/plain text/css application/javascript text/javascript text/html image/svg+xml;
+
+    location / {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+        set $upstream_app 192.0.2.10;
+        set $upstream_port 8080;
+        set $upstream_proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 2s;
+        proxy_send_timeout 15s;
+        proxy_read_timeout 15s;
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+    }
+
+    location /api/map {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+        set $upstream_app 192.0.2.10;
+        set $upstream_port 8080;
+        set $upstream_proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_cache msmap_api;
+        proxy_cache_lock on;
+        proxy_cache_background_update on;
+        proxy_cache_use_stale updating error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_cache_valid 200 30s;
+        proxy_cache_valid 404 10s;
+        proxy_buffering on;
+        proxy_buffers 32 16k;
+        proxy_busy_buffers_size 256k;
+        limit_req zone=msmap_api_ratelimit burst=20 nodelay;
+        limit_conn msmap_api_conn 20;
+        add_header X-Cache-Status $upstream_cache_status always;
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+    }
+
+    location /api/detail {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+        set $upstream_app 192.0.2.10;
+        set $upstream_port 8080;
+        set $upstream_proto http;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        limit_req zone=msmap_api_ratelimit burst=5 nodelay;
+        limit_conn msmap_api_conn 5;
+        proxy_connect_timeout 2s;
+        proxy_send_timeout 15s;
+        proxy_read_timeout 15s;
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+    }
+}
+```
+
 ---
 
 ## Web UI
 
-The UI is a single-page Leaflet.js map served at port 8080. Connections are
-plotted as clustered markers; click any marker to open a detail popup.
+The UI is a single-page Leaflet.js map served at port 8080. The main map polls
+`GET /api/map`, which returns one aggregate marker per source IP for the
+selected window. This lets the browser render the complete 24h view without the
+old 25,000-raw-row ceiling. Clicking a marker then lazy-loads recent raw events
+from `GET /api/detail`.
 
 ### Filter panel
 
@@ -179,7 +267,7 @@ plotted as clustered markers; click any marker to open a detail popup.
 | Source IP | Exact source IP match |
 | Dst Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Unique IPs | Deduplicate — show only the most recent connection per source IP |
+| Unique IPs | Retained for compatibility; the map feed is aggregate-per-source-IP by default |
 | Tor exits | Show only confirmed Tor exit nodes (requires AbuseIPDB) |
 | Datacenter | Show only `Data Center/Web Hosting/Transit` and `Content Delivery Network` IPs (requires AbuseIPDB) |
 | Residential | Show only `Fixed Line ISP` and `Mobile ISP` IPs (requires AbuseIPDB) |
@@ -212,11 +300,13 @@ is still present in the filter panel but has no effect.
 
 Clicking a marker shows:
 
-- Timestamp, source IP:port, destination IP:port, protocol, TCP flags
+- First/last seen timestamps for the aggregate source IP marker
+- Hit count within the selected window
 - Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
-- **Threat score** — AbuseIPDB abuse confidence 0–100
+- **Threat score** — latest and/or maximum AbuseIPDB abuse confidence 0–100
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** — `yes` (highlighted) or `no`
+- Recent raw events loaded on demand from `GET /api/detail`
 
 The OSINT fields appear once the background worker has resolved the IP against
 AbuseIPDB. Results are cached for 30 days; an API key is not required to view
