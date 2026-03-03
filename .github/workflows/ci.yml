@@ -183,3 +183,25 @@ jobs:
             type=gha,scope=dev
             type=gha,scope=release
           cache-to: type=gha,scope=release,mode=max
+
+  cleanup-registry:
+    name: Cleanup Registry
+    needs: [publish]
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Keep a small rollback window of recent published image versions while
+      # pruning older GHCR entries created by the rolling sha-* tags.
+      - name: Delete old GHCR versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: msmap
+          package-type: container
+          min-versions-to-keep: 30
