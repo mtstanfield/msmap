@@ -58,7 +58,38 @@ struct QueryFilters {
     std::string  country;       // exact match;  empty = any
     std::string  proto;         // exact match;  empty = any
     int          dst_port{0};   // exact match;  0 = any
+    int          offset{0};     // pagination offset; 0 = first page
     int          limit{25000};  // row cap (enforced max: 25 000)
+};
+
+struct MapFilters {
+    std::int64_t since{0};      // ts >= since
+    std::int64_t until{0};      // ts <= until; 0 = now
+    std::string  src_ip;        // exact match; empty = any
+    std::string  country;       // exact match; empty = any
+    std::string  proto;         // exact match; empty = any
+    int          dst_port{0};   // exact match; 0 = any
+};
+
+struct MapRow {
+    std::string            src_ip;
+    std::int64_t           first_ts{};
+    std::int64_t           last_ts{};
+    int                    count{};
+    std::optional<double>  lat;
+    std::optional<double>  lon;
+    std::string            country;
+    std::string            asn;
+    std::optional<int>     threat_latest;
+    std::optional<int>     threat_max;
+    std::optional<int>     sample_dst_port;
+    std::string            usage_type;
+    std::optional<bool>    is_tor;
+};
+
+struct DetailPage {
+    std::vector<ConnectionRow> rows;
+    std::optional<int>         next_cursor;
 };
 
 // ── Database class ────────────────────────────────────────────────────────────
@@ -95,12 +126,24 @@ public:
     [[nodiscard]] std::vector<ConnectionRow>
         query_connections(const QueryFilters& filters) const noexcept;
 
+    /// Return a complete per-source aggregate set for the requested window and filters.
+    /// Used by the public map endpoint so the browser can render the full 24h view
+    /// without a hard row ceiling on raw events.
+    [[nodiscard]] std::vector<MapRow>
+        query_map_rows(const MapFilters& filters) const noexcept;
+
+    /// Return one bounded detail page for a drilldown query.
+    [[nodiscard]] DetailPage
+        query_detail_page(const QueryFilters& filters) const noexcept;
+
     /// Delete all rows with ts < cutoff_ts and return the count removed.
     /// Thread-safe: acquires an internal mutex.
     /// Production code uses the automatic trigger inside insert() (every 10 000
-    /// rows, one-year cutoff); call this directly when a specific cutoff is
+    /// rows, 24h cutoff); call this directly when a specific cutoff is
     /// needed (manual maintenance, tests).
     int prune_older_than(std::int64_t cutoff_ts) noexcept;
+    /// Prune using the production retention window relative to now.
+    int prune_expired() noexcept;
 
 private:
     bool exec(const char* sql) noexcept;

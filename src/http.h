@@ -33,10 +33,8 @@ struct MhdDaemonCloser {
 /// when this object is destroyed.
 ///
 /// Endpoints:
-///   GET /api/connections   — JSON array, filterable via query parameters:
-///                             since=<epoch>  until=<epoch>  ip=<addr>
-///                             country=<CC>   proto=<TCP|UDP|ICMP>
-///                             port=<n>       limit=<n>  (default 25 000, max 25 000)
+///   GET /api/map           — aggregate JSON object for the requested window
+///   GET /api/detail        — paginated raw rows for popup drilldown
 ///   GET /api/home          — JSON {lat,lon} if MSMAP_HOME_HOST is set, else 404
 ///   GET /                  — full map UI (HTML)
 class HttpServer {
@@ -45,7 +43,8 @@ public:
     /// /api/home will return 404 in that case.
     HttpServer(std::uint16_t       port,
                Database&           db,
-               const HomeResolver* home_resolver) noexcept;
+               const HomeResolver* home_resolver,
+               unsigned int        thread_pool_size = 4) noexcept;
 
     // Destructor defined in http.cpp (stops MHD daemon, joins thread).
     ~HttpServer() noexcept;

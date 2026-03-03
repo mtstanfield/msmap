@@ -3,6 +3,7 @@
 #include "parser.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <ctime>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -250,4 +251,77 @@ TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     CHECK(rows.size() == 2);
+}
+
+TEST_CASE("prune_expired: removes rows older than 24h relative to now")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.ts = static_cast<std::int64_t>(std::time(nullptr)) - (25 * 3600);
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    entry.ts = static_cast<std::int64_t>(std::time(nullptr)) - 60;
+    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+
+    CHECK(db.prune_expired() == 1);
+
+    const auto rows = db.query_connections(msmap::QueryFilters{});
+    REQUIRE(rows.size() == 1);
+    CHECK(rows.at(0).ts == entry.ts);
+}
+
+TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.asn = "AS64500 Example";
+
+    entry.ts = 1000;
+    REQUIRE(db.insert(entry, geo, 10));
+    entry.ts = 1500;
+    REQUIRE(db.insert(entry, geo, 75));
+
+    auto other = entry;
+    other.src_ip = "203.0.113.44";
+    other.ts = 2000;
+    REQUIRE(db.insert(other, geo, 25));
+
+    msmap::MapFilters filters;
+    filters.since = 1;
+    filters.until = 5000;
+
+    const auto rows = db.query_map_rows(filters);
+    REQUIRE(rows.size() == 2);
+    REQUIRE(rows.at(0).src_ip == "203.0.113.44");
+    REQUIRE(rows.at(1).src_ip == entry.src_ip);
+    CHECK(rows.at(1).count == 2);
+    REQUIRE(rows.at(1).threat_max.has_value());
+    CHECK(*rows.at(1).threat_max == 75);
+}
+
+TEST_CASE("query_detail_page: returns next cursor when another page exists")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    for (int i = 0; i < 3; ++i) {
+        entry.ts = 1000 + i;
+        REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    }
+
+    msmap::QueryFilters filters;
+    filters.src_ip = entry.src_ip;
+    filters.limit = 2;
+    const auto page = db.query_detail_page(filters);
+    REQUIRE(page.rows.size() == 2);
+    REQUIRE(page.next_cursor.has_value());
+    CHECK(*page.next_cursor == 2);
 }
