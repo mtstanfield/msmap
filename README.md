@@ -339,8 +339,8 @@ browser then:
    outside the cluster layer).
 2. For newly active source IPs in a poll batch, selects the most relevant
    distinct origins and draws animated bezier arcs from those points toward
-   home. Arcs are ranked by recency, threat, and hit count, and are coloured to
-   match the threat level of the source.
+   home. Arcs are ranked by recency first and threat second, and are coloured
+   to match the threat level of the source.
 3. The arc line draws itself over 0.8 s (`stroke-dashoffset` CSS transition),
    with a dot tracking the head; a pulse ring fires on arrival. The assembly
    fades out and is removed after roughly 1.1 s total.
@@ -357,7 +357,7 @@ opening before spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
-`Animations` toggle still controls these marker highlight effects.
+`Animations` toggle still controls these arc and spike highlight effects.
 
 When home resolution succeeds, newly ingested RFC1918 destination IPs are
 rewritten to the resolved home IP before storage so popup detail and raw drill

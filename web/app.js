@@ -224,7 +224,6 @@ let homePt     = null;
 let homeMarker = null;
 // Stop retrying /api/home after a stable 404; the config only changes on reload.
 let homeFetchDisabled = false;
-const seenMarkerIps = new Set();
 const detailStateByIp = new Map();
 const activeArcs = new Set();
 
@@ -1095,7 +1094,6 @@ function makeArcCandidate(row, color) {
 function compareArcCandidates(left, right) {
     if (left.lastTs !== right.lastTs) { return right.lastTs - left.lastTs; }
     if (left.threat !== right.threat) { return right.threat - left.threat; }
-    if (left.count !== right.count) { return right.count - left.count; }
     return left.srcIp.localeCompare(right.srcIp);
 }
 
@@ -1284,17 +1282,6 @@ function bindPopupControls(row) {
             showNewerDetail(row);
         }
     });
-}
-
-function maybeAnimateMarker(marker, srcIp) {
-    if (seenMarkerIps.has(srcIp) || !animationsEnabled()) { return; }
-    const el = marker.getElement();
-    if (!el) { return; }
-
-    void el.getBoundingClientRect();
-    el.classList.add('marker-new');
-    seenMarkerIps.add(srcIp);
-    setTimeout(() => { el.classList.remove('marker-new'); }, 700);
 }
 
 function isSpikeMarker(row) {
