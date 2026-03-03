@@ -322,9 +322,12 @@ if(MSMAP_ENABLE_TESTS)
         Threads::Threads)
 
     # SQLite global state triggers LSAN false positives at process exit.
+    # Integration cases all bind the same loopback UDP port, so mark them
+    # RUN_SERIAL to avoid cross-test interference when ctest uses -j.
     # Pass ASAN_OPTIONS to every discovered test case via catch_discover_tests PROPERTIES.
     catch_discover_tests(test_integration
         PROPERTIES
+            RUN_SERIAL TRUE
             ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
 
   # libFuzzer parser fuzz

@@ -80,7 +80,7 @@ jobs:
       # the shipped codegen profile instead of only the generic fallback.
       - name: Configure and Build (Debug + ASan + UBSan)
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
+          /usr/bin/time -f 'build: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
             cmake -B build -G Ninja \
               -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_STANDARD=23 \
@@ -92,10 +92,12 @@ jobs:
       # Unit + integration tests under ASan + UBSan.
       # Integration tests bind to 127.0.0.1:54340 — loopback is available
       # inside Docker containers, so no host networking is required here.
+      # CMake marks those integration cases RUN_SERIAL, so ctest -j 2 still
+      # gets safe parallelism across the rest of the suite.
       - name: Test
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
-            ctest --test-dir build --output-on-failure
+          /usr/bin/time -f 'ctest: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            ctest --test-dir build --output-on-failure -j 2
 
   # ── Static analysis (runs in parallel with build-test) ───────────────────────
   lint:
@@ -127,29 +129,30 @@ jobs:
       # compile; without a full build they are absent and clang-tidy errors out.
       # The project uses no C++ modules (no 'import' statements), so scanning
       # is unnecessary and safe to disable.
-      - name: Configure and generate web bundle
+      - name: Configure build-lint and generate web bundle
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
-            cmake -B build -G Ninja \
+          /usr/bin/time -f 'lint configure: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci bash -c "
+            cmake -B build-lint -G Ninja \
               -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_STANDARD=23 \
               -DCMAKE_CXX_EXTENSIONS=OFF \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
               -DMSMAP_CPU_TARGET=x86-64-v3 \
-            && ninja -C build web_bundle"
+            && ninja -C build-lint web_bundle"
 
       # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
       # _deps/ from analysis.  run-clang-tidy-18 (not run-clang-tidy) is
       # required because the unversioned alias is not installed in the image.
       - name: clang-tidy
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
-            run-clang-tidy-18 -p build '/workspace/src/.*'
+          echo "clang-tidy mode: full-tree"
+          /usr/bin/time -f 'clang-tidy: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            run-clang-tidy-18 -p build-lint '/workspace/src/.*'
 
       - name: cppcheck
         run: |
-          docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+          /usr/bin/time -f 'cppcheck: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
             cppcheck --enable=style,performance,warning,portability \
               --error-exitcode=1 src/
 

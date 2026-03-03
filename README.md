@@ -554,7 +554,7 @@ cmake -B build -G Ninja \
 ninja -C build msmap
 
 # Test
-ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure -j 2
 ```
 
 ### Static analysis
@@ -579,6 +579,14 @@ docker run --rm -v "$PWD:/workspace" msmap-dev \
 docker run --rm -v "$PWD:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 ```
+
+CI keeps the same full-strength gate on both pull requests and `master`:
+Debug builds run with ASan + UBSan, tests run under `ctest`, and static
+analysis still runs across all of `src/`. The lint job uses a dedicated
+`build-lint/` tree so `clang-tidy` sees the same clean compile database as the
+documented local workflow above. The integration tests still share a fixed UDP
+port, so CMake marks those cases `RUN_SERIAL` while the rest of the suite can
+use `ctest -j 2`.
 
 ### Frontend mockups
 
