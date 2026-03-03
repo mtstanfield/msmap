@@ -359,40 +359,48 @@
                 <div id="filter-legend" style="width: 200px; margin-top: 0;">
                     <div id="legend-home">
                         <div class="legend-title">Home</div>
-                        <div class="legend-row">
-                            <span class="legend-home-swatch" aria-hidden="true"></span>
-                            <span>Configured home location</span>
+                        <div class="legend-list">
+                            <div class="legend-entry">
+                                <span class="legend-symbol-wrap" aria-hidden="true">
+                                    <span class="legend-home-swatch"></span>
+                                </span>
+                                <span class="legend-label">Home location</span>
+                            </div>
                         </div>
                     </div>
                     <div class="legend-title">Threat</div>
-                    <div class="legend-row"><span class="legend-swatch threat-unknown"></span><span>Unknown</span></div>
-                    <div class="legend-row"><span class="legend-swatch threat-clean"></span><span>Clean</span></div>
-                    <div class="legend-row"><span class="legend-swatch threat-low"></span><span>Low</span></div>
-                    <div class="legend-row"><span class="legend-swatch threat-medium"></span><span>Medium</span></div>
-                    <div class="legend-row"><span class="legend-swatch threat-high"></span><span>High</span></div>
+                    <div class="legend-list">
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
+                    </div>
                     <div class="legend-title">Spikes</div>
-                    <div class="legend-notes">
-                        <div class="legend-note">
-                            <span class="legend-symbol legend-symbol-cluster" aria-hidden="true">
+                    <div class="legend-list">
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap" aria-hidden="true">
+                                <span class="legend-symbol legend-symbol-cluster">
                                 <span class="legend-symbol-cluster-core"></span>
                                 <i class="cluster-spike-badge">!</i>
+                                </span>
                             </span>
-                            <span class="legend-note-value">Cluster spike</span>
+                            <span class="legend-label">Cluster spike</span>
                         </div>
-                        <div class="legend-note">
-                            <span class="legend-symbol legend-symbol-node" aria-hidden="true">!</span>
-                            <span class="legend-note-value">Node spike</span>
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
+                            <span class="legend-label">Node spike</span>
                         </div>
                     </div>
                     <div class="legend-title">Intel</div>
-                    <div class="legend-notes">
-                        <div class="legend-note">
-                            <span class="popup-chip popup-chip-intel">Tor</span>
-                            <span class="legend-note-value">Tor exit</span>
+                    <div class="legend-list">
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
+                            <span class="legend-label">Tor exit</span>
                         </div>
-                        <div class="legend-note">
-                            <span class="popup-chip popup-chip-intel">DROP</span>
-                            <span class="legend-note-value">Spamhaus DROP</span>
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
+                            <span class="legend-label">Spamhaus DROP</span>
                         </div>
                     </div>
                 </div>
