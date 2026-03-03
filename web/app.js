@@ -31,14 +31,6 @@ const appliedTextFilters = {
 };
 
 let textApplyTimer = null;
-let animationPreferenceExplicit = false;
-const reducedMotionQuery = (typeof window.matchMedia === 'function')
-    ? window.matchMedia('(prefers-reduced-motion: reduce)')
-    : null;
-
-function systemAnimationsDefault() {
-    return reducedMotionQuery?.matches ? 'off' : 'on';
-}
 
 function currentFilterState() {
     return {
@@ -59,7 +51,7 @@ function writeFiltersToUrl() {
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
-    if (animationPreferenceExplicit)                       { params.set('animations', state.animations); }
+    if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
     const next = params.toString();
     const base = window.location.pathname || '/';
     const target = next ? (base + '?' + next) : base;
@@ -69,11 +61,7 @@ function writeFiltersToUrl() {
 function saveFilters() {
     writeFiltersToUrl();
     try {
-        const state = currentFilterState();
-        if (!animationPreferenceExplicit) {
-            delete state.animations;
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentFilterState()));
     } catch (_) {}
 }
 
@@ -110,8 +98,7 @@ function readStoredFilters() {
 function loadFilters() {
     const s = parseUrlFilterState() || readStoredFilters();
     if (!s) {
-        fAnimations.value = systemAnimationsDefault();
-        animationPreferenceExplicit = false;
+        fAnimations.value = DEFAULT_FILTERS.animations;
         return;
     }
 
@@ -122,12 +109,10 @@ function loadFilters() {
     if (s.country     !== undefined) { fCountry.value = s.country; }
     if (s.animations  !== undefined) {
         setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations);
-        animationPreferenceExplicit = true;
         return;
     }
 
-    fAnimations.value = systemAnimationsDefault();
-    animationPreferenceExplicit = false;
+    fAnimations.value = DEFAULT_FILTERS.animations;
 }
 
 const lmap = L.map('map', {
@@ -220,11 +205,15 @@ const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 
-filterToggle.classList.add('active');
+function setFilterPanelOpen(open) {
+    filterPanel.style.display = open ? '' : 'none';
+    filterToggle.classList.toggle('active', open);
+}
+
+setFilterPanelOpen(!isMobileMapUi());
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
-    filterPanel.style.display = nowOpen ? 'none' : '';
-    filterToggle.classList.toggle('active', !nowOpen);
+    setFilterPanelOpen(!nowOpen);
 });
 
 let mappedCount   = 0;
@@ -422,11 +411,10 @@ function resetToDefaults() {
     }
     fTime.value         = DEFAULT_FILTERS.time;
     fProto.value        = DEFAULT_FILTERS.proto;
-    fAnimations.value   = systemAnimationsDefault();
+    fAnimations.value   = DEFAULT_FILTERS.animations;
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
-    animationPreferenceExplicit = false;
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -443,28 +431,10 @@ function applyNonTextFilters() {
     pollNow();
 }
 
-function handleReducedMotionPreferenceChange() {
-    if (animationPreferenceExplicit) { return; }
-    const next = systemAnimationsDefault();
-    if (fAnimations.value === next) { return; }
-    fAnimations.value = next;
-    applyNonTextFilters();
-}
-
 document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
-fAnimations.addEventListener('change', () => {
-    animationPreferenceExplicit = true;
-    applyNonTextFilters();
-});
-if (reducedMotionQuery) {
-    if (typeof reducedMotionQuery.addEventListener === 'function') {
-        reducedMotionQuery.addEventListener('change', handleReducedMotionPreferenceChange);
-    } else if (typeof reducedMotionQuery.addListener === 'function') {
-        reducedMotionQuery.addListener(handleReducedMotionPreferenceChange);
-    }
-}
+fAnimations.addEventListener('change', applyNonTextFilters);
 
 [fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('input', () => {
@@ -842,7 +812,7 @@ function buildDetailCard(row) {
         '<span class="popup-detail-value mono">' + escapeHtml(row.proto || '?') +
             (row.tcp_flags ? ' (' + escapeHtml(row.tcp_flags) + ')' : '') + '</span>',
         '</div>',
-        '<div class="popup-detail-row">',
+        '<div class="popup-detail-row popup-detail-row-rule">',
         '<span class="popup-detail-label">rule</span>',
         '<span class="popup-detail-value">' + escapeHtml(row.rule) + '</span>',
         '</div>',
@@ -881,15 +851,17 @@ function buildDetailPane(srcIp) {
         '<div id="' + slotId + '" class="popup-detail-wrap">',
         '<div class="popup-detail-bar">',
         '<div class="popup-detail-heading">Recent events</div>',
-        '<span class="popup-detail-position">' + (state.selectedIndex + 1) + ' / ' +
-            detailStateLabel(state) + '</span>',
         '</div>',
         buildDetailCard(row),
+        '<div class="popup-detail-footer">',
+        '<span class="popup-detail-position">' + (state.selectedIndex + 1) + ' / ' +
+            detailStateLabel(state) + '</span>',
         '<div class="popup-detail-nav">',
         '<button type="button" class="popup-detail-button" data-action="older" data-ip="' +
             escapeHtml(srcIp) + '"' + disablePrev + '>&larr;</button>',
         '<button type="button" class="popup-detail-button" data-action="newer" data-ip="' +
             escapeHtml(srcIp) + '"' + disableNewer + '>&rarr;</button>',
+        '</div>',
         '</div>',
         state.loading ? '<div class="popup-detail-hint">Loading older events...</div>' : '',
         '</div>',
