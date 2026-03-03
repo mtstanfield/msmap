@@ -130,6 +130,24 @@ TEST_CASE("AbuseCache: rate_limit_reset_if_new_day returns false same day")
     CHECK_FALSE(cache.confirmed_rate_remaining().has_value());
 }
 
+TEST_CASE("AbuseCache: expired post-midnight retry releases one probe request")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+
+    cache.set_rate_remaining_for_test(0);
+    cache.arm_quota_retry_for_test(100, true);
+
+    CHECK_FALSE(cache.release_quota_retry_probe_if_due_for_test(99));
+    CHECK(cache.rate_remaining() == 0);
+
+    CHECK(cache.release_quota_retry_probe_if_due_for_test(100));
+    CHECK(cache.rate_remaining() == 1);
+
+    CHECK_FALSE(cache.release_quota_retry_probe_if_due_for_test(101));
+    CHECK(cache.rate_remaining() == 1);
+}
+
 // ── update_connections_abuse(): integration ───────────────────────────────────
 
 TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")

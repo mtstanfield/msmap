@@ -98,6 +98,13 @@ public:
     /// Test hook for simulating quota exhaustion or partial remaining quota.
     void set_rate_remaining_for_test(int remaining) noexcept;
 
+    /// Test hook for arming the short post-midnight retry timer.
+    void arm_quota_retry_for_test(std::int64_t retry_after_ts,
+                                  bool post_reset_mode = true) noexcept;
+
+    /// Test hook for releasing a single retry probe once the timer expires.
+    bool release_quota_retry_probe_if_due_for_test(std::int64_t now) noexcept;
+
     /// Number of rows currently stored in the abuse cache table.
     [[nodiscard]] std::optional<std::int64_t> cache_row_count() const noexcept;
 
@@ -109,11 +116,17 @@ private:
     bool                        open() noexcept;
     void                        worker() noexcept;
 
-    /// Sleep in 15-minute intervals until rate_limit_reset_if_new_day() returns
-    /// true or stop_ is set.  Caller must hold queue_mutex_ via `lock`;
-    /// the lock is released and reacquired during each wait_for() interval.
+    /// Sleep until the next UTC midnight reset, or until a short post-midnight
+    /// retry backoff expires if AbuseIPDB is late applying the documented
+    /// quota reset. Caller must hold queue_mutex_ via `lock`; the lock is
+    /// released and reacquired during each wait_for() interval.
     void                        wait_for_quota_reset(
                                     std::unique_lock<std::mutex>& lock) noexcept;
+
+    /// Allow one post-midnight probe request once the retry timer expires.
+    /// Caller must hold queue_mutex_.
+    bool                        maybe_release_quota_retry_probe(
+                                    std::int64_t now) noexcept;
 
     /// Sets `request_made` to true if an HTTP request reached AbuseIPDB
     /// (regardless of HTTP status), so the caller only decrements the rate
@@ -162,6 +175,9 @@ private:
     std::optional<int> confirmed_rate_remaining_;
     std::int64_t rate_reset_day_{0};              // epoch_day() at last reset
     bool         quota_warned_{false};            // suppress repeated log lines
+    std::optional<std::int64_t> quota_retry_after_ts_;
+    int          quota_retry_backoff_secs_{60};
+    bool         post_reset_retry_mode_{false};
 
 };
 

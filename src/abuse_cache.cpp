@@ -140,6 +140,11 @@ std::int64_t epoch_day() noexcept
     return static_cast<std::int64_t>(std::time(nullptr)) / 86400LL;
 }
 
+std::int64_t next_utc_midnight_ts(std::int64_t day) noexcept
+{
+    return (day + 1LL) * 86400LL;
+}
+
 } // anonymous namespace
 
 // ── AbuseCache implementation ─────────────────────────────────────────────────
@@ -379,6 +384,21 @@ void AbuseCache::set_rate_remaining_for_test(int remaining) noexcept
     confirmed_rate_remaining_ = rate_remaining_;
 }
 
+void AbuseCache::arm_quota_retry_for_test(std::int64_t retry_after_ts,
+                                          bool post_reset_mode) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    quota_retry_after_ts_ = retry_after_ts;
+    post_reset_retry_mode_ = post_reset_mode;
+}
+
+bool AbuseCache::release_quota_retry_probe_if_due_for_test(
+    std::int64_t now) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return maybe_release_quota_retry_probe(now);
+}
+
 std::optional<std::int64_t> AbuseCache::cache_row_count() const noexcept
 {
     const std::lock_guard<std::mutex> lock{db_mutex_};
@@ -405,6 +425,9 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     if (today != rate_reset_day_) {
         rate_remaining_ = kDailyQuota;
         confirmed_rate_remaining_.reset();
+        quota_retry_after_ts_.reset();
+        quota_retry_backoff_secs_ = 60;
+        post_reset_retry_mode_ = true;
         rate_reset_day_ = today;
         quota_warned_   = false;  // allow one new warning next quota period
         return true;
@@ -412,18 +435,41 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     return false;
 }
 
+bool AbuseCache::maybe_release_quota_retry_probe(std::int64_t now) noexcept
+{
+    if (!quota_retry_after_ts_.has_value() || *quota_retry_after_ts_ > now) {
+        return false;
+    }
+    quota_retry_after_ts_.reset();
+    if (post_reset_retry_mode_ && rate_remaining_ <= 0) {
+        rate_remaining_ = 1;
+    }
+    return true;
+}
+
 // ── wait_for_quota_reset() ───────────────────────────────────────────────────
 
 void AbuseCache::wait_for_quota_reset(
     std::unique_lock<std::mutex>& lock) noexcept
 {
-    std::clog << "[INFO] AbuseCache: daily quota reached; "
-                 "polling for midnight reset (15-min intervals)\n";
     while (!stop_) {
-        queue_cv_.wait_for(lock, std::chrono::minutes(15),
-                           [this]() noexcept { return stop_; });
-        // If stop_ was set, the while condition exits on the next check.
-        // rate_limit_reset_if_new_day() is harmless to call during shutdown.
+        const auto now = static_cast<std::int64_t>(std::time(nullptr));
+        std::int64_t target_ts = next_utc_midnight_ts(rate_reset_day_);
+        if (quota_retry_after_ts_.has_value()) {
+            target_ts = *quota_retry_after_ts_;
+            if (maybe_release_quota_retry_probe(now)) {
+                break;
+            }
+            std::clog << "[INFO] AbuseCache: quota reset not live yet; retrying in "
+                      << (target_ts - now) << "s\n";
+        } else {
+            std::clog << "[INFO] AbuseCache: daily quota reached; waiting until UTC midnight reset\n";
+        }
+
+        const auto wait_for = std::chrono::seconds{
+            std::max<std::int64_t>(1, target_ts - now)
+        };
+        queue_cv_.wait_for(lock, wait_for, [this]() noexcept { return stop_; });
         if (rate_limit_reset_if_new_day()) {
             std::clog << "[INFO] AbuseCache: quota reset; resuming\n";
             break;
@@ -465,8 +511,7 @@ void AbuseCache::worker() noexcept
                 in_flight_.erase(ip);
 
                 if (!stop_) {
-                    // Poll every 15 min until UTC day rolls over.
-                    // Extracted to keep worker() cognitive complexity in check.
+                    // Wait until the UTC reset, or a short post-midnight probe.
                     wait_for_quota_reset(lock);
                 }
                 continue;
@@ -508,10 +553,20 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
             // once the daily quota resets at midnight.
             rate_remaining_ = 0;
             confirmed_rate_remaining_ = 0;
+            if (post_reset_retry_mode_) {
+                const auto now = static_cast<std::int64_t>(std::time(nullptr));
+                quota_retry_after_ts_ = now + quota_retry_backoff_secs_;
+                quota_retry_backoff_secs_ = std::min(quota_retry_backoff_secs_ * 2, 900);
+            } else {
+                quota_retry_after_ts_.reset();
+            }
             if (!stop_) { queue_.insert(ip); }
         } else if (confirmed_remaining.has_value()) {
             rate_remaining_ = *confirmed_remaining;
             confirmed_rate_remaining_ = *confirmed_remaining;
+            quota_retry_after_ts_.reset();
+            quota_retry_backoff_secs_ = 60;
+            post_reset_retry_mode_ = false;
         } else if (request_made) {
             --rate_remaining_;
         }
