@@ -15,6 +15,7 @@ const ARC_FADE_MS   =  300;
 const MAX_ARCS_POLL =   10;
 
 const STORAGE_KEY = 'msmap_filters';
+const MOTION_SESSION_KEY = 'msmap_motion';
 const DEFAULT_FILTERS = Object.freeze({
     time: '900',
     proto: '',
@@ -22,7 +23,6 @@ const DEFAULT_FILTERS = Object.freeze({
     port: '',
     country: '',
     severity: '',
-    animations: 'on',
 });
 
 const appliedTextFilters = {
@@ -41,7 +41,6 @@ function currentFilterState() {
         port:        appliedTextFilters.port,
         country:     appliedTextFilters.country,
         severity:    activeSeverity,
-        animations:  fAnimations.value,
     };
 }
 
@@ -54,7 +53,6 @@ function writeFiltersToUrl() {
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
     if (state.severity)                                    { params.set('severity', state.severity); }
-    if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
     const next = params.toString();
     const base = window.location.pathname || '/';
     const target = next ? (base + '?' + next) : base;
@@ -85,7 +83,6 @@ function parseUrlFilterState() {
     setIfPresent('port', 'port');
     setIfPresent('country', 'country');
     setIfPresent('severity', 'severity');
-    setIfPresent('animations', 'animations');
 
     return found ? state : null;
 }
@@ -99,25 +96,26 @@ function readStoredFilters() {
     }
 }
 
+function readStoredMotion() {
+    try {
+        return sessionStorage.getItem(MOTION_SESSION_KEY);
+    } catch (_) {
+        return null;
+    }
+}
+
 function loadFilters() {
     const s = parseUrlFilterState() || readStoredFilters();
-    if (!s) {
-        fAnimations.value = DEFAULT_FILTERS.animations;
-        return;
+    if (s) {
+        if (s.time        !== undefined) { setSelectValue(fTime, s.time, DEFAULT_FILTERS.time); }
+        if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
+        if (s.ip          !== undefined) { fIp.value = s.ip; }
+        if (s.port        !== undefined) { fPort.value = s.port; }
+        if (s.country     !== undefined) { fCountry.value = s.country; }
+        if (s.severity    !== undefined) { setSeverityValue(s.severity, { save: false, repoll: false }); }
     }
 
-    if (s.time        !== undefined) { setSelectValue(fTime, s.time, DEFAULT_FILTERS.time); }
-    if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
-    if (s.ip          !== undefined) { fIp.value = s.ip; }
-    if (s.port        !== undefined) { fPort.value = s.port; }
-    if (s.country     !== undefined) { fCountry.value = s.country; }
-    if (s.severity    !== undefined) { setSeverityValue(s.severity, { save: false, repoll: false }); }
-    if (s.animations  !== undefined) {
-        setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations);
-        return;
-    }
-
-    fAnimations.value = DEFAULT_FILTERS.animations;
+    setMotionValue(readStoredMotion(), { save: false, repoll: false, force: true });
 }
 
 const lmap = L.map('map', {
@@ -201,12 +199,14 @@ const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
 const fSeverityButtons = Array.from(document.querySelectorAll('[data-severity]'));
 const fSeverityText = document.getElementById('f-severity-text');
-const fAnimations   = document.getElementById('f-animations');
+const fMotionOn     = document.getElementById('f-motion-on');
+const fMotionOff    = document.getElementById('f-motion-off');
 const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 let activeFilterPanelTab = 'filters';
 let activeSeverity = DEFAULT_FILTERS.severity;
+let activeMotion = 'on';
 
 function setFilterPanelTab(tabName) {
     const nextTab = tabName === 'legend' ? 'legend' : 'filters';
@@ -229,6 +229,7 @@ function setFilterPanelOpen(open) {
 setFilterPanelTab('filters');
 setFilterPanelOpen(!isMobileMapUi());
 setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false });
+setMotionValue('on', { save: false, repoll: false, force: true });
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
     setFilterPanelOpen(!nowOpen);
@@ -278,8 +279,8 @@ function isMobileMapUi() {
     return window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 }
 
-function animationsEnabled() {
-    return fAnimations.value === 'on';
+function motionEnabled() {
+    return activeMotion === 'on';
 }
 
 function currentWindowSecs() {
@@ -316,6 +317,32 @@ function severityLabel(value) {
 function isValidSeverity(value) {
     return value === '' || value === 'unknown' || value === 'clean' ||
         value === 'low' || value === 'medium' || value === 'high';
+}
+
+function setMotionValue(value, { save = true, repoll = true, force = false } = {}) {
+    const next = value === 'off' ? 'off' : 'on';
+    const changed = next !== activeMotion;
+    activeMotion = next;
+    const onSelected = next === 'on';
+    fMotionOn.classList.toggle('is-active', onSelected);
+    fMotionOff.classList.toggle('is-active', !onSelected);
+    fMotionOn.setAttribute('aria-pressed', onSelected ? 'true' : 'false');
+    fMotionOff.setAttribute('aria-pressed', onSelected ? 'false' : 'true');
+    fMotionOn.tabIndex = onSelected ? 0 : -1;
+    fMotionOff.tabIndex = onSelected ? -1 : 0;
+    if (save && (changed || force)) {
+        try {
+            if (next === 'off') {
+                sessionStorage.setItem(MOTION_SESSION_KEY, 'off');
+            } else {
+                sessionStorage.removeItem(MOTION_SESSION_KEY);
+            }
+        } catch (_) {}
+    }
+    if (repoll && (changed || force)) {
+        clearActiveArcs();
+        pollNow();
+    }
 }
 
 function setSeverityValue(value, { save = true, repoll = true, force = false } = {}) {
@@ -481,11 +508,11 @@ function resetToDefaults() {
     }
     fTime.value         = DEFAULT_FILTERS.time;
     fProto.value        = DEFAULT_FILTERS.proto;
-    fAnimations.value   = DEFAULT_FILTERS.animations;
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
-setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false, force: true });
+    setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false, force: true });
+    setMotionValue('on', { save: true, repoll: false, force: true });
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -505,7 +532,12 @@ function applyNonTextFilters() {
 document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
-fAnimations.addEventListener('change', applyNonTextFilters);
+fMotionOn.addEventListener('click', () => {
+    setMotionValue('on');
+});
+fMotionOff.addEventListener('click', () => {
+    setMotionValue('off');
+});
 fSeverityButtons.forEach((button, index) => {
     button.addEventListener('click', () => {
         setSeverityValue(button.dataset.severity || '');
@@ -1193,7 +1225,7 @@ lmap.on('zoomstart', clearActiveArcs);
 function shouldCandidateArc(row) {
     return !isInitialLoad &&
         homePt &&
-        animationsEnabled() &&
+        motionEnabled() &&
         typeof row.last_ts === 'number' &&
         row.last_ts > lastMapTs &&
         Number.isFinite(row.lat) &&
@@ -1498,7 +1530,7 @@ function isSpikeMarker(row) {
 function applySpikeMarkerState(marker, spiking) {
     const el = marker.getElement();
     if (!el) { return; }
-    el.classList.toggle('marker-spike', spiking && animationsEnabled());
+    el.classList.toggle('marker-spike', spiking && motionEnabled());
 
     const tooltip = marker.getTooltip();
     if (spiking) {

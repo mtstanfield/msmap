@@ -20,8 +20,16 @@
     <!-- Tabbed controls panel -->
     <div id="filter-panel">
         <div class="filter-header">
-            <div class="filter-title">Controls</div>
             <div class="filter-header-actions">
+                <div class="filter-header-toggle-group" role="group" aria-label="Motion">
+                    <span class="filter-header-toggle-label">Motion</span>
+                    <div class="filter-header-toggle">
+                        <button id="f-motion-on" class="filter-header-toggle-button is-active"
+                                type="button" data-motion="on" aria-pressed="true">On</button>
+                        <button id="f-motion-off" class="filter-header-toggle-button"
+                                type="button" data-motion="off" aria-pressed="false">Off</button>
+                    </div>
+                </div>
                 <button id="f-defaults" type="button">Defaults</button>
             </div>
         </div>
@@ -95,12 +103,6 @@
                     </button>
                 </div>
                 <div id="f-severity-text" class="filter-severity-text">All severities</div>
-
-                <label class="filter-label" for="f-animations">Animations</label>
-                <select id="f-animations">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                </select>
             </div>
             <div id="filter-tab-legend" class="filter-tab-panel" role="tabpanel"
                  aria-labelledby="filter-tab-button-legend" hidden>

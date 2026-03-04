@@ -65,6 +65,7 @@ html, body {
 
 #filter-toggle:focus-visible,
 #f-defaults:focus-visible,
+#filter-panel .filter-header-toggle-button:focus-visible,
 #filter-panel .filter-tab-button:focus-visible,
 #filter-panel .filter-severity-button:focus-visible,
 #filter-panel select:focus-visible,
@@ -287,7 +288,7 @@ html, body {
     background: #161b22;
     border: 1px solid #30363d;
     border-radius: 6px;
-    padding: 14px 16px 16px;
+    padding: 12px 16px 16px;
     width: 200px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     color: #e6edf3;
@@ -298,25 +299,69 @@ html, body {
     max-height: calc(100vh - 72px);
 }
 
-.filter-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #8b949e;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
 .filter-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 #filter-panel .filter-header-actions {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: 6px;
+}
+
+.filter-header-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.filter-header-toggle-label {
+    color: #8b949e;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.filter-header-toggle {
+    display: inline-flex;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #0d1117;
+}
+
+.filter-header-toggle-button {
+    min-width: 34px;
+    padding: 4px 8px;
+    border: 0;
+    border-right: 1px solid #30363d;
+    background: transparent;
+    color: #8b949e;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.filter-header-toggle-button:last-child {
+    border-right: 0;
+}
+
+.filter-header-toggle-button:hover {
+    background: #161b22;
+    color: #c9d1d9;
+}
+
+.filter-header-toggle-button.is-active {
+    background: linear-gradient(180deg, #21262d, #1b2128);
+    color: #e6edf3;
 }
 
 #f-defaults {
@@ -1220,6 +1265,15 @@ html, body {
     #filter-panel {
         width: 188px;
         max-height: calc(100vh - 102px);
+    }
+
+    .filter-header-actions {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .filter-header-toggle-group {
+        flex: 1 1 auto;
     }
 
     #filter-legend {

@@ -321,18 +321,20 @@ events from `GET /api/detail`.
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
 | Severity | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
-| Animations | On / Off for highlight effects and home-directed arcs |
 | Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
-The top-right `Controls` panel is tabbed into `Filters` and `Legend`, with
-`Defaults` pinned in the shared header. All selects apply immediately. Text
-filters auto-apply once the value is valid, and `Defaults` resets the panel to
-the standard 15-minute view without changing the active tab. Applied filter
-state is mirrored into sparse query parameters, so copied URLs and bookmarks
-reopen the same view. On mobile-sized coarse-pointer UIs, the controls panel
-starts closed behind the gear toggle to keep the map clear.
+The top-right controls panel is tabbed into `Filters` and `Legend`, with
+`Defaults` and the `Motion` toggle pinned in the shared header. All filters
+apply immediately. Text filters auto-apply once the value is valid, and
+`Defaults` resets the filters to the standard 15-minute view without changing
+the active tab. Applied filter state is mirrored into sparse query parameters,
+so copied URLs and bookmarks reopen the same view. The `Motion` toggle is a
+session-only UI preference: it defaults to `On`, is not encoded into copied
+URLs, and is only remembered for the current browser tab. On mobile-sized
+coarse-pointer UIs, the controls panel starts closed behind the gear toggle to
+keep the map clear.
 
-### Animations
+### Motion
 
 When `MSMAP_HOME_HOST` is set, msmap resolves the hostname to an IPv4 address at
 startup, GeoIP-locates it, and serves the coordinates via `GET /api/home`. The
@@ -349,7 +351,7 @@ browser then:
    fades out and is removed after roughly 1.1 s total.
 4. Rate-limits arcs to 10 per poll batch and collapses near-identical origins
    so one hotspot does not dominate the animation budget.
-5. Clears stale arcs on zoom, filter changes, animation-toggle changes, and
+5. Clears stale arcs on zoom, filter changes, motion-toggle changes, and
    home-point changes.
 
 In the `15m` and `1h` views, sources with a dense short-window burst of hits
@@ -360,7 +362,7 @@ opening before spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
-`Animations` toggle still controls these arc and spike highlight effects.
+`Motion` toggle still controls these arc and spike highlight effects.
 
 When home resolution succeeds, newly ingested RFC1918 destination IPs are
 rewritten to the resolved home IP before storage so popup detail and raw drill
