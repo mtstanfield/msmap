@@ -311,7 +311,7 @@ selected window. That keeps the 24-hour view complete without trying to render
 every raw event in the browser. Clicking a marker then lazy-loads recent raw
 events from `GET /api/detail`.
 
-### Filter panel
+### Controls panel
 
 | Filter | Description |
 |---|---|
@@ -321,13 +321,15 @@ events from `GET /api/detail`.
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
 | Animations | On / Off for highlight effects and home-directed arcs |
-| Legend | Reference block inside the filter panel |
+| Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
-All selects apply immediately. Text filters auto-apply once the value is
-valid, and `Defaults` resets the panel to the standard 15-minute view. Applied
-filter state is mirrored into sparse query parameters, so copied URLs and
-bookmarks reopen the same view. On mobile-sized coarse-pointer UIs, the
-filter/legend panel starts closed behind the gear toggle to keep the map clear.
+The top-right `Controls` panel is tabbed into `Filters` and `Legend`, with
+`Defaults` pinned in the shared header. All selects apply immediately. Text
+filters auto-apply once the value is valid, and `Defaults` resets the panel to
+the standard 15-minute view without changing the active tab. Applied filter
+state is mirrored into sparse query parameters, so copied URLs and bookmarks
+reopen the same view. On mobile-sized coarse-pointer UIs, the controls panel
+starts closed behind the gear toggle to keep the map clear.
 
 ### Animations
 
@@ -403,8 +405,8 @@ backend caches:
 
 - `Mapped`: aggregate markers currently rendered
 - `Hits`: total matching event volume represented by the visible aggregate rows
-- `Updated`: freshness of the last successful poll, with a dot that reflects
-  live `/api/map` freshness (`unknown` on startup, green when current, red when
+- `Updated`: age of the current `/api/map` dataset on screen, with a dot that
+  reflects live poll health (`unknown` on startup, green when current, red when
   stale or failing)
 - `Events`: total retained connection rows in the current 24-hour window
 - `Sources`: distinct retained source IPs in that window
@@ -606,9 +608,9 @@ python3 -m http.server 8081
 ```
 
 Then visit `http://localhost:8081/popup_mock.html`.
-The mock page includes the current legend, desktop/mobile popup states, long-
-string stress coverage, and spiderfy layout demos for small through very large
-clusters.
+The mock page includes the current desktop/mobile popup states, the live
+footer/control-panel variants, long-string stress coverage, and spiderfy layout
+demos for small through very large clusters.
 
 ### Fuzzer (libFuzzer on the syslog parser)
 
