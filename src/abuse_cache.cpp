@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <sqlite3.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <chrono>
@@ -79,10 +80,10 @@ std::size_t curl_header_cb(const char* ptr, std::size_t size,
     constexpr std::string_view k_remaining_header{"x-ratelimit-remaining:"};
     std::string lower;
     lower.reserve(line.size());
-    for (const char ch : line) {
-        lower.push_back(static_cast<char>(
-            std::tolower(static_cast<unsigned char>(ch))));
-    }
+    std::transform(line.begin(), line.end(), std::back_inserter(lower),
+                   [](unsigned char ch) {
+                       return static_cast<char>(std::tolower(ch));
+                   });
 
     if (lower.starts_with(k_remaining_header)) {
         const char* value = line.c_str() + static_cast<std::ptrdiff_t>(k_remaining_header.size());
