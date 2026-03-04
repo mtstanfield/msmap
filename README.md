@@ -55,7 +55,7 @@ msmap binary
 | Threat / usage | AbuseIPDB | 30-day SQLite cache, optional API key |
 | Source intel | Tor Project + Spamhaus DROP | background-refreshed local cache |
 | Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
-| Runtime | `distroless/cc-debian12:nonroot` | static-ish binary, uid 65532 |
+| Runtime | `distroless/cc-debian12:nonroot` | distroless runtime, nonroot uid 65532 |
 
 The published release container targets `x86-64-v3` class CPUs. If you need an
 image that runs on older x86-64 hardware, rebuild with
@@ -233,7 +233,7 @@ the log format before forwarding it.
 ### nginx reference config
 
 Production should put nginx in front of `msmap` for TLS termination, gzip,
-microcaching, request coalescing, and basic rate limiting. The public hot path
+microcaching, request coalescing, and basic rate limiting. The main public path
 is `GET /` plus `GET /api/map`; the raw drilldown endpoint `GET /api/detail`
 should not be cached.
 
@@ -406,7 +406,7 @@ browser then:
 In the `15m` and `1h` views, sources with a dense short-window burst of hits
 also get a stronger marker pulse plus a centred `!` marker overlay so obvious
 spikes stand out without waiting for a popup drilldown. Clusters containing at
-least one such source get a small light `!` badge so they read as worth
+least one such source get a small light `!` badge so they stand out before
 opening before spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
