@@ -841,7 +841,7 @@ function setOperatorStatus(status) {
         } else {
             const quotaResetCountdown = formatUtcMidnightCountdown(now);
             statAbuse.dataset.tooltip = quotaResetCountdown
-                ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + ' (UTC midnight).')
+                ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + '.')
                 : 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
         }
     } else {
