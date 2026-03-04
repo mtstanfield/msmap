@@ -303,7 +303,7 @@ function setInputValidity(el, valid) {
     el.title = 'Enter a complete valid value or clear the field.';
 }
 
-function threatLabel(value) {
+function threatFilterLabel(value) {
     switch (value) {
         case 'unknown': return 'Unknown';
         case 'clean': return 'Clean';
@@ -355,7 +355,7 @@ function setThreatValue(value, { save = true, repoll = true, force = false } = {
         button.setAttribute('aria-checked', selected ? 'true' : 'false');
         button.tabIndex = selected ? 0 : -1;
     });
-    fThreatText.textContent = 'Threats: ' + threatLabel(next);
+    fThreatText.textContent = 'Threats: ' + threatFilterLabel(next);
     if (save && (changed || force)) {
         saveFilters();
     }
@@ -627,7 +627,7 @@ function threatClass(score) {
     return 'threat-high';
 }
 
-function threatLabel(score) {
+function threatScoreLabel(score) {
     if (score === null || score === undefined) { return null; }
     return 'score ' + score + '%';
 }
