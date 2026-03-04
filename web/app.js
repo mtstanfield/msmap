@@ -737,6 +737,9 @@ function formatCountdownUntil(targetSec, nowSec) {
     if (!Number.isFinite(targetSec) || !Number.isFinite(nowSec) || nowSec < 0) {
         return null;
     }
+    if (targetSec <= nowSec) {
+        return 'pending';
+    }
     const remainingSec = Math.max(0, targetSec - nowSec);
     const remainingMins = Math.ceil(remainingSec / 60);
     if (remainingMins <= 1) {
@@ -827,9 +830,14 @@ function setOperatorStatus(status) {
             ? formatCountdownUntil(retryAfterTs, now)
             : null;
         if (retryCountdown !== null) {
-            statAbuse.dataset.tooltip =
-                'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry in ' +
-                retryCountdown + '.';
+            if (retryCountdown === 'pending') {
+                statAbuse.dataset.tooltip =
+                    'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry is pending.';
+            } else {
+                statAbuse.dataset.tooltip =
+                    'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry in ' +
+                    retryCountdown + '.';
+            }
         } else {
             const quotaResetCountdown = formatUtcMidnightCountdown(now);
             statAbuse.dataset.tooltip = quotaResetCountdown
