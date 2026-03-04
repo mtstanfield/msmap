@@ -887,9 +887,24 @@ function ensureDetailState(srcIp) {
         retryTimerId: null,
         loaded: false,
         windowSecs: windowSecs,
+        anchorTs: 0,
     };
     detailStateByIp.set(srcIp, fresh);
     return fresh;
+}
+
+function currentDetailAnchorTs() {
+    if (Number.isFinite(lastMapGeneratedAt) && lastMapGeneratedAt > 0) {
+        return lastMapGeneratedAt;
+    }
+    return Math.floor(Date.now() / 1000);
+}
+
+function ensureDetailAnchor(state) {
+    if (!Number.isFinite(state.anchorTs) || state.anchorTs <= 0) {
+        state.anchorTs = currentDetailAnchorTs();
+    }
+    return state.anchorTs;
 }
 
 function buildMapQueryString() {
@@ -1394,14 +1409,18 @@ function openAggregatePopup(marker, row) {
             updatePopupContent(row, marker.getLatLng());
             return;
         }
+        if (!state.rows.length) {
+            state.anchorTs = 0;
+        }
+        ensureDetailAnchor(state);
         void loadDetail(row, '');
         return;
     }
     updatePopupContent(row, marker.getLatLng());
 }
 
-async function fetchDetailPage(srcIp, cursor) {
-    const since = Math.floor(Date.now() / 1000) - currentWindowSecs();
+async function fetchDetailPage(srcIp, cursor, anchorTs, windowSecs) {
+    const since = Math.max(0, anchorTs - windowSecs);
     const params = new URLSearchParams({
         ip: srcIp,
         since: String(since),
@@ -1443,6 +1462,7 @@ async function fetchDetailPage(srcIp, cursor) {
 async function loadDetail(row, cursor) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
+    const anchorTs = ensureDetailAnchor(state);
 
     state.loading = true;
     clearDetailRetryTimer(state);
@@ -1451,7 +1471,7 @@ async function loadDetail(row, cursor) {
     state.retryAfterMs = 0;
     updatePopupContent(row);
     try {
-        const body = await fetchDetailPage(row.src_ip, cursor);
+        const body = await fetchDetailPage(row.src_ip, cursor, anchorTs, state.windowSecs);
         const rows = body.rows;
         if (cursor) {
             state.rows = state.rows.concat(rows);
@@ -1555,6 +1575,7 @@ function bindPopupControls(row) {
             state.error = '';
             state.errorKind = '';
             state.retryAfterMs = 0;
+            state.anchorTs = 0;
             state.loaded = false;
             void loadDetail(row, '');
             return;
