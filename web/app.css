@@ -65,6 +65,7 @@ html, body {
 
 #filter-toggle:focus-visible,
 #f-defaults:focus-visible,
+#filter-panel .filter-tab-button:focus-visible,
 #filter-panel select:focus-visible,
 #filter-panel input:focus-visible,
 .popup-detail-button:focus-visible,
