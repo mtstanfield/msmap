@@ -505,6 +505,39 @@ html, body {
     color: #f0f6fc;
 }
 
+.popup-ip-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: copy;
+    appearance: none;
+}
+
+.popup-ip-copy:hover .ip,
+.popup-ip-copy:focus-visible .ip {
+    color: #58a6ff;
+}
+
+.popup-ip-copy:focus-visible {
+    outline: none;
+}
+
+.popup-ip-copy.is-copied .ip {
+    color: #3fb950;
+}
+
+.popup-ip-copy.is-copy-failed .ip {
+    color: #f85149;
+}
+
 .popup-summary {
     display: flex;
     flex-direction: column;

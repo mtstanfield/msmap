@@ -822,7 +822,9 @@ function buildAggregateSummary(r) {
         '<div class="popup-summary-top">',
         '<div class="popup-header">',
         '<div class="popup-kicker">Source</div>',
-        '<span class="ip">' + escapeHtml(r.src_ip) + '</span>',
+        '<button type="button" class="popup-ip-copy" data-copy-ip="' + escapeHtml(r.src_ip) +
+            '" aria-label="Copy source IP" title="Copy source IP">' +
+            '<span class="ip">' + escapeHtml(r.src_ip) + '</span></button>',
         '</div>',
         buildLinkouts(r.src_ip),
         '</div>',
@@ -1280,12 +1282,20 @@ function bindPopupControls(row) {
 
     ['mousedown', 'pointerdown', 'dblclick'].forEach((eventName) => {
         popupEl.addEventListener(eventName, (event) => {
-            if (!event.target.closest('[data-action]')) { return; }
+            if (!event.target.closest('[data-action], [data-copy-ip]')) { return; }
             event.stopPropagation();
         });
     });
 
     popupEl.addEventListener('click', (event) => {
+        const copyButton = event.target.closest('[data-copy-ip]');
+        if (copyButton && popupEl.contains(copyButton)) {
+            event.preventDefault();
+            event.stopPropagation();
+            void copyPopupIp(copyButton);
+            return;
+        }
+
         const button = event.target.closest('[data-action]');
         if (!button || !popupEl.contains(button)) { return; }
 
@@ -1310,6 +1320,60 @@ function bindPopupControls(row) {
             showNewerDetail(row);
         }
     });
+}
+
+async function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+    }
+
+    const probe = document.createElement('textarea');
+    probe.value = text;
+    probe.setAttribute('readonly', '');
+    probe.style.position = 'fixed';
+    probe.style.top = '-1000px';
+    probe.style.left = '-1000px';
+    document.body.appendChild(probe);
+    probe.select();
+    let ok = false;
+    try {
+        ok = document.execCommand('copy');
+    } catch (_) {
+        ok = false;
+    }
+    probe.remove();
+    if (!ok) {
+        throw new Error('copy failed');
+    }
+}
+
+function showPopupCopyState(button, state) {
+    button.classList.remove('is-copied', 'is-copy-failed');
+    button.classList.add(state === 'copied' ? 'is-copied' : 'is-copy-failed');
+    const header = button.closest('.popup-header');
+    const kicker = header ? header.querySelector('.popup-kicker') : null;
+    if (kicker) {
+        kicker.textContent = state === 'copied' ? 'Copied' : 'Copy failed';
+    }
+    window.setTimeout(() => {
+        if (!button.isConnected) { return; }
+        button.classList.remove('is-copied', 'is-copy-failed');
+        if (kicker && kicker.isConnected) {
+            kicker.textContent = 'Source';
+        }
+    }, state === 'copied' ? 1200 : 1600);
+}
+
+async function copyPopupIp(button) {
+    const ip = button.getAttribute('data-copy-ip');
+    if (!ip) { return; }
+    try {
+        await copyText(ip);
+        showPopupCopyState(button, 'copied');
+    } catch (_) {
+        showPopupCopyState(button, 'failed');
+    }
 }
 
 function isSpikeMarker(row) {
