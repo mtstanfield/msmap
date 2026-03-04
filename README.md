@@ -314,6 +314,20 @@ server {
 }
 ```
 
+Production notes:
+
+- Cache `GET /` and `GET /index.html` for a short TTL. They are bundled and
+  change rarely, so caching the initial HTML removes avoidable origin load
+  during traffic spikes.
+- Keep `GET /api/detail` uncached and explicitly return `503` from request or
+  connection limiting. The desktop popup now degrades recent-event drilldown
+  gracefully under temporary detail overload while leaving the aggregate popup
+  summary usable.
+- If your shared nginx proxy include is tuned for websockets, make sure this
+  app does not inherit `Connection: close` on ordinary proxied requests.
+  `msmap` does not use websockets, so upstream HTTP/1.1 keepalive should remain
+  enabled between nginx and the app.
+
 ---
 
 ## Web UI
@@ -321,8 +335,8 @@ server {
 The UI is a single-page Leaflet.js map served on port 8080. The main map polls
 `GET /api/map`, which returns one aggregate marker per source IP for the
 selected window. That keeps the 24-hour view complete without trying to render
-every raw event in the browser. Clicking a marker then lazy-loads recent raw
-events from `GET /api/detail`.
+every raw event in the browser. Clicking a marker shows the aggregate popup,
+and desktop-sized UI lazy-loads recent raw events from `GET /api/detail`.
 
 ### Controls panel
 
