@@ -20,90 +20,104 @@
     <!-- Filter/legend panel -->
     <div id="filter-panel">
         <div class="filter-header">
-            <div class="filter-title">Filters</div>
+            <div class="filter-title">Controls</div>
             <div class="filter-header-actions">
                 <button id="f-defaults" type="button">Defaults</button>
             </div>
         </div>
+        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
+            <button id="filter-tab-button-filters" class="filter-tab-button is-active" type="button"
+                    role="tab" aria-selected="true" aria-controls="filter-tab-filters"
+                    data-panel-tab="filters">Filters</button>
+            <button id="filter-tab-button-legend" class="filter-tab-button" type="button"
+                    role="tab" aria-selected="false" aria-controls="filter-tab-legend"
+                    data-panel-tab="legend">Legend</button>
+        </div>
+        <div class="filter-tab-body">
+            <div id="filter-tab-filters" class="filter-tab-panel" role="tabpanel"
+                 aria-labelledby="filter-tab-button-filters">
+                <label class="filter-label" for="f-time">Time range</label>
+                <select id="f-time">
+                    <option value="900" selected>Last 15 minutes</option>
+                    <option value="3600">Last hour</option>
+                    <option value="21600">Last 6 hours</option>
+                    <option value="86400">Last 24 hours</option>
+                </select>
 
-        <label class="filter-label" for="f-time">Time range</label>
-        <select id="f-time">
-            <option value="900" selected>Last 15 minutes</option>
-            <option value="3600">Last hour</option>
-            <option value="21600">Last 6 hours</option>
-            <option value="86400">Last 24 hours</option>
-        </select>
+                <label class="filter-label" for="f-proto">Protocol</label>
+                <select id="f-proto">
+                    <option value="">All</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                </select>
 
-        <label class="filter-label" for="f-proto">Protocol</label>
-        <select id="f-proto">
-            <option value="">All</option>
-            <option value="TCP">TCP</option>
-            <option value="UDP">UDP</option>
-        </select>
+                <label class="filter-label" for="f-ip">Source IP</label>
+                <input id="f-ip" type="text" placeholder="1.2.3.4" maxlength="45"
+                       autocomplete="off" spellcheck="false">
 
-        <label class="filter-label" for="f-ip">Source IP</label>
-        <input id="f-ip" type="text" placeholder="1.2.3.4" maxlength="45"
-               autocomplete="off" spellcheck="false">
+                <label class="filter-label" for="f-port">Destination Port</label>
+                <input id="f-port" type="text" placeholder="any" maxlength="5" inputmode="numeric"
+                       autocomplete="off" spellcheck="false">
 
-        <label class="filter-label" for="f-port">Destination Port</label>
-        <input id="f-port" type="text" placeholder="any" maxlength="5" inputmode="numeric"
-               autocomplete="off" spellcheck="false">
+                <label class="filter-label" for="f-country">Country</label>
+                <input id="f-country" type="text" placeholder="US" maxlength="2"
+                       autocomplete="off" spellcheck="false" style="text-transform:uppercase">
 
-        <label class="filter-label" for="f-country">Country</label>
-        <input id="f-country" type="text" placeholder="US" maxlength="2"
-               autocomplete="off" spellcheck="false" style="text-transform:uppercase">
-
-        <label class="filter-label" for="f-animations">Animations</label>
-        <select id="f-animations">
-            <option value="on">On</option>
-            <option value="off">Off</option>
-        </select>
-
-        <div id="filter-legend">
-            <div id="legend-home" style="display:none">
-                <div class="legend-title">Home</div>
-                <div class="legend-list">
-                    <div class="legend-entry">
-                        <span class="legend-symbol-wrap" aria-hidden="true">
-                            <span class="legend-home-swatch"></span>
-                        </span>
-                        <span class="legend-label">Home location</span>
+                <label class="filter-label" for="f-animations">Animations</label>
+                <select id="f-animations">
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                </select>
+            </div>
+            <div id="filter-tab-legend" class="filter-tab-panel" role="tabpanel"
+                 aria-labelledby="filter-tab-button-legend" hidden>
+                <div id="filter-legend">
+                    <div id="legend-home" style="display:none">
+                        <div class="legend-title">Home</div>
+                        <div class="legend-list">
+                            <div class="legend-entry">
+                                <span class="legend-symbol-wrap" aria-hidden="true">
+                                    <span class="legend-home-swatch"></span>
+                                </span>
+                                <span class="legend-label">Home location</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="legend-title">Threat</div>
-            <div class="legend-list">
-                <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
-                <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
-                <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
-                <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
-                <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
-            </div>
-            <div class="legend-title">Spikes</div>
-            <div class="legend-list">
-                <div class="legend-entry">
-                    <span class="legend-symbol-wrap" aria-hidden="true">
-                        <span class="legend-symbol legend-symbol-cluster">
-                        <span class="legend-symbol-cluster-core"></span>
-                        <i class="cluster-spike-badge">!</i>
-                        </span>
-                    </span>
-                    <span class="legend-label">Cluster spike</span>
-                </div>
-                <div class="legend-entry">
-                    <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
-                    <span class="legend-label">Node spike</span>
-                </div>
-            </div>
-            <div class="legend-title">Intel</div>
-            <div class="legend-list">
-                <div class="legend-entry">
-                    <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
-                    <span class="legend-label">Tor exit</span>
-                </div>
-                <div class="legend-entry">
-                    <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
-                    <span class="legend-label">Spamhaus DROP</span>
+                    <div class="legend-title">Threat</div>
+                    <div class="legend-list">
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
+                    </div>
+                    <div class="legend-title">Spikes</div>
+                    <div class="legend-list">
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap" aria-hidden="true">
+                                <span class="legend-symbol legend-symbol-cluster">
+                                <span class="legend-symbol-cluster-core"></span>
+                                <i class="cluster-spike-badge">!</i>
+                                </span>
+                            </span>
+                            <span class="legend-label">Cluster spike</span>
+                        </div>
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
+                            <span class="legend-label">Node spike</span>
+                        </div>
+                    </div>
+                    <div class="legend-title">Intel</div>
+                    <div class="legend-list">
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
+                            <span class="legend-label">Tor exit</span>
+                        </div>
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
+                            <span class="legend-label">Spamhaus DROP</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

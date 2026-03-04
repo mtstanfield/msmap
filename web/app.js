@@ -186,6 +186,9 @@ const statAbuseValue = document.getElementById('stat-abuse-value');
 const statError     = document.getElementById('stat-error');
 const filterPanel   = document.getElementById('filter-panel');
 const filterToggle  = document.getElementById('filter-toggle');
+const filterTabButtons = Array.from(document.querySelectorAll('[data-panel-tab]'));
+const filterTabFilters = document.getElementById('filter-tab-filters');
+const filterTabLegend  = document.getElementById('filter-tab-legend');
 const fTime         = document.getElementById('f-time');
 const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
@@ -195,16 +198,48 @@ const fAnimations   = document.getElementById('f-animations');
 const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
+let activeFilterPanelTab = 'filters';
+
+function setFilterPanelTab(tabName) {
+    const nextTab = tabName === 'legend' ? 'legend' : 'filters';
+    activeFilterPanelTab = nextTab;
+    filterTabButtons.forEach((button) => {
+        const selected = button.dataset.panelTab === nextTab;
+        button.classList.toggle('is-active', selected);
+        button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+    });
+    filterTabFilters.hidden = nextTab !== 'filters';
+    filterTabLegend.hidden = nextTab !== 'legend';
+}
 
 function setFilterPanelOpen(open) {
     filterPanel.style.display = open ? '' : 'none';
     filterToggle.classList.toggle('active', open);
 }
 
+setFilterPanelTab('filters');
 setFilterPanelOpen(!isMobileMapUi());
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
     setFilterPanelOpen(!nowOpen);
+});
+filterTabButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+        setFilterPanelTab(button.dataset.panelTab);
+    });
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+        }
+        event.preventDefault();
+        const nextTab = activeFilterPanelTab === 'filters' ? 'legend' : 'filters';
+        setFilterPanelTab(nextTab);
+        const nextButton = filterTabButtons.find((candidate) => candidate.dataset.panelTab === nextTab);
+        if (nextButton) {
+            nextButton.focus();
+        }
+    });
 });
 
 let mappedCount   = 0;

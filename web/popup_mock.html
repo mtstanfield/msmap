@@ -157,6 +157,25 @@
             display: none;
         }
 
+        .mock-control-panel {
+            width: 200px;
+            margin-left: auto;
+        }
+
+        .mock-control-panel.mobile {
+            width: 188px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .mock-control-panel .filter-tab-body {
+            max-height: 220px;
+        }
+
+        .mock-control-panel.mobile .filter-tab-body {
+            max-height: 260px;
+        }
+
         .leaflet-popup-tip-container,
         .leaflet-popup-close-button {
             display: none;
@@ -572,6 +591,100 @@
                         <div class="legend-entry">
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
                             <span class="legend-label">Spamhaus DROP</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel mock-panel-wide">
+            <h1>Tabbed Control Panel</h1>
+            <p>Desktop and mobile examples of the new tabbed filter/legend panel with a fixed header and internally scrolling body.</p>
+            <div class="mock-footer-grid">
+                <div>
+                    <h1 style="margin-bottom: 8px;">Desktop</h1>
+                    <div id="filter-panel" class="mock-control-panel" style="position: static; top: auto; right: auto; display: flex;">
+                        <div class="filter-header">
+                            <div class="filter-title">Controls</div>
+                            <div class="filter-header-actions">
+                                <button id="f-defaults" type="button">Defaults</button>
+                            </div>
+                        </div>
+                        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
+                            <button class="filter-tab-button is-active" type="button" role="tab" aria-selected="true">Filters</button>
+                            <button class="filter-tab-button" type="button" role="tab" aria-selected="false">Legend</button>
+                        </div>
+                        <div class="filter-tab-body">
+                            <div class="filter-tab-panel">
+                                <label class="filter-label">Time range</label>
+                                <select><option>Last 15 minutes</option></select>
+                                <label class="filter-label">Protocol</label>
+                                <select><option>All</option></select>
+                                <label class="filter-label">Source IP</label>
+                                <input type="text" placeholder="1.2.3.4">
+                                <label class="filter-label">Destination Port</label>
+                                <input type="text" placeholder="any">
+                                <label class="filter-label">Country</label>
+                                <input type="text" placeholder="US">
+                                <label class="filter-label">Animations</label>
+                                <select><option>On</option></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h1 style="margin-bottom: 8px;">Mobile</h1>
+                    <div id="filter-panel" class="mock-control-panel mobile" style="position: static; top: auto; right: auto; display: flex;">
+                        <div class="filter-header">
+                            <div class="filter-title">Controls</div>
+                            <div class="filter-header-actions">
+                                <button id="f-defaults" type="button">Defaults</button>
+                            </div>
+                        </div>
+                        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
+                            <button class="filter-tab-button" type="button" role="tab" aria-selected="false">Filters</button>
+                            <button class="filter-tab-button is-active" type="button" role="tab" aria-selected="true">Legend</button>
+                        </div>
+                        <div class="filter-tab-body">
+                            <div class="filter-tab-panel">
+                                <div id="filter-legend" style="margin-top: 0;">
+                                    <div class="legend-title">Threat</div>
+                                    <div class="legend-list">
+                                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
+                                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
+                                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
+                                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
+                                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
+                                    </div>
+                                    <div class="legend-title">Spikes</div>
+                                    <div class="legend-list">
+                                        <div class="legend-entry">
+                                            <span class="legend-symbol-wrap" aria-hidden="true">
+                                                <span class="legend-symbol legend-symbol-cluster">
+                                                    <span class="legend-symbol-cluster-core"></span>
+                                                    <i class="cluster-spike-badge">!</i>
+                                                </span>
+                                            </span>
+                                            <span class="legend-label">Cluster spike</span>
+                                        </div>
+                                        <div class="legend-entry">
+                                            <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
+                                            <span class="legend-label">Node spike</span>
+                                        </div>
+                                    </div>
+                                    <div class="legend-title">Intel</div>
+                                    <div class="legend-list">
+                                        <div class="legend-entry">
+                                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
+                                            <span class="legend-label">Tor exit</span>
+                                        </div>
+                                        <div class="legend-entry">
+                                            <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
+                                            <span class="legend-label">Spamhaus DROP</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
