@@ -76,7 +76,7 @@ std::size_t curl_header_cb(const char* ptr, std::size_t size,
         line.pop_back();
     }
 
-    constexpr std::string_view kRemainingHeader{"x-ratelimit-remaining:"};
+    constexpr std::string_view k_remaining_header{"x-ratelimit-remaining:"};
     std::string lower;
     lower.reserve(line.size());
     for (const char ch : line) {
@@ -84,8 +84,8 @@ std::size_t curl_header_cb(const char* ptr, std::size_t size,
             std::tolower(static_cast<unsigned char>(ch))));
     }
 
-    if (lower.rfind(kRemainingHeader, 0) == 0) {
-        const char* value = line.c_str() + static_cast<std::ptrdiff_t>(kRemainingHeader.size());
+    if (lower.starts_with(k_remaining_header)) {
+        const char* value = line.c_str() + static_cast<std::ptrdiff_t>(k_remaining_header.size());
         while (*value == ' ' || *value == '\t') { ++value; }
         char* end = nullptr;
         const long parsed = std::strtol(value, &end, 10);
@@ -563,7 +563,7 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
             if (!stop_) { queue_.insert(ip); }
         } else if (confirmed_remaining.has_value()) {
             rate_remaining_ = *confirmed_remaining;
-            confirmed_rate_remaining_ = *confirmed_remaining;
+            confirmed_rate_remaining_ = confirmed_remaining;
             quota_retry_after_ts_.reset();
             quota_retry_backoff_secs_ = 60;
             post_reset_retry_mode_ = false;
