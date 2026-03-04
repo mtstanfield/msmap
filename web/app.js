@@ -832,17 +832,17 @@ function setOperatorStatus(status) {
         if (retryCountdown !== null) {
             if (retryCountdown === 'pending') {
                 statAbuse.dataset.tooltip =
-                    'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry is pending.';
+                    'AbuseIPDB daily quota is exhausted. Next automatic retry is pending.';
             } else {
                 statAbuse.dataset.tooltip =
-                    'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry in ' +
+                    'AbuseIPDB daily quota is exhausted. Next automatic retry in ' +
                     retryCountdown + '.';
             }
         } else {
             const quotaResetCountdown = formatUtcMidnightCountdown(now);
             statAbuse.dataset.tooltip = quotaResetCountdown
-                ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + '.')
-                : 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
+                ? ('AbuseIPDB daily quota is exhausted. Quota refresh in ' + quotaResetCountdown + '.')
+                : 'AbuseIPDB daily quota is exhausted. New lookups will resume after the UTC midnight reset.';
         }
     } else {
         statAbuseValue.textContent = 'ok';
