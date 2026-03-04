@@ -290,7 +290,20 @@ server {
         proxy_no_cache 1;
         proxy_cache_bypass 1;
         limit_req zone=msmap_api_ratelimit burst=5 nodelay;
+        limit_req_status 503;
         limit_conn msmap_api_conn 5;
+        limit_conn_status 503;
+        proxy_pass http://192.0.2.10:8080;
+    }
+
+    location ~ ^/(|index\.html)$ {
+        include /config/nginx/proxy.conf;
+        proxy_cache msmap_api;
+        proxy_cache_lock on;
+        proxy_cache_background_update on;
+        proxy_cache_use_stale updating error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_cache_valid 200 300s;
+        add_header X-Cache-Status $upstream_cache_status always;
         proxy_pass http://192.0.2.10:8080;
     }
 
@@ -392,6 +405,8 @@ The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup, and it stays open across normal map refreshes
 while the same source IP remains visible in the current filtered view.
+Under heavy load, desktop recent-event drilldown may temporarily show an inline
+unavailable state while the aggregate summary remains usable.
 The map-level threat filter constrains aggregate rows from `/api/map`; the
 desktop drilldown still uses the existing source/time/proto/port detail query
 path in this version.

@@ -8,6 +8,7 @@ const HIDDEN_REFRESH_MS = 300000;
 const ERROR_REFRESH_MS  = 60000;
 const STATUS_REFRESH_MS = 60000;
 const DETAIL_PAGE_SIZE  = 20;
+const DETAIL_RETRY_COOLDOWN_MS = 10000;
 const TEXT_FILTER_DEBOUNCE_MS = 400;
 
 const ARC_DRAW_MS   =  800;
@@ -656,6 +657,44 @@ function detailStateLabel(state) {
     return total + '+';
 }
 
+function detailRetryBlocked(state, nowMs = Date.now()) {
+    return state.errorKind === 'temporary' && nowMs < state.retryAfterMs;
+}
+
+function parseRetryAfterMs(resp) {
+    const raw = resp.headers.get('Retry-After');
+    if (!raw) { return 0; }
+
+    const deltaSecs = Number.parseInt(raw, 10);
+    if (Number.isFinite(deltaSecs) && deltaSecs >= 0) {
+        return deltaSecs * 1000;
+    }
+
+    const atMs = Date.parse(raw);
+    if (!Number.isFinite(atMs)) { return 0; }
+    return Math.max(0, atMs - Date.now());
+}
+
+function makeDetailError(kind, message, retryAfterMs = 0) {
+    return { kind, message, retryAfterMs };
+}
+
+function clearDetailRetryTimer(state) {
+    if (state.retryTimerId !== null) {
+        clearTimeout(state.retryTimerId);
+        state.retryTimerId = null;
+    }
+}
+
+function scheduleDetailRetryUnlock(row, state, delayMs) {
+    clearDetailRetryTimer(state);
+    if (delayMs <= 0) { return; }
+    state.retryTimerId = setTimeout(() => {
+        state.retryTimerId = null;
+        updatePopupContent(row);
+    }, delayMs);
+}
+
 function setStatusCounts(mapped, total) {
     statMappedValue.textContent = mapped.toLocaleString();
     statTotalValue.textContent = total.toLocaleString();
@@ -833,6 +872,9 @@ function ensureDetailState(srcIp) {
     if (existing && existing.windowSecs === windowSecs) {
         return existing;
     }
+    if (existing && existing.retryTimerId !== null) {
+        clearTimeout(existing.retryTimerId);
+    }
 
     const fresh = {
         rows: [],
@@ -840,6 +882,9 @@ function ensureDetailState(srcIp) {
         nextCursor: '',
         loading: false,
         error: '',
+        errorKind: '',
+        retryAfterMs: 0,
+        retryTimerId: null,
         loaded: false,
         windowSecs: windowSecs,
     };
@@ -993,12 +1038,21 @@ function buildDetailCard(row) {
 function buildDetailPane(srcIp) {
     const state = ensureDetailState(srcIp);
     const slotId = detailSlotId(srcIp);
+    const retryBlocked = detailRetryBlocked(state);
 
     if ((!state.loaded && !state.error) || (state.loading && state.rows.length === 0)) {
         return '<div id="' + slotId + '" class="popup-detail-state">Loading recent events...</div>';
     }
 
     if (state.error && state.rows.length === 0) {
+        if (state.errorKind === 'temporary') {
+            return [
+                '<div id="' + slotId + '" class="popup-detail-state popup-detail-temporary">',
+                '<div>' + escapeHtml(state.error) + '</div>',
+                '<div class="popup-detail-hint">Try again in a few seconds.</div>',
+                '</div>',
+            ].join('');
+        }
         return [
             '<div id="' + slotId + '" class="popup-detail-state popup-detail-error">',
             '<div>' + escapeHtml(state.error) + '</div>',
@@ -1015,7 +1069,19 @@ function buildDetailPane(srcIp) {
     const row = state.rows[state.selectedIndex];
     const disableNewer = state.selectedIndex === 0 || state.loading ? ' disabled' : '';
     const atOldestLoaded = state.selectedIndex >= state.rows.length - 1;
-    const disablePrev = (atOldestLoaded && !state.nextCursor) || state.loading ? ' disabled' : '';
+    const disablePrev = (atOldestLoaded && !state.nextCursor) || state.loading || retryBlocked
+        ? ' disabled'
+        : '';
+    let detailHint = '';
+    if (state.loading) {
+        detailHint = '<div class="popup-detail-hint">Loading older events...</div>';
+    } else if (state.error) {
+        if (state.errorKind === 'temporary') {
+            detailHint = '<div class="popup-detail-hint">Older events temporarily unavailable under load. Try again in a few seconds.</div>';
+        } else {
+            detailHint = '<div class="popup-detail-hint">Could not load older events.</div>';
+        }
+    }
 
     return [
         '<div id="' + slotId + '" class="popup-detail-wrap">',
@@ -1033,7 +1099,7 @@ function buildDetailPane(srcIp) {
             escapeHtml(srcIp) + '"' + disableNewer + '>&rarr;</button>',
         '</div>',
         '</div>',
-        state.loading ? '<div class="popup-detail-hint">Loading older events...</div>' : '',
+        detailHint,
         '</div>',
     ].join('');
 }
@@ -1324,6 +1390,10 @@ function openAggregatePopup(marker, row) {
 
     const state = ensureDetailState(row.src_ip);
     if (!state.rows.length && !state.loading) {
+        if (detailRetryBlocked(state)) {
+            updatePopupContent(row, marker.getLatLng());
+            return;
+        }
         void loadDetail(row, '');
         return;
     }
@@ -1339,11 +1409,35 @@ async function fetchDetailPage(srcIp, cursor) {
     });
     if (cursor) { params.set('cursor', cursor); }
 
-    const resp = await fetch('/api/detail?' + params.toString());
-    if (!resp.ok) {
-        throw new Error('detail unavailable');
+    let resp;
+    try {
+        resp = await fetch('/api/detail?' + params.toString());
+    } catch (_) {
+        throw makeDetailError('temporary',
+            'Recent events temporarily unavailable under load.',
+            DETAIL_RETRY_COOLDOWN_MS);
     }
-    return resp.json();
+
+    if (!resp.ok) {
+        if (resp.status === 429 || resp.status === 502 || resp.status === 503 || resp.status === 504) {
+            const retryAfterMs = parseRetryAfterMs(resp) || DETAIL_RETRY_COOLDOWN_MS;
+            throw makeDetailError('temporary',
+                'Recent events temporarily unavailable under load.',
+                retryAfterMs);
+        }
+        throw makeDetailError('generic', 'Could not load recent events.');
+    }
+
+    let body;
+    try {
+        body = await resp.json();
+    } catch (_) {
+        throw makeDetailError('generic', 'Could not load recent events.');
+    }
+    if (!body || !Array.isArray(body.rows)) {
+        throw makeDetailError('generic', 'Could not load recent events.');
+    }
+    return body;
 }
 
 async function loadDetail(row, cursor) {
@@ -1351,11 +1445,14 @@ async function loadDetail(row, cursor) {
     if (state.loading) { return; }
 
     state.loading = true;
+    clearDetailRetryTimer(state);
     state.error = '';
+    state.errorKind = '';
+    state.retryAfterMs = 0;
     updatePopupContent(row);
     try {
         const body = await fetchDetailPage(row.src_ip, cursor);
-        const rows = Array.isArray(body.rows) ? body.rows : [];
+        const rows = body.rows;
         if (cursor) {
             state.rows = state.rows.concat(rows);
         } else {
@@ -1365,9 +1462,24 @@ async function loadDetail(row, cursor) {
         state.nextCursor = Number.isInteger(body.next_cursor) && body.next_cursor >= 0
             ? String(body.next_cursor)
             : '';
+        clearDetailRetryTimer(state);
         state.loaded = true;
-    } catch (_) {
-        state.error = 'Could not load recent events.';
+        state.error = '';
+        state.errorKind = '';
+        state.retryAfterMs = 0;
+    } catch (err) {
+        state.error = err && typeof err.message === 'string'
+            ? err.message
+            : 'Could not load recent events.';
+        state.errorKind = err && err.kind === 'temporary' ? 'temporary' : 'generic';
+        state.retryAfterMs = state.errorKind === 'temporary' && Number.isFinite(err.retryAfterMs)
+            ? (Date.now() + Math.max(0, err.retryAfterMs))
+            : 0;
+        if (state.errorKind === 'temporary') {
+            scheduleDetailRetryUnlock(row, state, Math.max(0, state.retryAfterMs - Date.now()));
+        } else {
+            clearDetailRetryTimer(state);
+        }
         state.loaded = true;
     } finally {
         state.loading = false;
@@ -1378,6 +1490,7 @@ async function loadDetail(row, cursor) {
 async function showOlderDetail(row) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
+    if (detailRetryBlocked(state)) { return; }
     if (state.selectedIndex < state.rows.length - 1) {
         state.selectedIndex++;
         updatePopupContent(row);
@@ -1435,9 +1548,13 @@ function bindPopupControls(row) {
         const action = button.getAttribute('data-action');
         if (action === 'retry') {
             const state = ensureDetailState(row.src_ip);
+            clearDetailRetryTimer(state);
             state.rows = [];
             state.selectedIndex = 0;
             state.nextCursor = '';
+            state.error = '';
+            state.errorKind = '';
+            state.retryAfterMs = 0;
             state.loaded = false;
             void loadDetail(row, '');
             return;
