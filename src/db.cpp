@@ -417,6 +417,10 @@ bool Database::exec(const char* sql) noexcept
 bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
                       std::optional<int> threat) noexcept
 {
+    if (!db_ || !geo.renderable()) {
+        return false;
+    }
+
     const std::lock_guard<std::mutex> lock{mutex_};
 
     sqlite3_stmt* const stmt = insert_stmt_.get();
@@ -449,16 +453,10 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
 
     (void)sqlite3_bind_text(stmt, 8, entry.rule.c_str(), -1, kStaticText);
 
-    // GeoIP enrichment — NULL when not resolved.
-    if (geo.found()) {
-        (void)sqlite3_bind_text(  stmt,  9, geo.country.c_str(), -1, kStaticText);
-        (void)sqlite3_bind_double(stmt, 10, geo.lat);
-        (void)sqlite3_bind_double(stmt, 11, geo.lon);
-    } else {
-        (void)sqlite3_bind_null(stmt,  9);
-        (void)sqlite3_bind_null(stmt, 10);
-        (void)sqlite3_bind_null(stmt, 11);
-    }
+    // GeoIP enrichment — renderable rows only.
+    (void)sqlite3_bind_text(  stmt,  9, geo.country.c_str(), -1, kStaticText);
+    (void)sqlite3_bind_double(stmt, 10, geo.lat);
+    (void)sqlite3_bind_double(stmt, 11, geo.lon);
 
     if (!geo.asn.empty()) {
         (void)sqlite3_bind_text(stmt, 12, geo.asn.c_str(), -1, kStaticText);

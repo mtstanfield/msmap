@@ -7,6 +7,21 @@
 #include <optional>
 #include <string>
 
+namespace {
+
+msmap::GeoIpResult make_renderable_geo()
+{
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.has_coords = true;
+    geo.asn = "AS64500 Example ISP";
+    return geo;
+}
+
+} // namespace
+
 // ── json::append_string ───────────────────────────────────────────────────────
 
 TEST_CASE("append_string: plain ASCII is quoted and unchanged", "[json]")
@@ -124,9 +139,9 @@ TEST_CASE("query_connections: returns all rows when no filters set", "[db][query
     msmap::LogEntry e2 = e1;
     e2.ts = 2000; e2.src_ip = "5.6.7.8"; e2.dst_port = 443;
 
-    const msmap::GeoIpResult no_geo{};
-    db.insert(e1, no_geo);
-    db.insert(e2, no_geo);
+    const auto geo = make_renderable_geo();
+    db.insert(e1, geo);
+    db.insert(e2, geo);
 
     const auto rows = db.query_connections({});
     REQUIRE(rows.size() == 2);
@@ -149,9 +164,9 @@ TEST_CASE("query_connections: filter by src_ip", "[db][query]")
     msmap::LogEntry other = base;
     other.src_ip = "9.9.9.9"; other.ts = 2000;
 
-    const msmap::GeoIpResult no_geo{};
-    db.insert(base,  no_geo);
-    db.insert(other, no_geo);
+    const auto geo = make_renderable_geo();
+    db.insert(base,  geo);
+    db.insert(other, geo);
 
     msmap::QueryFilters f;
     f.src_ip = "1.2.3.4";
@@ -174,9 +189,9 @@ TEST_CASE("query_connections: filter by dst_port", "[db][query]")
     msmap::LogEntry https = base;
     https.dst_port = 443; https.ts = 2000;
 
-    const msmap::GeoIpResult no_geo{};
-    db.insert(base,  no_geo);
-    db.insert(https, no_geo);
+    const auto geo = make_renderable_geo();
+    db.insert(base,  geo);
+    db.insert(https, geo);
 
     msmap::QueryFilters f;
     f.dst_port = 443;
@@ -196,10 +211,10 @@ TEST_CASE("query_connections: limit is respected", "[db][query]")
     base.tcp_flags = "SYN"; base.chain = "input"; base.in_iface = "ether1";
     base.rule = "FW_INPUT_NEW"; base.conn_state = "new"; base.pkt_len = 52;
 
-    const msmap::GeoIpResult no_geo{};
+    const auto geo = make_renderable_geo();
     for (int i = 0; i < 5; ++i) {
         base.ts = static_cast<std::int64_t>(i + 1);
-        db.insert(base, no_geo);
+        db.insert(base, geo);
     }
 
     msmap::QueryFilters f;
@@ -223,6 +238,7 @@ TEST_CASE("query_connections: GeoIP columns round-trip correctly", "[db][query]"
     geo.country = "DE";
     geo.lat     = 51.5;
     geo.lon     = 10.0;
+    geo.has_coords = true;
     geo.asn     = "AS1234 Example ISP";
     db.insert(e, geo);
 
@@ -245,7 +261,7 @@ TEST_CASE("query_connections: ICMP row has null ports", "[db][query]")
     e.proto = "ICMP"; e.chain = "input"; e.in_iface = "ether1";
     e.rule = "FW_INPUT_NEW"; e.conn_state = "new"; e.pkt_len = 28;
 
-    db.insert(e, msmap::GeoIpResult{});
+    db.insert(e, make_renderable_geo());
 
     const auto rows = db.query_connections({});
     REQUIRE(rows.size() == 1);

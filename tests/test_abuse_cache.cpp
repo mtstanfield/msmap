@@ -40,6 +40,16 @@ msmap::LogEntry make_entry(const std::string& src_ip)
     return e;
 }
 
+msmap::GeoIpResult make_renderable_geo()
+{
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.has_coords = true;
+    return geo;
+}
+
 } // anonymous namespace
 
 // ── Construction ─────────────────────────────────────────────────────────────
@@ -354,7 +364,7 @@ TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")
     {
         msmap::Database db{db_path};
         REQUIRE(db.valid());
-        REQUIRE(db.insert(make_entry("5.5.5.5"), msmap::GeoIpResult{}));
+        REQUIRE(db.insert(make_entry("5.5.5.5"), make_renderable_geo()));
 
         const auto rows = db.query_connections(msmap::QueryFilters{});
         REQUIRE(rows.size() == 1);
@@ -391,7 +401,7 @@ TEST_CASE("AbuseCache: update_connections_abuse skips already-enriched rows")
     {
         msmap::Database db{db_path};
         REQUIRE(db.valid());
-        REQUIRE(db.insert(make_entry("6.6.6.6"), msmap::GeoIpResult{}));
+        REQUIRE(db.insert(make_entry("6.6.6.6"), make_renderable_geo()));
     }
 
     // First enrichment: sets threat + usage_type.

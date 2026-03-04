@@ -5,6 +5,20 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+namespace {
+
+msmap::GeoIpResult make_renderable_geo()
+{
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.has_coords = true;
+    return geo;
+}
+
+} // namespace
+
 TEST_CASE("status cache: empty database snapshot is available", "[status]")
 {
     msmap::Database db{":memory:"};
@@ -48,8 +62,9 @@ TEST_CASE("status cache: populated database snapshot includes counts", "[status]
     other.ts = 1500;
     other.src_ip = "5.6.7.8";
 
-    db.insert(base, msmap::GeoIpResult{});
-    db.insert(other, msmap::GeoIpResult{});
+    const auto geo = make_renderable_geo();
+    db.insert(base, geo);
+    db.insert(other, geo);
 
     msmap::StatusCache status{db, nullptr, nullptr, nullptr, false, false, 60};
     const auto snapshot = status.snapshot();

@@ -58,6 +58,17 @@ msmap::LogEntry make_icmp_entry()
     return e;
 }
 
+msmap::GeoIpResult make_renderable_geo()
+{
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.has_coords = true;
+    geo.asn = "AS14618 Amazon.com Inc.";
+    return geo;
+}
+
 } // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -70,18 +81,18 @@ TEST_CASE("In-memory database opens successfully")
     REQUIRE(db.valid());
 }
 
-TEST_CASE("TCP entry inserts without error — no geo data")
+TEST_CASE("TCP entry inserts without error")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}));
+    REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo()));
 }
 
 TEST_CASE("ICMP entry inserts without error — ports stored as NULL")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(make_icmp_entry(), msmap::GeoIpResult{}));
+    REQUIRE(db.insert(make_icmp_entry(), make_renderable_geo()));
 }
 
 TEST_CASE("Entry inserts with populated GeoIpResult")
@@ -89,13 +100,20 @@ TEST_CASE("Entry inserts with populated GeoIpResult")
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
 
+    REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo()));
+}
+
+TEST_CASE("Entry with non-renderable GeoIpResult is rejected")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
     msmap::GeoIpResult geo;
     geo.country = "US";
-    geo.lat     = 37.751;
-    geo.lon     = -97.822;
-    geo.asn     = "AS14618 Amazon.com Inc.";
+    geo.asn = "AS14618 Amazon.com Inc.";
 
-    REQUIRE(db.insert(make_tcp_entry(), geo));
+    REQUIRE_FALSE(db.insert(make_tcp_entry(), geo));
+    CHECK(db.query_connections(msmap::QueryFilters{}).empty());
 }
 
 TEST_CASE("Multiple entries insert without error")
@@ -104,8 +122,8 @@ TEST_CASE("Multiple entries insert without error")
     REQUIRE(db.valid());
 
     for (int i = 0; i < 10; ++i) {
-        REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}));
-        REQUIRE(db.insert(make_icmp_entry(), msmap::GeoIpResult{}));
+        REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo()));
+        REQUIRE(db.insert(make_icmp_entry(), make_renderable_geo()));
     }
 }
 
@@ -116,11 +134,12 @@ TEST_CASE("prune_older_than: removes rows strictly below cutoff")
 
     // Insert three old rows and two new rows.
     auto entry = make_tcp_entry();
-    entry.ts = 1000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 2000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 3000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 5000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 6000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    const auto geo = make_renderable_geo();
+    entry.ts = 1000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 2000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 3000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 5000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 6000; REQUIRE(db.insert(entry, geo));
 
     // Prune ts < 4000 — should remove the three old rows.
     CHECK(db.prune_older_than(4000) == 3);
@@ -138,8 +157,9 @@ TEST_CASE("prune_older_than: cutoff below all rows removes nothing")
     REQUIRE(db.valid());
 
     auto entry = make_tcp_entry();
-    entry.ts = 5000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 6000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    const auto geo = make_renderable_geo();
+    entry.ts = 5000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 6000; REQUIRE(db.insert(entry, geo));
 
     CHECK(db.prune_older_than(1000) == 0);
 
@@ -153,8 +173,9 @@ TEST_CASE("prune_older_than: cutoff above all rows clears table")
     REQUIRE(db.valid());
 
     auto entry = make_tcp_entry();
-    entry.ts = 1000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    entry.ts = 2000; REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    const auto geo = make_renderable_geo();
+    entry.ts = 1000; REQUIRE(db.insert(entry, geo));
+    entry.ts = 2000; REQUIRE(db.insert(entry, geo));
 
     CHECK(db.prune_older_than(9'999'999) == 2);
 
@@ -174,7 +195,7 @@ TEST_CASE("threat score round-trips through insert and query_connections")
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
 
-    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{}, std::optional<int>{75}));
+    REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo(), std::optional<int>{75}));
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
@@ -186,7 +207,7 @@ TEST_CASE("threat score nullopt stores and reads as NULL")
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
 
-    REQUIRE(db.insert(make_tcp_entry(), msmap::GeoIpResult{})); // default threat = nullopt
+    REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo())); // default threat = nullopt
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
@@ -207,7 +228,7 @@ TEST_CASE("Entry parsed via parse_log inserts correctly")
 
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
-    REQUIRE(db.insert(result.entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(result.entry, make_renderable_geo()));
 }
 
 TEST_CASE("Duplicate suppression: identical entries produce exactly one row")
@@ -218,8 +239,8 @@ TEST_CASE("Duplicate suppression: identical entries produce exactly one row")
     const auto entry = make_tcp_entry();
 
     // First insert succeeds; second is silently ignored by INSERT OR IGNORE.
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     CHECK(rows.size() == 1);
@@ -232,8 +253,8 @@ TEST_CASE("Duplicate suppression: ICMP entries (NULL ports) deduplicate correctl
 
     const auto entry = make_icmp_entry();
 
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     CHECK(rows.size() == 1);
@@ -246,9 +267,9 @@ TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
 
     auto entry = make_tcp_entry();
     entry.ts = 1000;
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
     entry.ts = 2000;
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     const auto rows = db.query_connections(msmap::QueryFilters{});
     CHECK(rows.size() == 2);
@@ -275,15 +296,15 @@ TEST_CASE("status_snapshot: reports latest event and distinct sources")
     auto entry = make_tcp_entry();
     entry.ts = 1000;
     entry.src_ip = "198.51.100.10";
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     entry.ts = 2000;
     entry.src_ip = "198.51.100.10";
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     entry.ts = 3000;
     entry.src_ip = "203.0.113.25";
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     const auto snapshot = db.status_snapshot();
     REQUIRE(snapshot.has_value());
@@ -300,9 +321,9 @@ TEST_CASE("prune_expired: removes rows older than 24h relative to now")
 
     auto entry = make_tcp_entry();
     entry.ts = static_cast<std::int64_t>(std::time(nullptr)) - (25 * 3600);
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
     entry.ts = static_cast<std::int64_t>(std::time(nullptr)) - 60;
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(entry, make_renderable_geo()));
 
     CHECK(db.prune_expired() == 1);
 
@@ -333,6 +354,7 @@ TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
     geo.country = "US";
     geo.lat = 37.751;
     geo.lon = -97.822;
+    geo.has_coords = true;
     geo.asn = "AS64500 Example";
 
     entry.ts = 1000;
@@ -367,6 +389,7 @@ TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
     geo.country = "US";
     geo.lat = 37.751;
     geo.lon = -97.822;
+    geo.has_coords = true;
     geo.asn = "AS64500 Example";
 
     auto entry = make_tcp_entry();
@@ -467,8 +490,8 @@ TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
     auto icmp = make_icmp_entry();
     icmp.ts = 2000;
 
-    REQUIRE(db.insert(tcp, msmap::GeoIpResult{}));
-    REQUIRE(db.insert(icmp, msmap::GeoIpResult{}));
+    REQUIRE(db.insert(tcp, make_renderable_geo()));
+    REQUIRE(db.insert(icmp, make_renderable_geo()));
 
     msmap::QueryFilters filtered;
     filtered.exclude_icmp = true;
@@ -492,7 +515,7 @@ TEST_CASE("query_detail_page: returns next cursor when another page exists")
     auto entry = make_tcp_entry();
     for (int i = 0; i < 3; ++i) {
         entry.ts = 1000 + i;
-        REQUIRE(db.insert(entry, msmap::GeoIpResult{}));
+        REQUIRE(db.insert(entry, make_renderable_geo()));
     }
 
     msmap::QueryFilters filters;
@@ -513,7 +536,7 @@ TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
     entry.src_ip = "198.51.100.10";
     entry.ts = 1000;
 
-    REQUIRE(db.insert(entry, msmap::GeoIpResult{}, 42));
+    REQUIRE(db.insert(entry, make_renderable_geo(), 42));
     REQUIRE(db.upsert_ip_intel(entry.src_ip, msmap::IpIntel{
         .tor_exit = true,
         .spamhaus_drop = false,

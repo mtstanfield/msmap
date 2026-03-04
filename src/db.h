@@ -133,7 +133,8 @@ public:
     [[nodiscard]] bool valid() const noexcept { return db_ != nullptr; }
 
     /// Insert a parsed log entry with its GeoIP enrichment.
-    /// Pass a default-constructed GeoIpResult{} to store NULLs for geo columns.
+    /// Only renderable GeoIpResult values are accepted; non-renderable rows
+    /// are rejected to keep the retained dataset map-only.
     /// `threat` is the AbuseIPDB confidence score (0-100), or nullopt if not yet known.
     /// Thread-safe: acquires an internal mutex before touching SQLite.
     bool insert(const LogEntry& entry, const GeoIpResult& geo,
