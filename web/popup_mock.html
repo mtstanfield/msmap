@@ -105,6 +105,58 @@
             position: static;
         }
 
+        .mock-footer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .mock-footer-grid .mock-footer-wrap {
+            min-width: 0;
+        }
+
+        .mock-footer-mobile {
+            width: 292px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .mock-footer-mobile #status-bar {
+            flex-wrap: wrap;
+            align-items: flex-start;
+            padding: 6px 10px;
+            gap: 8px;
+        }
+
+        .mock-footer-mobile #status-left,
+        .mock-footer-mobile #status-right {
+            width: 100%;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mock-footer-mobile .status-group {
+            gap: 8px;
+        }
+
+        .mock-footer-mobile #status-right {
+            font-size: 11px;
+        }
+
+        .mock-footer-mobile.metadata-hidden #stat-brand,
+        .mock-footer-mobile.metadata-hidden #status-right a,
+        .mock-footer-mobile.metadata-hidden #stat-built {
+            display: none;
+        }
+
+        .mock-footer-mobile.live-mobile-footer #stat-events,
+        .mock-footer-mobile.live-mobile-footer #stat-events + .status-sep-ops,
+        .mock-footer-mobile.live-mobile-footer #stat-sources,
+        .mock-footer-mobile.live-mobile-footer #stat-sources + .status-sep-ops {
+            display: none;
+        }
+
         .leaflet-popup-tip-container,
         .leaflet-popup-close-button {
             display: none;
@@ -397,6 +449,10 @@
             .popup-variant-grid {
                 grid-template-columns: minmax(0, 1fr);
             }
+
+            .mock-footer-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
         }
 
         @media (max-width: 640px) {
@@ -572,6 +628,206 @@
                         </span>
                         <a href="#" rel="noopener noreferrer">GitHub</a>
                         <span id="stat-built">built 2026-03-03 11:14 UTC</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel mock-panel-wide">
+            <h1>Live Mobile Footer</h1>
+            <p>Current mobile footer stack with <code>Feeds</code> and <code>Abuse</code> added back to the top row, while <code>Events</code> and <code>Sources</code> stay hidden.</p>
+            <div class="mock-footer-wrap mock-footer-mobile live-mobile-footer">
+                <div id="status-bar">
+                    <div id="status-left">
+                        <div class="status-group">
+                            <span class="status-item">
+                                <span class="status-label">Mapped</span>
+                                <span class="status-value status-value-ops">184</span>
+                            </span>
+                            <span class="status-sep" aria-hidden="true">&middot;</span>
+                            <span class="status-item">
+                                <span class="status-label">Hits</span>
+                                <span class="status-value status-value-ops">12.4K</span>
+                            </span>
+                        </div>
+                        <div id="status-ops" class="status-group">
+                            <span id="stat-events" class="status-item status-item-ops">
+                                <span class="status-label">Events</span>
+                                <span class="status-value status-value-ops">248K</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span id="stat-sources" class="status-item status-item-ops">
+                                <span class="status-label">Sources</span>
+                                <span class="status-value status-value-ops">18.7K</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-item-ops">
+                                <span class="status-label">Feeds</span>
+                                <span class="status-value status-value-ops status-state-ok">ok</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-item-ops">
+                                <span class="status-label">Abuse</span>
+                                <span class="status-value status-value-ops status-state-ok">ok</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div id="status-right">
+                        <div class="status-group status-freshness">
+                            <span class="status-dot is-healthy" aria-hidden="true"></span>
+                            <span>Updated 18s ago</span>
+                        </div>
+                        <span id="stat-brand">
+                            <span class="brand-mark" aria-hidden="true">🌐</span>
+                            <span class="brand-name">msmap</span>
+                        </span>
+                        <a href="#" rel="noopener noreferrer">GitHub</a>
+                        <span id="stat-built">built 2026-03-03 11:14 UTC</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mock-panel mock-panel-wide">
+            <h1>Mobile Footer Variants</h1>
+            <p>Variant 1 replaces the metadata row with full ops status. Variant 2 keeps only <code>Updated</code>, <code>Feeds</code>, and <code>Abuse</code> on the second row.</p>
+            <div class="mock-footer-grid">
+                <div>
+                    <h1 style="margin-bottom: 8px;">Variant 1</h1>
+                    <p>Two rows: <code>Mapped</code>/<code>Hits</code>, then <code>Events</code>/<code>Sources</code>/<code>Feeds</code>/<code>Abuse</code>.</p>
+                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
+                        <div id="status-bar">
+                            <div id="status-left">
+                                <div class="status-group">
+                                    <span class="status-item">
+                                        <span class="status-label">Mapped</span>
+                                        <span class="status-value status-value-ops">184</span>
+                                    </span>
+                                    <span class="status-sep" aria-hidden="true">&middot;</span>
+                                    <span class="status-item">
+                                        <span class="status-label">Hits</span>
+                                        <span class="status-value status-value-ops">12.4K</span>
+                                    </span>
+                                </div>
+                                <div id="status-ops" class="status-group">
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Events</span>
+                                        <span class="status-value status-value-ops">248K</span>
+                                    </span>
+                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Sources</span>
+                                        <span class="status-value status-value-ops">18.7K</span>
+                                    </span>
+                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Feeds</span>
+                                        <span class="status-value status-value-ops status-state-ok">ok</span>
+                                    </span>
+                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Abuse</span>
+                                        <span class="status-value status-value-ops status-state-ok">ok</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="status-right">
+                                <div class="status-group status-freshness">
+                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
+                                    <span>Updated 18s ago</span>
+                                </div>
+                                <span id="stat-brand">
+                                    <span class="brand-mark" aria-hidden="true">🌐</span>
+                                    <span class="brand-name">msmap</span>
+                                </span>
+                                <a href="#" rel="noopener noreferrer">GitHub</a>
+                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h1 style="margin-bottom: 8px;">Variant 2</h1>
+                    <p>Two rows: <code>Mapped</code>/<code>Hits</code>, then only <code>Updated</code>, <code>Feeds</code>, and <code>Abuse</code>.</p>
+                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
+                        <div id="status-bar">
+                            <div id="status-left">
+                                <div class="status-group">
+                                    <span class="status-item">
+                                        <span class="status-label">Mapped</span>
+                                        <span class="status-value status-value-ops">184</span>
+                                    </span>
+                                    <span class="status-sep" aria-hidden="true">&middot;</span>
+                                    <span class="status-item">
+                                        <span class="status-label">Hits</span>
+                                        <span class="status-value status-value-ops">12.4K</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="status-right">
+                                <div class="status-group status-freshness">
+                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
+                                    <span>Updated 18s ago</span>
+                                </div>
+                                <span class="status-item status-item-ops">
+                                    <span class="status-label">Feeds</span>
+                                    <span class="status-value status-value-ops status-state-ok">ok</span>
+                                </span>
+                                <span class="status-item status-item-ops">
+                                    <span class="status-label">Abuse</span>
+                                    <span class="status-value status-value-ops status-state-ok">ok</span>
+                                </span>
+                                <span id="stat-brand">
+                                    <span class="brand-mark" aria-hidden="true">🌐</span>
+                                    <span class="brand-name">msmap</span>
+                                </span>
+                                <a href="#" rel="noopener noreferrer">GitHub</a>
+                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h1 style="margin-bottom: 8px;">Variant 3</h1>
+                    <p>Top row combines <code>Mapped</code>, <code>Hits</code>, <code>Feeds</code>, and <code>Abuse</code>. Second row keeps <code>Updated</code>.</p>
+                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
+                        <div id="status-bar">
+                            <div id="status-left">
+                                <div class="status-group">
+                                    <span class="status-item">
+                                        <span class="status-label">Mapped</span>
+                                        <span class="status-value status-value-ops">184</span>
+                                    </span>
+                                    <span class="status-sep" aria-hidden="true">&middot;</span>
+                                    <span class="status-item">
+                                        <span class="status-label">Hits</span>
+                                        <span class="status-value status-value-ops">12.4K</span>
+                                    </span>
+                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Feeds</span>
+                                        <span class="status-value status-value-ops status-state-ok">ok</span>
+                                    </span>
+                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                                    <span class="status-item status-item-ops">
+                                        <span class="status-label">Abuse</span>
+                                        <span class="status-value status-value-ops status-state-ok">ok</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="status-right">
+                                <div class="status-group status-freshness">
+                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
+                                    <span>Updated 18s ago</span>
+                                </div>
+                                <span id="stat-brand">
+                                    <span class="brand-mark" aria-hidden="true">🌐</span>
+                                    <span class="brand-name">msmap</span>
+                                </span>
+                                <a href="#" rel="noopener noreferrer">GitHub</a>
+                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

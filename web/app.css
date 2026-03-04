@@ -1149,9 +1149,10 @@ html, body {
         font-size: 11px;
     }
 
-    #status-ops,
-    .status-item-ops,
-    .status-sep-ops {
+    #stat-events,
+    #stat-events + .status-sep-ops,
+    #stat-sources,
+    #stat-sources + .status-sep-ops {
         display: none;
     }
 }
