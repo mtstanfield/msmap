@@ -355,7 +355,7 @@ function setSeverityValue(value, { save = true, repoll = true, force = false } =
         button.setAttribute('aria-checked', selected ? 'true' : 'false');
         button.tabIndex = selected ? 0 : -1;
     });
-    fSeverityText.textContent = next ? ('Severity: ' + severityLabel(next)) : 'All severities';
+    fSeverityText.textContent = 'Threat: ' + severityLabel(next);
     if (save && (changed || force)) {
         saveFilters();
     }

@@ -564,7 +564,7 @@ html, body {
     grid-template-columns: auto repeat(5, 1fr);
     gap: 6px;
     align-items: center;
-    margin-top: 1px;
+    margin-top: 5px;
 }
 
 .filter-severity-button {
