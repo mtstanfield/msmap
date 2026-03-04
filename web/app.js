@@ -22,7 +22,7 @@ const DEFAULT_FILTERS = Object.freeze({
     ip: '',
     port: '',
     country: '',
-    severity: '',
+    threat: '',
 });
 
 const appliedTextFilters = {
@@ -40,7 +40,7 @@ function currentFilterState() {
         ip:          appliedTextFilters.ip,
         port:        appliedTextFilters.port,
         country:     appliedTextFilters.country,
-        severity:    activeSeverity,
+        threat:      activeThreat,
     };
 }
 
@@ -52,7 +52,7 @@ function writeFiltersToUrl() {
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
-    if (state.severity)                                    { params.set('severity', state.severity); }
+    if (state.threat)                                      { params.set('threat', state.threat); }
     const next = params.toString();
     const base = window.location.pathname || '/';
     const target = next ? (base + '?' + next) : base;
@@ -82,7 +82,7 @@ function parseUrlFilterState() {
     setIfPresent('ip', 'ip');
     setIfPresent('port', 'port');
     setIfPresent('country', 'country');
-    setIfPresent('severity', 'severity');
+    setIfPresent('threat', 'threat');
 
     return found ? state : null;
 }
@@ -112,7 +112,7 @@ function loadFilters() {
         if (s.ip          !== undefined) { fIp.value = s.ip; }
         if (s.port        !== undefined) { fPort.value = s.port; }
         if (s.country     !== undefined) { fCountry.value = s.country; }
-        if (s.severity    !== undefined) { setSeverityValue(s.severity, { save: false, repoll: false }); }
+        if (s.threat      !== undefined) { setThreatValue(s.threat, { save: false, repoll: false }); }
     }
 
     setMotionValue(readStoredMotion(), { save: false, repoll: false, force: true });
@@ -149,7 +149,7 @@ const cluster = L.markerClusterGroup({
     iconCreateFunction(clusterMarker) {
         const children = clusterMarker.getAllChildMarkers();
         const total = children.length;
-        const nHigh = children.filter(m => m.options.severity === 'high').length;
+        const nHigh = children.filter(m => m.options.threat === 'high').length;
         const hasSpike = children.some(m => m.options.spiking === true);
         const ratio = total > 0 ? nHigh / total : 0;
         let cls;
@@ -197,15 +197,15 @@ const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
-const fSeverityButtons = Array.from(document.querySelectorAll('[data-severity]'));
-const fSeverityText = document.getElementById('f-severity-text');
+const fThreatButtons = Array.from(document.querySelectorAll('[data-threat]'));
+const fThreatText = document.getElementById('f-threat-text');
 const fMotionOn     = document.getElementById('f-motion-on');
 const fMotionOff    = document.getElementById('f-motion-off');
 const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 let activeFilterPanelTab = 'filters';
-let activeSeverity = DEFAULT_FILTERS.severity;
+let activeThreat = DEFAULT_FILTERS.threat;
 let activeMotion = 'on';
 
 function setFilterPanelTab(tabName) {
@@ -228,7 +228,7 @@ function setFilterPanelOpen(open) {
 
 setFilterPanelTab('filters');
 setFilterPanelOpen(!isMobileMapUi());
-setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false });
+setThreatValue(DEFAULT_FILTERS.threat, { save: false, repoll: false });
 setMotionValue('on', { save: false, repoll: false, force: true });
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
@@ -303,7 +303,7 @@ function setInputValidity(el, valid) {
     el.title = 'Enter a complete valid value or clear the field.';
 }
 
-function severityLabel(value) {
+function threatLabel(value) {
     switch (value) {
         case 'unknown': return 'Unknown';
         case 'clean': return 'Clean';
@@ -314,7 +314,7 @@ function severityLabel(value) {
     }
 }
 
-function isValidSeverity(value) {
+function isValidThreat(value) {
     return value === '' || value === 'unknown' || value === 'clean' ||
         value === 'low' || value === 'medium' || value === 'high';
 }
@@ -345,17 +345,17 @@ function setMotionValue(value, { save = true, repoll = true, force = false } = {
     }
 }
 
-function setSeverityValue(value, { save = true, repoll = true, force = false } = {}) {
-    const next = isValidSeverity(value) ? value : DEFAULT_FILTERS.severity;
-    const changed = next !== activeSeverity;
-    activeSeverity = next;
-    fSeverityButtons.forEach((button) => {
-        const selected = button.dataset.severity === next;
+function setThreatValue(value, { save = true, repoll = true, force = false } = {}) {
+    const next = isValidThreat(value) ? value : DEFAULT_FILTERS.threat;
+    const changed = next !== activeThreat;
+    activeThreat = next;
+    fThreatButtons.forEach((button) => {
+        const selected = button.dataset.threat === next;
         button.classList.toggle('is-active', selected);
         button.setAttribute('aria-checked', selected ? 'true' : 'false');
         button.tabIndex = selected ? 0 : -1;
     });
-    fSeverityText.textContent = 'Threat: ' + severityLabel(next);
+    fThreatText.textContent = 'Threats: ' + threatLabel(next);
     if (save && (changed || force)) {
         saveFilters();
     }
@@ -511,7 +511,7 @@ function resetToDefaults() {
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
-    setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false, force: true });
+    setThreatValue(DEFAULT_FILTERS.threat, { save: false, repoll: false, force: true });
     setMotionValue('on', { save: true, repoll: false, force: true });
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
@@ -538,9 +538,9 @@ fMotionOn.addEventListener('click', () => {
 fMotionOff.addEventListener('click', () => {
     setMotionValue('off');
 });
-fSeverityButtons.forEach((button, index) => {
+fThreatButtons.forEach((button, index) => {
     button.addEventListener('click', () => {
-        setSeverityValue(button.dataset.severity || '');
+        setThreatValue(button.dataset.threat || '');
     });
     button.addEventListener('keydown', (event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
@@ -548,10 +548,10 @@ fSeverityButtons.forEach((button, index) => {
         }
         event.preventDefault();
         const step = event.key === 'ArrowRight' ? 1 : -1;
-        const nextIndex = (index + step + fSeverityButtons.length) % fSeverityButtons.length;
-        const nextButton = fSeverityButtons[nextIndex];
+        const nextIndex = (index + step + fThreatButtons.length) % fThreatButtons.length;
+        const nextButton = fThreatButtons[nextIndex];
         nextButton.focus();
-        setSeverityValue(nextButton.dataset.severity || '');
+        setThreatValue(nextButton.dataset.threat || '');
     });
 });
 
@@ -609,7 +609,7 @@ function markerColor(threat) {
     return '#f85149';
 }
 
-function markerSeverity(row) {
+function markerThreat(row) {
     if (row.spamhaus_drop === true) { return 'high'; }
     const threat = row.threat_max;
     if (threat === null || threat === undefined) { return 'unknown'; }
@@ -854,7 +854,7 @@ function buildMapQueryString() {
     if (appliedTextFilters.ip)      { params.set('ip', appliedTextFilters.ip); }
     if (appliedTextFilters.port)    { params.set('port', appliedTextFilters.port); }
     if (appliedTextFilters.country) { params.set('country', appliedTextFilters.country); }
-    if (activeSeverity)             { params.set('severity', activeSeverity); }
+    if (activeThreat)               { params.set('threat', activeThreat); }
     return '?' + params.toString();
 }
 
@@ -1571,10 +1571,10 @@ function renderMap(rows) {
         }
         totalSeen += Number.isFinite(r.count) ? r.count : 0;
 
-        const severity = markerSeverity(r);
+        const threat = markerThreat(r);
         const spiking = isSpikeMarker(r);
         const mobileUi = isMobileMapUi();
-        const color = severity === 'high'
+        const color = threat === 'high'
             ? '#f85149'
             : markerColor((r.threat_max !== undefined) ? r.threat_max : null);
         const marker = L.circleMarker([r.lat, r.lon], {
@@ -1583,7 +1583,7 @@ function renderMap(rows) {
             fillColor:   color,
             fillOpacity: 0.75,
             weight:      mobileUi ? (spiking ? 2.5 : 2) : (spiking ? 2 : 1),
-            severity:    severity,
+            threat:      threat,
             spiking:     spiking,
             srcIp:       r.src_ip,
         });

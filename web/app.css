@@ -67,7 +67,7 @@ html, body {
 #f-defaults:focus-visible,
 #filter-panel .filter-header-toggle-button:focus-visible,
 #filter-panel .filter-tab-button:focus-visible,
-#filter-panel .filter-severity-button:focus-visible,
+#filter-panel .filter-threat-button:focus-visible,
 #filter-panel select:focus-visible,
 #filter-panel input:focus-visible,
 .popup-detail-button:focus-visible,
@@ -559,7 +559,7 @@ html, body {
     margin-top: 4px;
 }
 
-.filter-severity {
+.filter-threat {
     display: grid;
     grid-template-columns: auto repeat(5, 1fr);
     gap: 6px;
@@ -567,7 +567,7 @@ html, body {
     margin-top: 5px;
 }
 
-.filter-severity-button {
+.filter-threat-button {
     min-width: 0;
     width: 100%;
     height: 28px;
@@ -583,19 +583,19 @@ html, body {
     transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
-.filter-severity-button:hover {
+.filter-threat-button:hover {
     background: #161b22;
     color: #c9d1d9;
 }
 
-.filter-severity-button.is-active {
+.filter-threat-button.is-active {
     border-color: #58a6ff;
     background: #161b22;
     color: #e6edf3;
     box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.18);
 }
 
-.filter-severity-button-all {
+.filter-threat-button-all {
     width: auto;
     padding: 0 10px;
     font-size: 11px;
@@ -604,7 +604,7 @@ html, body {
     text-transform: uppercase;
 }
 
-.filter-severity-dot {
+.filter-threat-dot {
     width: 10px;
     height: 10px;
     border-radius: 999px;
@@ -612,7 +612,7 @@ html, body {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.filter-severity-text {
+.filter-threat-text {
     margin-top: 4px;
     color: #8b949e;
     font-size: 10px;

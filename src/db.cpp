@@ -190,7 +190,7 @@ struct BoundFilterState {
     bool has_src_ip{false};
     bool has_country{false};
     bool has_proto{false};
-    bool has_severity{false};
+    bool has_threat{false};
     bool exclude_icmp{false};
     bool has_port{false};
 };
@@ -199,7 +199,7 @@ struct WhereInputs {
     std::string_view src_ip;
     std::string_view country;
     std::string_view proto;
-    std::string_view severity;
+    std::string_view threat;
     bool             exclude_icmp{false};
     std::int64_t     since{};
     std::int64_t     until{};
@@ -214,7 +214,7 @@ BoundFilterState build_where_clause(std::string& sql, const WhereInputs& inputs)
     state.has_src_ip  = !inputs.src_ip.empty();
     state.has_country = !inputs.country.empty();
     state.has_proto   = !inputs.proto.empty();
-    state.has_severity = !inputs.severity.empty();
+    state.has_threat = !inputs.threat.empty();
     state.exclude_icmp = !state.has_proto && inputs.exclude_icmp;
     state.has_port    = inputs.dst_port > 0;
 
@@ -228,16 +228,16 @@ BoundFilterState build_where_clause(std::string& sql, const WhereInputs& inputs)
     if (state.has_src_ip)  { add_cond("src_ip = ?"); }
     if (state.has_country) { add_cond("country = ?"); }
     if (state.has_proto)   { add_cond("proto = ?"); }
-    if (state.has_severity) {
-        if (inputs.severity == "unknown") {
+    if (state.has_threat) {
+        if (inputs.threat == "unknown") {
             add_cond("threat IS NULL");
-        } else if (inputs.severity == "clean") {
+        } else if (inputs.threat == "clean") {
             add_cond("threat = 0");
-        } else if (inputs.severity == "low") {
+        } else if (inputs.threat == "low") {
             add_cond("threat BETWEEN 1 AND 33");
-        } else if (inputs.severity == "medium") {
+        } else if (inputs.threat == "medium") {
             add_cond("threat BETWEEN 34 AND 66");
-        } else if (inputs.severity == "high") {
+        } else if (inputs.threat == "high") {
             add_cond("threat BETWEEN 67 AND 100");
         }
     }
@@ -696,7 +696,7 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
         "intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
-    const WhereInputs inputs{f.src_ip, f.country, f.proto, f.severity, f.exclude_icmp,
+    const WhereInputs inputs{f.src_ip, f.country, f.proto, f.threat, f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);
     sql += " ORDER BY ts DESC";

@@ -320,12 +320,12 @@ MapFilters parse_map_filters(MHD_Connection* conn)
             f.proto = raw;
         }
     }
-    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "severity");
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "threat");
         v != nullptr) {
         const std::string raw = safe_param(v, 7);
         if (raw == "unknown" || raw == "clean" || raw == "low" ||
             raw == "medium" || raw == "high") {
-            f.severity = raw;
+            f.threat = raw;
         }
     }
     if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "port");

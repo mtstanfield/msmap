@@ -358,7 +358,7 @@ TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
     CHECK(*rows.at(1).threat_max == 75);
 }
 
-TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]")
+TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -404,7 +404,7 @@ TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]"
 
     SECTION("clean")
     {
-        filters.severity = "clean";
+        filters.threat = "clean";
         const auto rows = db.query_map_rows(filters);
         REQUIRE(rows.size() == 1);
         CHECK(rows.front().src_ip == "198.51.100.10");
@@ -417,7 +417,7 @@ TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]"
 
     SECTION("unknown")
     {
-        filters.severity = "unknown";
+        filters.threat = "unknown";
         const auto rows = db.query_map_rows(filters);
         REQUIRE(rows.size() == 1);
         CHECK(rows.front().src_ip == "198.51.100.11");
@@ -426,7 +426,7 @@ TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]"
 
     SECTION("low")
     {
-        filters.severity = "low";
+        filters.threat = "low";
         const auto rows = db.query_map_rows(filters);
         REQUIRE(rows.size() == 1);
         CHECK(rows.front().src_ip == "198.51.100.12");
@@ -436,7 +436,7 @@ TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]"
 
     SECTION("medium")
     {
-        filters.severity = "medium";
+        filters.threat = "medium";
         const auto rows = db.query_map_rows(filters);
         REQUIRE(rows.size() == 1);
         CHECK(rows.front().src_ip == "198.51.100.13");
@@ -446,7 +446,7 @@ TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]"
 
     SECTION("high")
     {
-        filters.severity = "high";
+        filters.threat = "high";
         const auto rows = db.query_map_rows(filters);
         REQUIRE(rows.size() == 2);
         CHECK(rows.at(0).src_ip == "198.51.100.14");

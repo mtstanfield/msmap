@@ -277,11 +277,11 @@
             transition: transform 200ms ease-out, opacity 140ms ease-out;
         }
 
-        .spiderfy-node[data-severity="medium"] {
+        .spiderfy-node[data-threat="medium"] {
             background: #f0883e;
         }
 
-        .spiderfy-node[data-severity="low"] {
+        .spiderfy-node[data-threat="low"] {
             background: #d29922;
         }
 
@@ -599,7 +599,7 @@
 
         <section class="mock-panel mock-panel-wide">
             <h1>Tabbed Control Panel</h1>
-            <p>Desktop and mobile examples of the tabbed control panel, plus a native select comparison for the severity control.</p>
+            <p>Desktop and mobile examples of the tabbed control panel, plus a native select comparison for the threat control.</p>
             <div class="mock-footer-grid">
                 <div>
                     <h1 style="margin-bottom: 8px;">Desktop Dot Strip</h1>
@@ -632,15 +632,15 @@
                                 <input type="text" placeholder="any">
                                 <label class="filter-label">Country</label>
                                 <input type="text" placeholder="US">
-                                <div class="filter-severity" role="radiogroup" aria-label="Threat">
-                                    <button type="button" class="filter-severity-button filter-severity-button-all" role="radio" aria-checked="false">All</button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-unknown" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button is-active" role="radio" aria-checked="true"><span class="filter-severity-dot threat-clean" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-low" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-medium" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-high" aria-hidden="true"></span></button>
+                                <div class="filter-threat" role="radiogroup" aria-label="Threat">
+                                    <button type="button" class="filter-threat-button filter-threat-button-all" role="radio" aria-checked="false">All</button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-unknown" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button is-active" role="radio" aria-checked="true"><span class="filter-threat-dot threat-clean" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-low" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-medium" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-high" aria-hidden="true"></span></button>
                                 </div>
-                                <div class="filter-severity-text">Threat: Clean</div>
+                                <div class="filter-threat-text">Threats: Clean</div>
                             </div>
                         </div>
                     </div>
@@ -703,15 +703,15 @@
                                 <select><option>All</option></select>
                                 <label class="filter-label">Country</label>
                                 <input type="text" placeholder="US">
-                                <div class="filter-severity" role="radiogroup" aria-label="Threat">
-                                    <button type="button" class="filter-severity-button filter-severity-button-all" role="radio" aria-checked="false">All</button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-unknown" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-clean" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-low" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button is-active" role="radio" aria-checked="true"><span class="filter-severity-dot threat-medium" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-severity-button" role="radio" aria-checked="false"><span class="filter-severity-dot threat-high" aria-hidden="true"></span></button>
+                                <div class="filter-threat" role="radiogroup" aria-label="Threat">
+                                    <button type="button" class="filter-threat-button filter-threat-button-all" role="radio" aria-checked="false">All</button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-unknown" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-clean" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-low" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button is-active" role="radio" aria-checked="true"><span class="filter-threat-dot threat-medium" aria-hidden="true"></span></button>
+                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-high" aria-hidden="true"></span></button>
                                 </div>
-                                <div class="filter-severity-text">Threat: Medium</div>
+                                <div class="filter-threat-text">Threats: Medium</div>
                             </div>
                         </div>
                     </div>
@@ -1272,7 +1272,7 @@
                     const spike = i % 3 === 0;
                     node.className = 'spiderfy-node';
                     node.dataset.spike = spike ? 'true' : 'false';
-                    node.dataset.severity = i % 5 === 0 ? 'medium' : (i % 2 === 0 ? 'high' : 'low');
+                    node.dataset.threat = i % 5 === 0 ? 'medium' : (i % 2 === 0 ? 'high' : 'low');
                     node.textContent = spike ? '!' : '!';
                     node.style.setProperty('--dx', `${Math.cos(angle) * radius}px`);
                     node.style.setProperty('--dy', `${Math.sin(angle) * radius}px`);

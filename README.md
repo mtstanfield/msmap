@@ -320,7 +320,7 @@ events from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
-| Severity | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
+| Threat | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
 | Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
 The top-right controls panel is tabbed into `Filters` and `Legend`, with
@@ -392,7 +392,7 @@ The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup, and it stays open across normal map refreshes
 while the same source IP remains visible in the current filtered view.
-The map-level severity filter constrains aggregate rows from `/api/map`; the
+The map-level threat filter constrains aggregate rows from `/api/map`; the
 desktop drilldown still uses the existing source/time/proto/port detail query
 path in this version.
 
@@ -444,7 +444,7 @@ Supported query parameters:
 | `ip` | optional exact source IP filter |
 | `port` | optional exact destination port filter |
 | `country` | optional 2-letter country filter |
-| `severity` | optional exact threat bucket: `unknown`, `clean`, `low`, `medium`, or `high` |
+| `threat` | optional exact threat bucket: `unknown`, `clean`, `low`, `medium`, or `high` |
 
 Notes:
 
