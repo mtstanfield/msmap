@@ -385,6 +385,10 @@ html, body {
     min-height: 0;
 }
 
+.filter-tab-panel[hidden] {
+    display: none !important;
+}
+
 #filter-tab-filters {
     display: flex;
     flex-direction: column;
