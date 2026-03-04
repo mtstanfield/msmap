@@ -210,6 +210,7 @@ filterToggle.addEventListener('click', () => {
 let mappedCount   = 0;
 let totalSeen     = 0;
 let lastMapTs     = 0;
+let lastMapGeneratedAt = 0;
 let isInitialLoad = true;
 let pollTimer     = null;
 let pollInFlight  = false;
@@ -1383,7 +1384,9 @@ function isSpikeMarker(row) {
         return false;
     }
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = Number.isFinite(lastMapGeneratedAt) && lastMapGeneratedAt > 0
+        ? lastMapGeneratedAt
+        : Math.floor(Date.now() / 1000);
     const count = row.count;
     const span = Math.max(0, row.last_ts - row.first_ts);
     const age = Math.max(0, now - row.last_ts);
@@ -1529,6 +1532,9 @@ async function poll() {
 
         const body = await resp.json();
         const rows = Array.isArray(body.rows) ? body.rows : [];
+        lastMapGeneratedAt = Number.isFinite(body.generated_at)
+            ? body.generated_at
+            : Math.floor(Date.now() / 1000);
         setError('');
         renderMap(rows);
 
@@ -1563,6 +1569,7 @@ function pollNow() {
     clearActiveArcs();
     isInitialLoad = true;
     lastMapTs = 0;
+    lastMapGeneratedAt = 0;
     setStatusCounts(0, 0);
     setStatusFreshness('Refreshing...');
     requestPollNow();
