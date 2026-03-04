@@ -172,6 +172,8 @@ std::string status_to_json(const StatusPayload& snapshot)
                                 : std::nullopt);
     out += ",\"abuse_quota_exhausted\":";
     out += snapshot.abuse_quota_exhausted ? "true" : "false";
+    out += ",\"abuse_quota_retry_after_ts\":";
+    append_i64_or_null(out, snapshot.abuse_quota_retry_after_ts);
     out += ",\"intel_enabled\":";
     out += snapshot.intel_enabled ? "true" : "false";
     out += ",\"home_configured\":";

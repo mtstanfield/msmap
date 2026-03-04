@@ -125,6 +125,9 @@ public:
     /// Last quota remaining value confirmed by an AbuseIPDB HTTP response.
     [[nodiscard]] std::optional<int> confirmed_rate_remaining() const noexcept;
 
+    /// Next scheduled epoch timestamp for a post-midnight quota retry probe.
+    [[nodiscard]] std::optional<std::int64_t> quota_retry_after_ts() const noexcept;
+
     /// Test hook for simulating quota exhaustion or partial remaining quota.
     void set_rate_remaining_for_test(int remaining) noexcept;
 

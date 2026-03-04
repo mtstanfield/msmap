@@ -733,13 +733,11 @@ function formatCompactCount(value) {
     }).format(value);
 }
 
-function formatUtcMidnightCountdown(nowSec) {
-    if (!Number.isFinite(nowSec) || nowSec < 0) {
+function formatCountdownUntil(targetSec, nowSec) {
+    if (!Number.isFinite(targetSec) || !Number.isFinite(nowSec) || nowSec < 0) {
         return null;
     }
-    const secondsPerDay = 24 * 60 * 60;
-    const nextMidnightSec = (Math.floor(nowSec / secondsPerDay) + 1) * secondsPerDay;
-    const remainingSec = Math.max(0, nextMidnightSec - nowSec);
+    const remainingSec = Math.max(0, targetSec - nowSec);
     const remainingMins = Math.ceil(remainingSec / 60);
     if (remainingMins <= 1) {
         return '~<1m';
@@ -751,6 +749,15 @@ function formatUtcMidnightCountdown(nowSec) {
         return '~' + mins + 'm';
     }
     return '~' + hours + 'h' + mins + 'm';
+}
+
+function formatUtcMidnightCountdown(nowSec) {
+    if (!Number.isFinite(nowSec) || nowSec < 0) {
+        return null;
+    }
+    const secondsPerDay = 24 * 60 * 60;
+    const nextMidnightSec = (Math.floor(nowSec / secondsPerDay) + 1) * secondsPerDay;
+    return formatCountdownUntil(nextMidnightSec, nowSec);
 }
 
 function setOperatorStatus(status) {
@@ -813,10 +820,22 @@ function setOperatorStatus(status) {
         statAbuseValue.textContent = 'quota';
         statAbuseValue.classList.add('status-state-stale');
         const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
-        const quotaResetCountdown = formatUtcMidnightCountdown(now);
-        statAbuse.dataset.tooltip = quotaResetCountdown
-            ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + ' (UTC midnight).')
-            : 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
+        const retryAfterTs = Number.isFinite(status.abuse_quota_retry_after_ts)
+            ? status.abuse_quota_retry_after_ts
+            : null;
+        const retryCountdown = retryAfterTs !== null
+            ? formatCountdownUntil(retryAfterTs, now)
+            : null;
+        if (retryCountdown !== null) {
+            statAbuse.dataset.tooltip =
+                'AbuseIPDB daily quota is exhausted. 0 requests remaining today. Next automatic retry in ' +
+                retryCountdown + '.';
+        } else {
+            const quotaResetCountdown = formatUtcMidnightCountdown(now);
+            statAbuse.dataset.tooltip = quotaResetCountdown
+                ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + ' (UTC midnight).')
+                : 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
+        }
     } else {
         statAbuseValue.textContent = 'ok';
         statAbuseValue.classList.add('status-state-ok');

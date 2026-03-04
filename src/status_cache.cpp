@@ -29,6 +29,10 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
     payload.abuse_quota_exhausted =
         abuse_enabled && payload.abuse_rate_remaining.has_value() &&
         *payload.abuse_rate_remaining <= 0;
+    payload.abuse_quota_retry_after_ts =
+        (abuse_enabled && abuse_cache != nullptr)
+            ? abuse_cache->quota_retry_after_ts()
+            : std::nullopt;
     payload.intel_enabled = intel_enabled;
     payload.home_configured = home_resolver != nullptr;
     payload.home_valid = payload.home_configured && home_resolver->get().valid;
@@ -126,6 +130,10 @@ void StatusCache::refresh_snapshot() noexcept
     payload.abuse_quota_exhausted =
         abuse_enabled_ && payload.abuse_rate_remaining.has_value() &&
         *payload.abuse_rate_remaining <= 0;
+    payload.abuse_quota_retry_after_ts =
+        (abuse_enabled_ && abuse_cache_ != nullptr)
+            ? abuse_cache_->quota_retry_after_ts()
+            : std::nullopt;
     payload.intel_enabled = intel_enabled_;
     payload.home_configured = home_resolver_ != nullptr;
     payload.home_valid = payload.home_configured && home_resolver_->get().valid;

@@ -164,6 +164,8 @@ TEST_CASE("AbuseCache: expired post-midnight retry releases one probe request")
 
     cache.set_rate_remaining_for_test(0);
     cache.arm_quota_retry_for_test(100, true);
+    REQUIRE(cache.quota_retry_after_ts().has_value());
+    CHECK(*cache.quota_retry_after_ts() == 100);
 
     CHECK_FALSE(cache.release_quota_retry_probe_if_due_for_test(99));
     CHECK(cache.rate_remaining() == 0);

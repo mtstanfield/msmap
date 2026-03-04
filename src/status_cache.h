@@ -23,6 +23,7 @@ struct StatusPayload {
     bool                          abuse_enabled{false};
     std::optional<int>            abuse_rate_remaining;
     bool                          abuse_quota_exhausted{false};
+    std::optional<std::int64_t>   abuse_quota_retry_after_ts;
     bool                          intel_enabled{false};
     bool                          home_configured{false};
     bool                          home_valid{false};
