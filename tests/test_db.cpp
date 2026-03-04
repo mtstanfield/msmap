@@ -358,6 +358,105 @@ TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
     CHECK(*rows.at(1).threat_max == 75);
 }
 
+TEST_CASE("query_map_rows: severity filters exact threat buckets", "[db][query]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.asn = "AS64500 Example";
+
+    auto entry = make_tcp_entry();
+    entry.src_ip = "198.51.100.10";
+    entry.ts = 1000;
+    REQUIRE(db.insert(entry, geo, 0));
+    entry.ts = 1100;
+    REQUIRE(db.insert(entry, geo, 0));
+    entry.ts = 1200;
+    REQUIRE(db.insert(entry, geo, 80));
+
+    auto unknown = entry;
+    unknown.src_ip = "198.51.100.11";
+    unknown.ts = 1300;
+    REQUIRE(db.insert(unknown, geo));
+
+    auto low = entry;
+    low.src_ip = "198.51.100.12";
+    low.ts = 1400;
+    REQUIRE(db.insert(low, geo, 20));
+
+    auto medium = entry;
+    medium.src_ip = "198.51.100.13";
+    medium.ts = 1500;
+    REQUIRE(db.insert(medium, geo, 50));
+
+    auto high = entry;
+    high.src_ip = "198.51.100.14";
+    high.ts = 1600;
+    REQUIRE(db.insert(high, geo, 90));
+
+    msmap::MapFilters filters;
+    filters.since = 1;
+    filters.until = 5000;
+
+    SECTION("clean")
+    {
+        filters.severity = "clean";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.10");
+        CHECK(rows.front().count == 2);
+        CHECK(rows.front().first_ts == 1000);
+        CHECK(rows.front().last_ts == 1100);
+        REQUIRE(rows.front().threat_max.has_value());
+        CHECK(*rows.front().threat_max == 0);
+    }
+
+    SECTION("unknown")
+    {
+        filters.severity = "unknown";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.11");
+        CHECK_FALSE(rows.front().threat_max.has_value());
+    }
+
+    SECTION("low")
+    {
+        filters.severity = "low";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.12");
+        REQUIRE(rows.front().threat_max.has_value());
+        CHECK(*rows.front().threat_max == 20);
+    }
+
+    SECTION("medium")
+    {
+        filters.severity = "medium";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.13");
+        REQUIRE(rows.front().threat_max.has_value());
+        CHECK(*rows.front().threat_max == 50);
+    }
+
+    SECTION("high")
+    {
+        filters.severity = "high";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 2);
+        CHECK(rows.at(0).src_ip == "198.51.100.14");
+        CHECK(rows.at(1).src_ip == "198.51.100.10");
+        REQUIRE(rows.at(1).threat_max.has_value());
+        CHECK(*rows.at(1).threat_max == 80);
+        CHECK(rows.at(1).count == 1);
+    }
+}
+
 TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
 {
     msmap::Database db{":memory:"};

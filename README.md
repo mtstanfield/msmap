@@ -320,6 +320,7 @@ events from `GET /api/detail`.
 | Source IP | Exact source IP match |
 | Destination Port | Exact destination port match |
 | Country | 2-letter ISO code (requires GeoIP) |
+| Severity | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
 | Animations | On / Off for highlight effects and home-directed arcs |
 | Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
@@ -389,6 +390,9 @@ The popup shows the newest raw event first and lazy-loads older pages only when
 the user walks past the oldest loaded entry. It no longer dumps the full first
 page of raw rows into the popup, and it stays open across normal map refreshes
 while the same source IP remains visible in the current filtered view.
+The map-level severity filter constrains aggregate rows from `/api/map`; the
+desktop drilldown still uses the existing source/time/proto/port detail query
+path in this version.
 
 Threat colour still comes from AbuseIPDB, and the popup keeps AbuseIPDB
 `usage_type` as compact context only. Tor status comes from Tor Project bulk
@@ -438,6 +442,7 @@ Supported query parameters:
 | `ip` | optional exact source IP filter |
 | `port` | optional exact destination port filter |
 | `country` | optional 2-letter country filter |
+| `severity` | optional exact threat bucket: `unknown`, `clean`, `low`, `medium`, or `high` |
 
 Notes:
 

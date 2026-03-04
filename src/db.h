@@ -75,6 +75,7 @@ struct MapFilters {
     std::string  src_ip;        // exact match; empty = any
     std::string  country;       // exact match; empty = any
     std::string  proto;         // exact match; empty = any
+    std::string  severity;      // exact threat bucket; empty = any
     bool         exclude_icmp{false}; // when true and proto unset, hide ICMP
     int          dst_port{0};   // exact match; 0 = any
 };

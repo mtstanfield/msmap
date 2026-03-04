@@ -21,6 +21,7 @@ const DEFAULT_FILTERS = Object.freeze({
     ip: '',
     port: '',
     country: '',
+    severity: '',
     animations: 'on',
 });
 
@@ -39,6 +40,7 @@ function currentFilterState() {
         ip:          appliedTextFilters.ip,
         port:        appliedTextFilters.port,
         country:     appliedTextFilters.country,
+        severity:    activeSeverity,
         animations:  fAnimations.value,
     };
 }
@@ -51,6 +53,7 @@ function writeFiltersToUrl() {
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
     if (state.country)                                     { params.set('country', state.country); }
+    if (state.severity)                                    { params.set('severity', state.severity); }
     if (state.animations !== DEFAULT_FILTERS.animations)   { params.set('animations', state.animations); }
     const next = params.toString();
     const base = window.location.pathname || '/';
@@ -81,6 +84,7 @@ function parseUrlFilterState() {
     setIfPresent('ip', 'ip');
     setIfPresent('port', 'port');
     setIfPresent('country', 'country');
+    setIfPresent('severity', 'severity');
     setIfPresent('animations', 'animations');
 
     return found ? state : null;
@@ -107,6 +111,7 @@ function loadFilters() {
     if (s.ip          !== undefined) { fIp.value = s.ip; }
     if (s.port        !== undefined) { fPort.value = s.port; }
     if (s.country     !== undefined) { fCountry.value = s.country; }
+    if (s.severity    !== undefined) { setSeverityValue(s.severity, { save: false, repoll: false }); }
     if (s.animations  !== undefined) {
         setSelectValue(fAnimations, s.animations, DEFAULT_FILTERS.animations);
         return;
@@ -194,6 +199,8 @@ const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
 const fCountry      = document.getElementById('f-country');
+const fSeverityButtons = Array.from(document.querySelectorAll('[data-severity]'));
+const fSeverityText = document.getElementById('f-severity-text');
 const fAnimations   = document.getElementById('f-animations');
 const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
@@ -220,6 +227,7 @@ function setFilterPanelOpen(open) {
 
 setFilterPanelTab('filters');
 setFilterPanelOpen(!isMobileMapUi());
+setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false });
 filterToggle.addEventListener('click', () => {
     const nowOpen = filterPanel.style.display !== 'none';
     setFilterPanelOpen(!nowOpen);
@@ -257,6 +265,7 @@ let mapFeedState = 'unknown';
 let lastStatus = null;
 let statusPollTimer = null;
 let statusInFlight = false;
+let activeSeverity = DEFAULT_FILTERS.severity;
 
 let homePt     = null;
 let homeMarker = null;
@@ -291,6 +300,41 @@ function setInputValidity(el, valid) {
         return;
     }
     el.title = 'Enter a complete valid value or clear the field.';
+}
+
+function severityLabel(value) {
+    switch (value) {
+        case 'unknown': return 'Unknown';
+        case 'clean': return 'Clean';
+        case 'low': return 'Low';
+        case 'medium': return 'Medium';
+        case 'high': return 'High';
+        default: return 'All';
+    }
+}
+
+function isValidSeverity(value) {
+    return value === '' || value === 'unknown' || value === 'clean' ||
+        value === 'low' || value === 'medium' || value === 'high';
+}
+
+function setSeverityValue(value, { save = true, repoll = true, force = false } = {}) {
+    const next = isValidSeverity(value) ? value : DEFAULT_FILTERS.severity;
+    const changed = next !== activeSeverity;
+    activeSeverity = next;
+    fSeverityButtons.forEach((button) => {
+        const selected = button.dataset.severity === next;
+        button.classList.toggle('is-active', selected);
+        button.setAttribute('aria-checked', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+    });
+    fSeverityText.textContent = next ? ('Severity: ' + severityLabel(next)) : 'All severities';
+    if (save && (changed || force)) {
+        saveFilters();
+    }
+    if (repoll && (changed || force)) {
+        pollNow();
+    }
 }
 
 function isValidIpv4(value) {
@@ -441,6 +485,7 @@ function resetToDefaults() {
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
     fCountry.value      = DEFAULT_FILTERS.country;
+setSeverityValue(DEFAULT_FILTERS.severity, { save: false, repoll: false, force: true });
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
@@ -461,6 +506,22 @@ document.getElementById('f-defaults').addEventListener('click', resetToDefaults)
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
 fAnimations.addEventListener('change', applyNonTextFilters);
+fSeverityButtons.forEach((button, index) => {
+    button.addEventListener('click', () => {
+        setSeverityValue(button.dataset.severity || '');
+    });
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+        }
+        event.preventDefault();
+        const step = event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + step + fSeverityButtons.length) % fSeverityButtons.length;
+        const nextButton = fSeverityButtons[nextIndex];
+        nextButton.focus();
+        setSeverityValue(nextButton.dataset.severity || '');
+    });
+});
 
 [fIp, fPort, fCountry].forEach((el) => {
     el.addEventListener('input', () => {
@@ -761,6 +822,7 @@ function buildMapQueryString() {
     if (appliedTextFilters.ip)      { params.set('ip', appliedTextFilters.ip); }
     if (appliedTextFilters.port)    { params.set('port', appliedTextFilters.port); }
     if (appliedTextFilters.country) { params.set('country', appliedTextFilters.country); }
+    if (activeSeverity)             { params.set('severity', activeSeverity); }
     return '?' + params.toString();
 }
 

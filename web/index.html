@@ -63,6 +63,39 @@
                 <input id="f-country" type="text" placeholder="US" maxlength="2"
                        autocomplete="off" spellcheck="false" style="text-transform:uppercase">
 
+                <div class="filter-label">Severity</div>
+                <div id="f-severity" class="filter-severity" role="radiogroup" aria-label="Severity">
+                    <button type="button" class="filter-severity-button filter-severity-button-all is-active"
+                            data-severity="" role="radio" aria-checked="true"
+                            aria-label="All severities">All</button>
+                    <button type="button" class="filter-severity-button"
+                            data-severity="unknown" role="radio" aria-checked="false"
+                            aria-label="Severity unknown">
+                        <span class="filter-severity-dot threat-unknown" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-severity-button"
+                            data-severity="clean" role="radio" aria-checked="false"
+                            aria-label="Severity clean">
+                        <span class="filter-severity-dot threat-clean" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-severity-button"
+                            data-severity="low" role="radio" aria-checked="false"
+                            aria-label="Severity low">
+                        <span class="filter-severity-dot threat-low" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-severity-button"
+                            data-severity="medium" role="radio" aria-checked="false"
+                            aria-label="Severity medium">
+                        <span class="filter-severity-dot threat-medium" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-severity-button"
+                            data-severity="high" role="radio" aria-checked="false"
+                            aria-label="Severity high">
+                        <span class="filter-severity-dot threat-high" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div id="f-severity-text" class="filter-severity-text">All severities</div>
+
                 <label class="filter-label" for="f-animations">Animations</label>
                 <select id="f-animations">
                     <option value="on">On</option>
