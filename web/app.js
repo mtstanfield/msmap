@@ -733,6 +733,26 @@ function formatCompactCount(value) {
     }).format(value);
 }
 
+function formatUtcMidnightCountdown(nowSec) {
+    if (!Number.isFinite(nowSec) || nowSec < 0) {
+        return null;
+    }
+    const secondsPerDay = 24 * 60 * 60;
+    const nextMidnightSec = (Math.floor(nowSec / secondsPerDay) + 1) * secondsPerDay;
+    const remainingSec = Math.max(0, nextMidnightSec - nowSec);
+    const remainingMins = Math.ceil(remainingSec / 60);
+    if (remainingMins <= 1) {
+        return '~<1m';
+    }
+
+    const hours = Math.floor(remainingMins / 60);
+    const mins = remainingMins % 60;
+    if (hours <= 0) {
+        return '~' + mins + 'm';
+    }
+    return '~' + hours + 'h' + mins + 'm';
+}
+
 function setOperatorStatus(status) {
     lastStatus = status;
     if (!status || status.ok !== true) {
@@ -792,7 +812,11 @@ function setOperatorStatus(status) {
     } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
         statAbuseValue.classList.add('status-state-stale');
-        statAbuse.dataset.tooltip = 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
+        const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
+        const quotaResetCountdown = formatUtcMidnightCountdown(now);
+        statAbuse.dataset.tooltip = quotaResetCountdown
+            ? ('AbuseIPDB daily quota is exhausted. 0 requests remaining today. Quota refresh in ' + quotaResetCountdown + ' (UTC midnight).')
+            : 'AbuseIPDB daily quota is exhausted. 0 requests remaining today. New lookups will resume after the UTC midnight reset.';
     } else {
         statAbuseValue.textContent = 'ok';
         statAbuseValue.classList.add('status-state-ok');
