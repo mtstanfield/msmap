@@ -146,8 +146,13 @@ int main() {
     }
     (void)db.prune_expired();
 
-    // GeoIP is optional enrichment; we continue even if the mmdb files are absent.
+    // GeoLite2 City is required for map markers; fail fast if it is absent or invalid.
     msmap::GeoIp geoip{city_path, asn_path};
+    if (!geoip.city_ready()) {
+        std::clog << "[FATAL] GeoIP City database unavailable: map markers require "
+                     "a valid GeoLite2-City.mmdb\n";
+        return EXIT_FAILURE;
+    }
 
     // Resolve MSMAP_HOME_HOST → IP + lat/lon for /api/home, home-directed arcs,
     // and RFC1918 destination rewrite on newly ingested rows. HomeResolver

@@ -77,7 +77,7 @@ HomePoint HomeResolver::resolve_once() const noexcept
     const std::string resolved{ip_buf.data()};
 
     const GeoIpResult geo = geoip_.lookup(resolved);
-    if (!geo.found()) {
+    if (!geo.renderable()) {
         std::clog << "[WARN] HomeResolver: GeoIP lookup failed for "
                   << resolved << " — home point not updated\n";
         return {};

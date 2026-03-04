@@ -18,7 +18,8 @@ class HomeResolver;
 /// Each UDP datagram contains exactly one syslog message. The parser
 /// auto-detects BSD (<PRI>) and RFC 3339 timestamp formats, so both
 /// direct Mikrotik datagrams and rsyslog-reformatted lines are accepted.
-/// Enriches each entry with GeoIP and AbuseIPDB data and inserts into `db`.
+/// Enriches each entry with GeoIP and AbuseIPDB data and inserts only rows
+/// whose source GeoIP resolves to a map-renderable point.
 /// Checks geoip.reload_if_changed() on every received datagram (fast no-op
 /// when the mmdb files have not changed).
 /// Parse warnings and socket errors go to stderr.

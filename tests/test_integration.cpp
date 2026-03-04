@@ -3,9 +3,10 @@
 // End-to-end integration tests for the full ingest pipeline:
 //   UDP socket → listener → parser → SQLite → query
 //
-// Each test spins up a fresh in-memory Database and GeoIp (disabled),
-// starts run_listener() on a std::jthread, injects log lines as UDP
-// datagrams to loopback, then queries the DB and asserts field values.
+// Each test spins up a fresh in-memory Database and a GeoIp instance without a
+// valid City DB, starts run_listener() on a std::jthread, injects log lines as
+// UDP datagrams to loopback, then asserts that map-unrenderable rows are
+// dropped safely at ingest.
 //
 // Thread lifecycle: jthread destructor calls request_stop() then join();
 // the listener's poll(50 ms) timeout ensures it exits within 50 ms.
@@ -131,98 +132,68 @@ constexpr std::string_view kInvalid = "not a valid Mikrotik firewall log line";
 
 // ── Test cases ────────────────────────────────────────────────────────────────
 
-TEST_CASE("Integration: TCP line parsed and stored correctly")
+TEST_CASE("Integration: valid TCP line is dropped when source GeoIP is unavailable")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 1);
-    const auto& r = rows.front();
-    CHECK(r.src_ip     == "185.220.101.47");
-    CHECK(r.src_port   == 54321);
-    CHECK(r.dst_ip     == "203.0.113.1");
-    CHECK(r.dst_port   == 22);
-    CHECK(r.proto      == "TCP");
-    CHECK(r.tcp_flags  == "SYN");
-    CHECK(r.rule       == "FW_INPUT_NEW");
-    // GeoIP absent → geo columns empty / nullopt
-    CHECK(r.country.empty());
-    CHECK(!r.lat.has_value());
-    // AbuseIPDB absent (abuse=nullptr) → threat nullopt
-    CHECK(!r.threat.has_value());
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: UDP line — no tcp_flags, ports present")
+TEST_CASE("Integration: valid UDP line is dropped when source GeoIP is unavailable")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kUdp});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 1);
-    const auto& r = rows.front();
-    CHECK(r.proto      == "UDP");
-    CHECK(r.tcp_flags.empty());
-    CHECK(r.src_ip     == "8.8.8.8");
-    CHECK(r.src_port   == 5353);
-    CHECK(r.dst_port   == 53);
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: ICMP line — ports stored as NULL")
+TEST_CASE("Integration: valid ICMP line is dropped when source GeoIP is unavailable")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kIcmp});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 1);
-    const auto& r = rows.front();
-    CHECK(r.proto      == "ICMP");
-    CHECK(r.src_ip     == "1.1.1.1");
-    CHECK(!r.src_port.has_value());
-    CHECK(!r.dst_port.has_value());
-    CHECK(r.tcp_flags.empty());
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: non-UTC timezone normalised to UTC epoch")
+TEST_CASE("Integration: timezone-normalised valid rows still drop without source GeoIP")
 {
     ListenerFixture fix{kPort};
-    // kTcpSyn (UTC) and kTcpSynPlusTwoHours (+02:00) represent the same UTC
-    // instant but have different source IPs so they are distinct DB rows.
     send_lines(kPort, {kTcpSyn, kTcpSynPlusTwoHours});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 2);
-    // Both records represent the same instant — ts must be equal.
-    CHECK(rows.at(0).ts == rows.at(1).ts);
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: multiple datagrams all inserted")
+TEST_CASE("Integration: multiple valid datagrams are all dropped without source GeoIP")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn, kUdp, kIcmp});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 3);
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: unparseable line skipped, valid line still inserted")
+TEST_CASE("Integration: unparseable line skipped, valid line still drops without source GeoIP")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kInvalid, kTcpAck});
 
-    // The invalid line is logged as a WARN and discarded; only kTcpAck is stored.
+    // The invalid line is logged as a WARN and the valid line is dropped later
+    // because no City GeoIP is available in this fixture.
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 1);
-    CHECK(rows.front().proto == "TCP");
-    CHECK(rows.front().src_ip == "172.234.31.140");
+    CHECK(rows.empty());
 }
 
-TEST_CASE("Integration: two sequential datagrams accumulate rows")
+TEST_CASE("Integration: repeated valid datagrams remain dropped without source GeoIP")
 {
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn});
     send_lines(kPort, {kUdp});
 
     const auto rows = fix.db.query_connections(msmap::QueryFilters{});
-    REQUIRE(rows.size() == 2);
+    CHECK(rows.empty());
 }

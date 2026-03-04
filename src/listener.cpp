@@ -57,6 +57,11 @@ private:
 // RFC 5426 recommends receivers accept at least 480 B; 4096 provides headroom.
 constexpr std::size_t kRecvBufSize{4096};
 
+[[nodiscard]] bool should_retain_for_map(const GeoIpResult& geo) noexcept
+{
+    return geo.renderable();
+}
+
 // ── Per-datagram handler ──────────────────────────────────────────────────────
 
 void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
@@ -78,6 +83,9 @@ void process_datagram(std::string_view data, Database& db, GeoIp& geoip,
             }
         }
         const GeoIpResult        geo       = geoip.lookup(result.entry.src_ip);
+        if (!should_retain_for_map(geo)) {
+            return;
+        }
         const std::optional<int> threat = [&]() noexcept -> std::optional<int> {
             if (abuse == nullptr) { return std::nullopt; }
             const auto hit = abuse->lookup(result.entry.src_ip);

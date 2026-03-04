@@ -107,9 +107,9 @@ docker run -d \
 
 `ghcr.io/mtstanfield/msmap:latest` assumes an `x86-64-v3` capable CPU.
 
-Service startup without GeoIP data is still possible, but the web map will not
-render source markers until a GeoLite2 City database is mounted at
-`/var/lib/msmap/geoip/GeoLite2-City.mmdb`.
+A valid GeoLite2 City database must be mounted at
+`/var/lib/msmap/geoip/GeoLite2-City.mmdb` for `msmap` to start and render map
+markers.
 
 With AbuseIPDB threat scoring:
 
@@ -186,6 +186,8 @@ Notes:
 
 - `geoipupdate` is optional as an update mechanism, but a GeoLite2 City
   database is required for map markers to render.
+- `msmap` now fails fast at startup if `GeoLite2-City.mmdb` is missing or
+  invalid.
 - `GeoLite2-ASN.mmdb` is optional and only affects ASN enrichment.
 - `ABUSEIPDB_API_KEY` is optional; without it, existing cached AbuseIPDB data is
   still readable but new threat/usage lookups are disabled.
@@ -199,8 +201,10 @@ Download `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` from
 (free account required) and place them in the directory mounted at
 `/var/lib/msmap/geoip/`. `GeoLite2-City.mmdb` is required for map markers and
 country/location data. `GeoLite2-ASN.mmdb` is optional and only adds ASN
-enrichment. msmap reloads changed `.mmdb` files automatically — no restart
-needed after a geoipupdate run.
+enrichment. `msmap` fails fast if the City DB is missing or invalid, retains
+only rows whose source GeoIP resolves to a renderable map point, and
+transactionally reloads changed `.mmdb` files so a bad update does not replace
+the last good City database.
 
 ### Mikrotik router configuration
 

@@ -73,29 +73,45 @@ GeoIp::~GeoIp() noexcept = default;
 
 bool GeoIp::open() noexcept
 {
-    city_db_.reset();
-    asn_db_.reset();
-    city_open_ = false;
-
     if (city_path_.empty()) {
         std::clog << "[WARN] GeoIP: no city mmdb path set; "
-                     "geo columns will be NULL\n";
+                     "map lookups unavailable\n";
         return false;
     }
 
-    city_db_ = open_mmdb(city_path_, "city");
-    if (!city_db_) {
+    auto new_city_db = open_mmdb(city_path_, "city");
+    if (!new_city_db) {
         return false;
     }
-    city_open_ = true;
-    city_mtime_ = file_mtime(city_path_);
+
+    const std::int64_t new_city_mtime = file_mtime(city_path_);
+
+    std::unique_ptr<MMDB_s, MmdbCloser> new_asn_db;
+    std::int64_t new_asn_mtime = asn_mtime_;
 
     if (!asn_path_.empty()) {
-        asn_db_ = open_mmdb(asn_path_, "asn");
-        if (asn_db_) {
-            asn_mtime_ = file_mtime(asn_path_);
+        if (auto candidate_asn_db = open_mmdb(asn_path_, "asn")) {
+            new_asn_db = std::move(candidate_asn_db);
+            new_asn_mtime = file_mtime(asn_path_);
+        } else if (!asn_db_) {
+            new_asn_mtime = 0;
         }
-        // ASN failure is non-fatal; log already emitted by open_mmdb.
+    }
+
+    city_db_ = std::move(new_city_db);
+    city_open_ = true;
+    city_mtime_ = new_city_mtime;
+
+    if (!asn_path_.empty()) {
+        if (new_asn_db) {
+            asn_db_ = std::move(new_asn_db);
+            asn_mtime_ = new_asn_mtime;
+        } else if (!asn_db_) {
+            asn_mtime_ = new_asn_mtime;
+        }
+    } else {
+        asn_db_.reset();
+        asn_mtime_ = 0;
     }
 
     std::clog << "[INFO] GeoIP loaded: city=" << city_path_
@@ -135,6 +151,9 @@ GeoIpResult GeoIp::lookup(const std::string& ip) const noexcept
         return result; // no country → lat/lon meaningless
     }
 
+    bool has_lat{false};
+    bool has_lon{false};
+
     // ── Latitude ──────────────────────────────────────────────────────────────
     if (MMDB_get_value(&city_res.entry, &data,
                        "location", "latitude",
@@ -142,6 +161,7 @@ GeoIpResult GeoIp::lookup(const std::string& ip) const noexcept
         && data.has_data
         && data.type == MMDB_DATA_TYPE_DOUBLE) {
         result.lat = data.double_value; // NOLINT(cppcoreguidelines-pro-type-union-access)
+        has_lat = true;
     }
 
     // ── Longitude ─────────────────────────────────────────────────────────────
@@ -151,7 +171,10 @@ GeoIpResult GeoIp::lookup(const std::string& ip) const noexcept
         && data.has_data
         && data.type == MMDB_DATA_TYPE_DOUBLE) {
         result.lon = data.double_value; // NOLINT(cppcoreguidelines-pro-type-union-access)
+        has_lon = true;
     }
+
+    result.has_coords = has_lat && has_lon;
 
     // ── ASN (separate database, optional) ─────────────────────────────────────
     lookup_asn(ip, result);

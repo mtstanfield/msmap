@@ -17,9 +17,16 @@ struct GeoIpResult {
     double      lat{0.0};
     double      lon{0.0};
     std::string asn;     // e.g. "AS12345 Some ISP", empty if not found
+    bool        has_coords{false};
 
     /// True only when a country code was resolved.
     [[nodiscard]] bool found() const noexcept { return !country.empty(); }
+
+    /// True when the lookup has coordinates suitable for map placement.
+    [[nodiscard]] bool renderable() const noexcept
+    {
+        return found() && has_coords;
+    }
 };
 
 // ── MMDB handle deleter ───────────────────────────────────────────────────────
@@ -34,8 +41,8 @@ class GeoIp {
 public:
     /// Open the GeoLite2-City mmdb at city_path, and optionally the
     /// GeoLite2-ASN mmdb at asn_path (pass empty string to skip ASN).
-    /// If the files are absent, valid() returns false but the object is
-    /// still usable — all lookups return an empty GeoIpResult.
+    /// If the City file is absent or invalid, city_ready() returns false and
+    /// lookups return an empty GeoIpResult.
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     GeoIp(std::string_view city_path, std::string_view asn_path) noexcept;
 
@@ -47,8 +54,14 @@ public:
     GeoIp(GeoIp&&)                 = delete;
     GeoIp& operator=(GeoIp&&)      = delete;
 
-    /// True if the city database was opened successfully.
-    [[nodiscard]] bool valid() const noexcept { return city_open_; }
+    /// True if the City database was opened successfully.
+    [[nodiscard]] bool city_ready() const noexcept { return city_open_; }
+
+    /// Backward-compatible alias for city_ready().
+    [[nodiscard]] bool valid() const noexcept { return city_ready(); }
+
+    /// True if the ASN database is currently loaded.
+    [[nodiscard]] bool asn_ready() const noexcept { return asn_db_ != nullptr; }
 
     /// Look up src_ip and return country/lat/lon/asn.
     /// Returns an empty GeoIpResult if not found or not valid.
@@ -62,7 +75,8 @@ public:
     bool reload_if_changed() noexcept;
 
 private:
-    /// (Re-)open both mmdb files using the stored paths.
+    /// (Re-)open mmdb files using the stored paths. City reload is
+    /// transactional: on failure, the last good loaded City DB remains active.
     bool open() noexcept;
 
     /// Fill result.asn from the ASN database if it is open and has data.
