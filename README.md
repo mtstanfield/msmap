@@ -260,6 +260,8 @@ server {
 
     location = /api/map {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_cache msmap_api;
         proxy_cache_lock on;
         proxy_cache_background_update on;
@@ -275,6 +277,8 @@ server {
 
     location = /api/home {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_cache msmap_api;
         proxy_cache_lock on;
         proxy_cache_valid 200 300s;
@@ -285,6 +289,8 @@ server {
 
     location = /api/status {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_cache msmap_api;
         proxy_cache_lock on;
         proxy_cache_background_update on;
@@ -297,6 +303,8 @@ server {
 
     location = /api/detail {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_no_cache 1;
         proxy_cache_bypass 1;
         limit_req zone=msmap_api_ratelimit burst=5 nodelay;
@@ -308,6 +316,8 @@ server {
 
     location ~ ^/(|index\.html)$ {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_cache msmap_api;
         proxy_cache_lock on;
         proxy_cache_background_update on;
@@ -319,6 +329,8 @@ server {
 
     location / {
         include /config/nginx/proxy.conf;
+        proxy_set_header Connection "";
+        proxy_set_header Upgrade "";
         proxy_pass http://192.0.2.10:8080;
     }
 }
@@ -333,10 +345,10 @@ Production notes:
   connection limiting. The desktop popup now degrades recent-event drilldown
   gracefully under temporary detail overload while leaving the aggregate popup
   summary usable.
-- If your shared nginx proxy include is tuned for websockets, make sure this
-  app does not inherit `Connection: close` on ordinary proxied requests.
-  `msmap` does not use websockets, so upstream HTTP/1.1 keepalive should remain
-  enabled between nginx and the app.
+- `msmap` does not use websockets. Override `Connection` and `Upgrade` to empty
+  values after the shared proxy include so ordinary proxied requests keep
+  upstream HTTP/1.1 connections alive instead of inheriting websocket-oriented
+  header behavior.
 
 ---
 
