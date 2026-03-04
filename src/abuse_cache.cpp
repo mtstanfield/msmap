@@ -243,7 +243,8 @@ bool AbuseCache::open() noexcept
 
 // ── lookup() ─────────────────────────────────────────────────────────────────
 
-std::optional<AbuseResult> AbuseCache::lookup(const std::string& ip) const noexcept
+std::optional<AbuseCacheEntry> AbuseCache::lookup_entry(
+    const std::string& ip) const noexcept
 {
     if (!db_) { return std::nullopt; }
 
@@ -252,62 +253,103 @@ std::optional<AbuseResult> AbuseCache::lookup(const std::string& ip) const noexc
     sqlite3_stmt* const stmt = lookup_stmt_.get();
     (void)sqlite3_bind_text(stmt, 1, ip.c_str(), -1, kStaticText);
 
-    std::optional<AbuseResult> result{std::nullopt};
+    std::optional<AbuseCacheEntry> result{std::nullopt};
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const int          score        = sqlite3_column_int(stmt,   0);
-        const std::int64_t last_checked = sqlite3_column_int64(stmt, 1);
-        const auto         now          = static_cast<std::int64_t>(std::time(nullptr));
-        if (now - last_checked < kCacheTtlSecs) {
-            AbuseResult hit;
-            hit.score      = score;
-            const auto* ut = sqlite3_column_text(stmt, 2);
-            if (ut != nullptr) {
-                hit.usage_type.assign(
-                    reinterpret_cast<const char*>(ut), // NOLINT(*-reinterpret-cast)
-                    static_cast<std::size_t>(sqlite3_column_bytes(stmt, 2)));
-            }
-            result     = std::move(hit);
+        AbuseCacheEntry entry;
+        entry.result.score = sqlite3_column_int(stmt, 0);
+        entry.last_checked = sqlite3_column_int64(stmt, 1);
+        const auto* ut = sqlite3_column_text(stmt, 2);
+        if (ut != nullptr) {
+            entry.result.usage_type.assign(
+                reinterpret_cast<const char*>(ut), // NOLINT(*-reinterpret-cast)
+                static_cast<std::size_t>(sqlite3_column_bytes(stmt, 2)));
         }
-        // Stale: return nullopt — submit() will re-queue for refresh.
+        result = std::move(entry);
     }
     (void)sqlite3_reset(stmt);
     return result;
+}
+
+std::optional<AbuseResult> AbuseCache::lookup(const std::string& ip) const noexcept
+{
+    const auto entry = lookup_entry(ip);
+    if (!entry.has_value()) {
+        return std::nullopt;
+    }
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    if (classify_cache_age(now, entry->last_checked) == AbuseLookupState::kStale) {
+        return std::nullopt;
+    }
+    return entry->result;
+}
+
+AbuseLookupState AbuseCache::classify_cache_age(std::int64_t now,
+                                                std::int64_t last_checked) noexcept
+{
+    const auto age = now - last_checked;
+    if (age < kSoftRefreshAgeSecs) {
+        return AbuseLookupState::kFresh;
+    }
+    if (age < kCacheTtlSecs) {
+        return AbuseLookupState::kSoftRefreshEligible;
+    }
+    return AbuseLookupState::kStale;
 }
 
 // ── submit() ─────────────────────────────────────────────────────────────────
 
 void AbuseCache::submit(const std::string& ip) noexcept
 {
-    if (api_key_.empty() || !db_) { return; }
+    (void)enqueue_submit_candidate(ip, true);
+}
 
-    // Fast cache check — skip the queue entirely for fresh entries.
-    // This is the primary quota guard: an IP cached within the TTL window
-    // is never re-queued regardless of how many packets we see from it.
-    if (lookup(ip).has_value()) { return; }
+bool AbuseCache::enqueue_submit_candidate(const std::string& ip,
+                                          bool               notify_worker) noexcept
+{
+    if (api_key_.empty() || !db_) { return false; }
 
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    const auto entry = lookup_entry(ip);
+    const auto state = entry.has_value()
+        ? classify_cache_age(now, entry->last_checked)
+        : AbuseLookupState::kMissing;
+
+    if (state == AbuseLookupState::kFresh) {
+        return false;
+    }
+
+    bool queued = false;
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
-        // Check for UTC day rollover first so that if the worker is idle (queue
-        // empty, no IP to re-queue into wait_for_quota_reset), the reset is still
-        // detected on the next incoming packet rather than never.
         rate_limit_reset_if_new_day();
-        // Suppress new submissions when today's quota is exhausted.  IPs that
-        // were already in the queue before quota ran out are still processed by
-        // the worker once the daily counter resets at midnight.
         if (rate_remaining_ <= 0) {
             if (!quota_warned_) {
                 std::clog << "[WARN] AbuseCache: daily quota reached; "
                              "new submissions suppressed until midnight reset\n";
                 quota_warned_ = true;
             }
-            return;
+            return false;
         }
         if (queue_.contains(ip) || in_flight_.contains(ip)) {
-            return; // already queued or being fetched
+            return false;
         }
-        queue_.insert(ip);
+
+        if (state == AbuseLookupState::kSoftRefreshEligible) {
+            if (soft_refresh_remaining_ <= 0 || soft_queue_.contains(ip)) {
+                return false;
+            }
+            soft_queue_.insert_or_assign(ip, entry->last_checked);
+            queued = true;
+        } else {
+            soft_queue_.erase(ip);
+            queued = queue_.insert(ip).second;
+        }
     }
-    queue_cv_.notify_one();
+
+    if (queued && notify_worker) {
+        queue_cv_.notify_one();
+    }
+    return queued;
 }
 
 // ── cache_store() ────────────────────────────────────────────────────────────
@@ -372,6 +414,12 @@ int AbuseCache::rate_remaining() const noexcept
     return rate_remaining_;
 }
 
+int AbuseCache::soft_refresh_remaining() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return soft_refresh_remaining_;
+}
+
 std::optional<int> AbuseCache::confirmed_rate_remaining() const noexcept
 {
     const std::lock_guard<std::mutex> lock{queue_mutex_};
@@ -383,6 +431,78 @@ void AbuseCache::set_rate_remaining_for_test(int remaining) noexcept
     const std::lock_guard<std::mutex> lock{queue_mutex_};
     rate_remaining_ = remaining < 0 ? 0 : remaining;
     confirmed_rate_remaining_ = rate_remaining_;
+}
+
+void AbuseCache::set_soft_refresh_remaining_for_test(int remaining) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    soft_refresh_remaining_ = std::max(0, remaining);
+}
+
+bool AbuseCache::set_last_checked_for_test(const std::string& ip,
+                                           std::int64_t       last_checked) noexcept
+{
+    if (!db_) { return false; }
+
+    const std::lock_guard<std::mutex> lock{db_mutex_};
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db_.get(),
+                           "UPDATE abuse_cache SET last_checked = ? WHERE ip = ?",
+                           -1, &raw, nullptr) != SQLITE_OK) {
+        return false;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+    (void)sqlite3_bind_int64(stmt.get(), 1, last_checked);
+    (void)sqlite3_bind_text(stmt.get(), 2, ip.c_str(), -1, kStaticText);
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        return false;
+    }
+    return sqlite3_changes(db_.get()) > 0;
+}
+
+AbuseLookupState AbuseCache::lookup_state_for_test(const std::string& ip,
+                                                   std::int64_t now) const noexcept
+{
+    const auto entry = lookup_entry(ip);
+    if (!entry.has_value()) {
+        return AbuseLookupState::kMissing;
+    }
+    return classify_cache_age(now, entry->last_checked);
+}
+
+bool AbuseCache::enqueue_submit_candidate_for_test(const std::string& ip) noexcept
+{
+    return enqueue_submit_candidate(ip, false);
+}
+
+bool AbuseCache::normal_queue_contains_for_test(const std::string& ip) const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return queue_.contains(ip);
+}
+
+bool AbuseCache::soft_queue_contains_for_test(const std::string& ip) const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return soft_queue_.contains(ip);
+}
+
+std::optional<PendingSelection> AbuseCache::pop_next_pending_for_test() noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return pop_next_pending_locked();
+}
+
+void AbuseCache::shutdown_worker_for_test() noexcept
+{
+    {
+        const std::lock_guard<std::mutex> lock{queue_mutex_};
+        stop_ = true;
+    }
+    queue_cv_.notify_all();
+    if (worker_thread_.joinable()) {
+        worker_thread_.join();
+    }
 }
 
 void AbuseCache::arm_quota_retry_for_test(std::int64_t retry_after_ts,
@@ -425,6 +545,7 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     const std::int64_t today = epoch_day();
     if (today != rate_reset_day_) {
         rate_remaining_ = kDailyQuota;
+        soft_refresh_remaining_ = kSoftRefreshBudgetPerDay;
         confirmed_rate_remaining_.reset();
         quota_retry_after_ts_.reset();
         quota_retry_backoff_secs_ = 60;
@@ -446,6 +567,30 @@ bool AbuseCache::maybe_release_quota_retry_probe(std::int64_t now) noexcept
         rate_remaining_ = 1;
     }
     return true;
+}
+
+std::optional<PendingSelection> AbuseCache::pop_next_pending_locked() noexcept
+{
+    if (!queue_.empty()) {
+        auto it = queue_.begin();
+        PendingSelection selection{*it, false, 0};
+        queue_.erase(it);
+        return selection;
+    }
+    if (soft_queue_.empty()) {
+        return std::nullopt;
+    }
+
+    auto best = soft_queue_.begin();
+    for (auto it = std::next(soft_queue_.begin()); it != soft_queue_.end(); ++it) {
+        if (it->second < best->second ||
+            (it->second == best->second && it->first < best->first)) {
+            best = it;
+        }
+    }
+    PendingSelection selection{best->first, true, best->second};
+    soft_queue_.erase(best);
+    return selection;
 }
 
 // ── wait_for_quota_reset() ───────────────────────────────────────────────────
@@ -483,22 +628,24 @@ void AbuseCache::wait_for_quota_reset(
 void AbuseCache::worker() noexcept
 {
     for (;;) {
-        std::string ip;
+        PendingSelection selection;
 
         {
             std::unique_lock<std::mutex> lock{queue_mutex_};
             queue_cv_.wait(lock, [this]() noexcept {
-                return stop_ || !queue_.empty();
+                return stop_ || !queue_.empty() || !soft_queue_.empty();
             });
 
-            if (stop_ && queue_.empty()) {
+            if (stop_ && queue_.empty() && soft_queue_.empty()) {
                 return;
             }
 
-            auto it = queue_.begin();
-            ip = *it;
-            queue_.erase(it);
-            in_flight_.insert(ip);
+            const auto next = pop_next_pending_locked();
+            if (!next.has_value()) {
+                continue;
+            }
+            selection = *next;
+            in_flight_.insert(selection.ip);
         }
 
         // Check and reset daily rate limit.
@@ -508,8 +655,14 @@ void AbuseCache::worker() noexcept
             if (rate_remaining_ <= 0) {
                 // Re-queue (if not shutting down) so the IP is processed
                 // once quota resets.
-                if (!stop_) { queue_.insert(ip); }
-                in_flight_.erase(ip);
+                if (!stop_) {
+                    if (selection.is_soft_refresh) {
+                        soft_queue_.insert_or_assign(selection.ip, selection.soft_last_checked);
+                    } else {
+                        queue_.insert(selection.ip);
+                    }
+                }
+                in_flight_.erase(selection.ip);
 
                 if (!stop_) {
                     // Wait until the UTC reset, or a short post-midnight probe.
@@ -519,10 +672,15 @@ void AbuseCache::worker() noexcept
             }
         }
 
-        // Skip if a fresh cache entry appeared since submit() was called.
-        if (lookup(ip).has_value()) {
+        // Skip if a cache entry no longer needs this class of refresh.
+        const auto entry = lookup_entry(selection.ip);
+        const auto now = static_cast<std::int64_t>(std::time(nullptr));
+        const auto state = entry.has_value()
+            ? classify_cache_age(now, entry->last_checked)
+            : AbuseLookupState::kMissing;
+        if (state == AbuseLookupState::kFresh) {
             const std::lock_guard<std::mutex> lock{queue_mutex_};
-            in_flight_.erase(ip);
+            in_flight_.erase(selection.ip);
             continue;
         }
 
@@ -532,8 +690,9 @@ void AbuseCache::worker() noexcept
         bool request_made    = false;
         bool quota_exhausted = false;
         std::optional<int> confirmed_remaining;
-        const auto result = fetch_abuse(ip, request_made, quota_exhausted, confirmed_remaining);
-        apply_fetch_result(ip, result, request_made, quota_exhausted, confirmed_remaining);
+        const auto result = fetch_abuse(selection.ip, request_made, quota_exhausted, confirmed_remaining);
+        apply_fetch_result(selection.ip, result, selection.is_soft_refresh, selection.soft_last_checked,
+                           request_made, quota_exhausted, confirmed_remaining);
     }
 }
 
@@ -541,12 +700,17 @@ void AbuseCache::worker() noexcept
 
 void AbuseCache::apply_fetch_result(const std::string&                ip,
                                     const std::optional<AbuseResult>& result,
+                                    bool                               is_soft_refresh,
+                                    std::int64_t                       soft_last_checked,
                                     bool                               request_made,
                                     bool                               quota_exhausted,
                                     std::optional<int>                 confirmed_remaining) noexcept
 {
     {
         const std::lock_guard<std::mutex> lock{queue_mutex_};
+        if (is_soft_refresh && request_made && soft_refresh_remaining_ > 0) {
+            --soft_refresh_remaining_;
+        }
         if (quota_exhausted) {
             // 429: server confirms quota gone.  Zero counter immediately so
             // the next worker() iteration enters wait_for_quota_reset instead
@@ -561,7 +725,13 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
             } else {
                 quota_retry_after_ts_.reset();
             }
-            if (!stop_) { queue_.insert(ip); }
+            if (!stop_) {
+                if (is_soft_refresh) {
+                    soft_queue_.insert_or_assign(ip, soft_last_checked);
+                } else {
+                    queue_.insert(ip);
+                }
+            }
         } else if (confirmed_remaining.has_value()) {
             rate_remaining_ = *confirmed_remaining;
             confirmed_rate_remaining_ = confirmed_remaining;
@@ -577,6 +747,10 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
     if (result.has_value()) {
         if (cache_store(ip, *result)) {
             update_connections_abuse(ip, *result);
+        }
+        if (is_soft_refresh) {
+            std::clog << "[INFO] AbuseCache: soft refresh " << ip
+                      << " budget_left=" << soft_refresh_remaining() << '\n';
         }
     } else if (quota_exhausted) {
         std::clog << "[WARN] AbuseCache: 429 from AbuseIPDB for " << ip

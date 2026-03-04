@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 struct sqlite3;
@@ -20,14 +21,34 @@ namespace msmap {
 /// Threat scores change slowly; the AbuseIPDB free tier allows 1000 checks/day,
 /// so a long TTL is essential to preserve quota for new IPs.
 inline constexpr std::int64_t kCacheTtlSecs{30LL * 24LL * 3600LL};
+inline constexpr std::int64_t kSoftRefreshAgeSecs{14LL * 24LL * 3600LL};
 
 /// AbuseIPDB free-tier daily quota.
 inline constexpr int kDailyQuota{1000};
+inline constexpr int kSoftRefreshBudgetPerDay{150};
 
 /// Fields extracted from an AbuseIPDB /api/v2/check response.
 struct AbuseResult {
     int         score{0};         ///< abuseConfidenceScore (0–100)
     std::string usage_type;       ///< usageType; empty string if not present
+};
+
+struct AbuseCacheEntry {
+    AbuseResult  result;
+    std::int64_t last_checked{0};
+};
+
+enum class AbuseLookupState : std::uint8_t {
+    kMissing,
+    kFresh,
+    kSoftRefreshEligible,
+    kStale,
+};
+
+struct PendingSelection {
+    std::string ip;
+    bool        is_soft_refresh{false};
+    std::int64_t soft_last_checked{0};
 };
 
 // ── AbuseCache ────────────────────────────────────────────────────────────────
@@ -72,6 +93,11 @@ public:
     /// Thread-safe; never calls the API.
     [[nodiscard]] std::optional<AbuseResult> lookup(const std::string& ip) const noexcept;
 
+    /// Classify cached AbuseIPDB age against the fresh/soft/stale policy.
+    [[nodiscard]] static AbuseLookupState classify_cache_age(
+        std::int64_t now,
+        std::int64_t last_checked) noexcept;
+
     /// Enqueue `ip` for background resolution if not already cached/queued.
     /// Non-blocking. Safe to call from the listener hot path.
     /// No-op when api_key_ is empty or the object is invalid.
@@ -97,6 +123,33 @@ public:
 
     /// Test hook for simulating quota exhaustion or partial remaining quota.
     void set_rate_remaining_for_test(int remaining) noexcept;
+
+    /// Test hook for simulating the soft-refresh reserve.
+    void set_soft_refresh_remaining_for_test(int remaining) noexcept;
+
+    /// Current number of soft-refresh requests remaining today.
+    [[nodiscard]] int soft_refresh_remaining() const noexcept;
+
+    /// Test hook for adjusting cached entry age.
+    bool set_last_checked_for_test(const std::string& ip,
+                                   std::int64_t       last_checked) noexcept;
+
+    /// Test hook for inspecting lookup classification without queueing work.
+    [[nodiscard]] AbuseLookupState lookup_state_for_test(const std::string& ip,
+                                                         std::int64_t now) const noexcept;
+
+    /// Test hook for exercising submit queueing without waking the worker.
+    bool enqueue_submit_candidate_for_test(const std::string& ip) noexcept;
+
+    /// Test hook for checking which queue currently owns an IP.
+    [[nodiscard]] bool normal_queue_contains_for_test(const std::string& ip) const noexcept;
+    [[nodiscard]] bool soft_queue_contains_for_test(const std::string& ip) const noexcept;
+
+    /// Test hook for checking worker queue selection order.
+    [[nodiscard]] std::optional<PendingSelection> pop_next_pending_for_test() noexcept;
+
+    /// Test hook for stopping the background worker before queue inspection.
+    void shutdown_worker_for_test() noexcept;
 
     /// Test hook for arming the short post-midnight retry timer.
     void arm_quota_retry_for_test(std::int64_t retry_after_ts,
@@ -128,6 +181,15 @@ private:
     bool                        maybe_release_quota_retry_probe(
                                     std::int64_t now) noexcept;
 
+    [[nodiscard]] std::optional<AbuseCacheEntry>
+                                lookup_entry(const std::string& ip) const noexcept;
+
+    bool                        enqueue_submit_candidate(const std::string& ip,
+                                    bool notify_worker) noexcept;
+
+    [[nodiscard]] std::optional<PendingSelection>
+                                pop_next_pending_locked() noexcept;
+
     /// Sets `request_made` to true if an HTTP request reached AbuseIPDB
     /// (regardless of HTTP status), so the caller only decrements the rate
     /// counter when a real API call was issued (not on curl/network failures).
@@ -143,6 +205,8 @@ private:
     /// Extracted from worker() to keep its cognitive complexity in bounds.
     void apply_fetch_result(const std::string&                ip,
                             const std::optional<AbuseResult>& result,
+                            bool                               is_soft_refresh,
+                            std::int64_t                       soft_last_checked,
                             bool                               request_made,
                             bool                               quota_exhausted,
                             std::optional<int>                 confirmed_remaining) noexcept;
@@ -165,6 +229,7 @@ private:
     mutable std::mutex              queue_mutex_;
     std::condition_variable         queue_cv_;
     std::unordered_set<std::string> queue_;       // pending IPs (set deduplicates)
+    std::unordered_map<std::string, std::int64_t> soft_queue_; // ip -> last_checked
     std::unordered_set<std::string> in_flight_;   // IPs currently being fetched
     bool                            stop_{false};
     std::thread                     worker_thread_;
@@ -172,6 +237,7 @@ private:
     // ── Rate limiting ────────────────────────────────────────────────────────
     // Accessed only under queue_mutex_.
     int          rate_remaining_{kDailyQuota};
+    int          soft_refresh_remaining_{kSoftRefreshBudgetPerDay};
     std::optional<int> confirmed_rate_remaining_;
     std::int64_t rate_reset_day_{0};              // epoch_day() at last reset
     bool         quota_warned_{false};            // suppress repeated log lines

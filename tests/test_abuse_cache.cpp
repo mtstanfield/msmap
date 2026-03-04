@@ -148,6 +148,120 @@ TEST_CASE("AbuseCache: expired post-midnight retry releases one probe request")
     CHECK(cache.rate_remaining() == 1);
 }
 
+TEST_CASE("AbuseCache: lookup state distinguishes fresh soft-refresh and stale")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+
+    const msmap::AbuseResult result{42, "ISP/Residential"};
+    REQUIRE(cache.cache_store("8.8.4.4", result));
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.set_last_checked_for_test("8.8.4.4", now - (7 * 24 * 3600)));
+    CHECK(cache.lookup_state_for_test("8.8.4.4", now) == msmap::AbuseLookupState::kFresh);
+
+    REQUIRE(cache.set_last_checked_for_test("8.8.4.4", now - (15 * 24 * 3600)));
+    CHECK(cache.lookup_state_for_test("8.8.4.4", now) ==
+          msmap::AbuseLookupState::kSoftRefreshEligible);
+
+    REQUIRE(cache.set_last_checked_for_test("8.8.4.4", now - (31 * 24 * 3600)));
+    CHECK(cache.lookup_state_for_test("8.8.4.4", now) == msmap::AbuseLookupState::kStale);
+}
+
+TEST_CASE("AbuseCache: soft-refresh eligible entry queues into soft queue")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.9", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.9", now - (15 * 24 * 3600)));
+
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.9"));
+    CHECK_FALSE(cache.normal_queue_contains_for_test("9.9.9.9"));
+    CHECK(cache.soft_queue_contains_for_test("9.9.9.9"));
+}
+
+TEST_CASE("AbuseCache: soft-refresh eligible entry is skipped when soft budget is exhausted")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.10", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.10", now - (15 * 24 * 3600)));
+    cache.set_soft_refresh_remaining_for_test(0);
+
+    CHECK_FALSE(cache.enqueue_submit_candidate_for_test("9.9.9.10"));
+    CHECK_FALSE(cache.normal_queue_contains_for_test("9.9.9.10"));
+    CHECK_FALSE(cache.soft_queue_contains_for_test("9.9.9.10"));
+}
+
+TEST_CASE("AbuseCache: stale entry queues normally even when soft budget is exhausted")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.11", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.11", now - (31 * 24 * 3600)));
+    cache.set_soft_refresh_remaining_for_test(0);
+
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.11"));
+    CHECK(cache.normal_queue_contains_for_test("9.9.9.11"));
+    CHECK_FALSE(cache.soft_queue_contains_for_test("9.9.9.11"));
+}
+
+TEST_CASE("AbuseCache: normal queue takes priority over soft queue")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.12", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.cache_store("9.9.9.13", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.12", now - (31 * 24 * 3600)));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.13", now - (15 * 24 * 3600)));
+
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.13"));
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.12"));
+
+    const auto first = cache.pop_next_pending_for_test();
+    REQUIRE(first.has_value());
+    CHECK(first->ip == "9.9.9.12");
+    CHECK_FALSE(first->is_soft_refresh);
+}
+
+TEST_CASE("AbuseCache: soft queue selects oldest checked IP first")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.14", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.cache_store("9.9.9.15", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.14", now - (16 * 24 * 3600)));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.15", now - (20 * 24 * 3600)));
+
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.14"));
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.15"));
+
+    const auto first = cache.pop_next_pending_for_test();
+    REQUIRE(first.has_value());
+    CHECK(first->ip == "9.9.9.15");
+    CHECK(first->is_soft_refresh);
+
+    const auto second = cache.pop_next_pending_for_test();
+    REQUIRE(second.has_value());
+    CHECK(second->ip == "9.9.9.14");
+    CHECK(second->is_soft_refresh);
+}
+
 // ── update_connections_abuse(): integration ───────────────────────────────────
 
 TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")
