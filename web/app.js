@@ -206,6 +206,7 @@ const legendHome    = document.getElementById('legend-home');
 const statDot       = statTime.querySelector('.status-dot');
 const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
 let activeFilterPanelTab = 'filters';
+let activeSeverity = DEFAULT_FILTERS.severity;
 
 function setFilterPanelTab(tabName) {
     const nextTab = tabName === 'legend' ? 'legend' : 'filters';
@@ -265,7 +266,6 @@ let mapFeedState = 'unknown';
 let lastStatus = null;
 let statusPollTimer = null;
 let statusInFlight = false;
-let activeSeverity = DEFAULT_FILTERS.severity;
 
 let homePt     = null;
 let homeMarker = null;
