@@ -391,9 +391,10 @@ while the same source IP remains visible in the current filtered view.
 Threat colour still comes from AbuseIPDB, and the popup keeps AbuseIPDB
 `usage_type` as compact context only. Tor status comes from Tor Project bulk
 exit data, and Spamhaus DROP badges come from locally cached list lookups.
-AbuseIPDB results are cached for 30 days, with a small traffic-driven early
-refresh pool for entries older than 14 days. An API key is not required to
-view previously cached data.
+AbuseIPDB results are cached for a 30-day hard TTL, with a small
+traffic-driven early-refresh pool for still-valid entries older than 14 days.
+New and hard-stale IPs always take priority over that low-priority refresh
+pool. An API key is not required to view previously cached data.
 
 ### Status bar
 

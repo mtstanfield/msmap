@@ -487,10 +487,25 @@ bool AbuseCache::soft_queue_contains_for_test(const std::string& ip) const noexc
     return soft_queue_.contains(ip);
 }
 
+bool AbuseCache::in_flight_contains_for_test(const std::string& ip) const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return in_flight_.contains(ip);
+}
+
 std::optional<PendingSelection> AbuseCache::pop_next_pending_for_test() noexcept
 {
     const std::lock_guard<std::mutex> lock{queue_mutex_};
     return pop_next_pending_locked();
+}
+
+void AbuseCache::requeue_pending_for_test(const std::string& ip,
+                                          bool               is_soft_refresh,
+                                          std::int64_t       soft_last_checked,
+                                          std::int64_t       now) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    requeue_pending_locked(ip, is_soft_refresh, soft_last_checked, now);
 }
 
 void AbuseCache::shutdown_worker_for_test() noexcept
@@ -503,6 +518,12 @@ void AbuseCache::shutdown_worker_for_test() noexcept
     if (worker_thread_.joinable()) {
         worker_thread_.join();
     }
+}
+
+void AbuseCache::mark_in_flight_for_test(const std::string& ip) noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    in_flight_.insert(ip);
 }
 
 void AbuseCache::arm_quota_retry_for_test(std::int64_t retry_after_ts,
@@ -557,6 +578,28 @@ bool AbuseCache::rate_limit_reset_if_new_day() noexcept
     return false;
 }
 
+void AbuseCache::rewind_rate_reset_day_for_test() noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    --rate_reset_day_;
+}
+
+void AbuseCache::apply_fetch_result_for_test(
+    const std::string& ip,
+    bool               is_soft_refresh,
+    std::int64_t       soft_last_checked,
+    bool               request_made,
+    bool               quota_exhausted,
+    std::optional<int> confirmed_remaining) noexcept
+{
+    {
+        const std::lock_guard<std::mutex> lock{queue_mutex_};
+        in_flight_.insert(ip);
+    }
+    apply_fetch_result(ip, std::nullopt, is_soft_refresh, soft_last_checked,
+                       request_made, quota_exhausted, confirmed_remaining);
+}
+
 bool AbuseCache::maybe_release_quota_retry_probe(std::int64_t now) noexcept
 {
     if (!quota_retry_after_ts_.has_value() || *quota_retry_after_ts_ > now) {
@@ -591,6 +634,24 @@ std::optional<PendingSelection> AbuseCache::pop_next_pending_locked() noexcept
     PendingSelection selection{best->first, true, best->second};
     soft_queue_.erase(best);
     return selection;
+}
+
+void AbuseCache::requeue_pending_locked(const std::string& ip,
+                                        bool               is_soft_refresh,
+                                        std::int64_t       soft_last_checked,
+                                        std::int64_t       now) noexcept
+{
+    if (!is_soft_refresh) {
+        queue_.insert(ip);
+        return;
+    }
+
+    if (classify_cache_age(now, soft_last_checked) == AbuseLookupState::kStale) {
+        queue_.insert(ip);
+        return;
+    }
+
+    soft_queue_.insert_or_assign(ip, soft_last_checked);
 }
 
 // ── wait_for_quota_reset() ───────────────────────────────────────────────────
@@ -656,11 +717,9 @@ void AbuseCache::worker() noexcept
                 // Re-queue (if not shutting down) so the IP is processed
                 // once quota resets.
                 if (!stop_) {
-                    if (selection.is_soft_refresh) {
-                        soft_queue_.insert_or_assign(selection.ip, selection.soft_last_checked);
-                    } else {
-                        queue_.insert(selection.ip);
-                    }
+                    requeue_pending_locked(selection.ip, selection.is_soft_refresh,
+                                           selection.soft_last_checked,
+                                           static_cast<std::int64_t>(std::time(nullptr)));
                 }
                 in_flight_.erase(selection.ip);
 
@@ -726,11 +785,8 @@ void AbuseCache::apply_fetch_result(const std::string&                ip,
                 quota_retry_after_ts_.reset();
             }
             if (!stop_) {
-                if (is_soft_refresh) {
-                    soft_queue_.insert_or_assign(ip, soft_last_checked);
-                } else {
-                    queue_.insert(ip);
-                }
+                requeue_pending_locked(ip, is_soft_refresh, soft_last_checked,
+                                       static_cast<std::int64_t>(std::time(nullptr)));
             }
         } else if (confirmed_remaining.has_value()) {
             rate_remaining_ = *confirmed_remaining;

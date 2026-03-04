@@ -91,6 +91,23 @@ TEST_CASE("AbuseCache: cache_store zero score round-trips")
     REQUIRE(hit->score == 0);
 }
 
+TEST_CASE("AbuseCache: lookup returns cached result for soft-refresh eligible entries")
+{
+    msmap::AbuseCache cache{":memory:", ""};
+    REQUIRE(cache.valid());
+
+    const msmap::AbuseResult result{55, "Hosting"};
+    REQUIRE(cache.cache_store("8.8.4.5", result));
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.set_last_checked_for_test("8.8.4.5", now - (15 * 24 * 3600)));
+
+    const auto hit = cache.lookup("8.8.4.5");
+    REQUIRE(hit.has_value());
+    CHECK(hit->score == 55);
+    CHECK(hit->usage_type == "Hosting");
+}
+
 // ── TTL constant ─────────────────────────────────────────────────────────────
 
 TEST_CASE("AbuseCache: kCacheTtlSecs is 30 days")
@@ -199,6 +216,28 @@ TEST_CASE("AbuseCache: soft-refresh eligible entry is skipped when soft budget i
     CHECK_FALSE(cache.soft_queue_contains_for_test("9.9.9.10"));
 }
 
+TEST_CASE("AbuseCache: duplicate submit is suppressed across soft queue and in-flight state")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    REQUIRE(cache.cache_store("9.9.9.17", msmap::AbuseResult{10, "Hosting"}));
+    REQUIRE(cache.set_last_checked_for_test("9.9.9.17", now - (15 * 24 * 3600)));
+
+    REQUIRE(cache.enqueue_submit_candidate_for_test("9.9.9.17"));
+    CHECK_FALSE(cache.enqueue_submit_candidate_for_test("9.9.9.17"));
+    CHECK(cache.soft_queue_contains_for_test("9.9.9.17"));
+
+    const auto pending = cache.pop_next_pending_for_test();
+    REQUIRE(pending.has_value());
+    CHECK(pending->ip == "9.9.9.17");
+    cache.mark_in_flight_for_test("9.9.9.17");
+    CHECK(cache.in_flight_contains_for_test("9.9.9.17"));
+    CHECK_FALSE(cache.enqueue_submit_candidate_for_test("9.9.9.17"));
+}
+
 TEST_CASE("AbuseCache: stale entry queues normally even when soft budget is exhausted")
 {
     msmap::AbuseCache cache{":memory:", "dummy_key"};
@@ -260,6 +299,49 @@ TEST_CASE("AbuseCache: soft queue selects oldest checked IP first")
     REQUIRE(second.has_value());
     CHECK(second->ip == "9.9.9.14");
     CHECK(second->is_soft_refresh);
+}
+
+TEST_CASE("AbuseCache: stale soft-refresh work is promoted to the normal queue on requeue")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    cache.shutdown_worker_for_test();
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    const auto stale_checked = now - (31 * 24 * 3600);
+
+    cache.requeue_pending_for_test("9.9.9.16", true, stale_checked, now);
+
+    CHECK(cache.normal_queue_contains_for_test("9.9.9.16"));
+    CHECK_FALSE(cache.soft_queue_contains_for_test("9.9.9.16"));
+}
+
+TEST_CASE("AbuseCache: soft refresh budget resets on UTC day rollover")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+
+    cache.set_soft_refresh_remaining_for_test(0);
+    cache.rewind_rate_reset_day_for_test();
+
+    REQUIRE(cache.rate_limit_reset_if_new_day());
+    CHECK(cache.soft_refresh_remaining() == msmap::kSoftRefreshBudgetPerDay);
+}
+
+TEST_CASE("AbuseCache: quota exhausted apply path promotes stale soft refresh to normal queue")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    const auto stale_checked = now - (31 * 24 * 3600);
+
+    cache.apply_fetch_result_for_test("9.9.9.18", true, stale_checked,
+                                      true, true);
+
+    CHECK(cache.normal_queue_contains_for_test("9.9.9.18"));
+    CHECK_FALSE(cache.soft_queue_contains_for_test("9.9.9.18"));
+    CHECK_FALSE(cache.in_flight_contains_for_test("9.9.9.18"));
 }
 
 // ── update_connections_abuse(): integration ───────────────────────────────────
