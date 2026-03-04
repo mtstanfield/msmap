@@ -1327,6 +1327,17 @@ html, body {
         font-size: 11px;
     }
 
+    #stat-time::after {
+        left: 0;
+        right: auto;
+        transform: translateY(4px);
+    }
+
+    #stat-time:hover::after,
+    #stat-time:focus-visible::after {
+        transform: translateY(0);
+    }
+
     #stat-events,
     #stat-events + .status-sep-ops,
     #stat-sources,
