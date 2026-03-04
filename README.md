@@ -1,8 +1,10 @@
 # msmap – Mikrotik Firewall Log Viewer
 
 `msmap` is a self-contained C++23 application that ingests Mikrotik firewall
-logs over syslog UDP, enriches them with GeoIP and cached threat intelligence,
-and serves a single-page world map for live inbound traffic triage.
+logs over syslog UDP, enriches them with local GeoIP and cached threat
+intelligence, and serves a single-page world map for live inbound traffic
+triage. A GeoLite2 City database is required for source markers to render on
+the map.
 
 Live deployment: <https://map.thetaxi.space>
 
@@ -29,7 +31,7 @@ Mikrotik router
 msmap binary
     ├── parser          (hand-written tokenizer, fuzz-tested)
     ├── SQLite DB       (WAL mode, 24h retention)
-    ├── GeoIP           (libmaxminddb + local GeoLite2 City/ASN mmdb)
+    ├── GeoIP           (libmaxminddb + local GeoLite2 City/ASN mmdb; City required for map markers, ASN optional)
     ├── Abuse cache     (AbuseIPDB score + usage_type, SQLite-backed)
     ├── Intel cache     (Tor Project + Spamhaus DROP, background refreshed)
     ├── Home resolver   (optional home marker / arcs / RFC1918 dst rewrite)
@@ -49,7 +51,7 @@ msmap binary
 | Build | CMake 3.29+ (supported 3.x) + Ninja | source builds default to a generic CPU target; release image defaults to `x86-64-v3` |
 | HTTP server | `libmicrohttpd` | embedded, no framework |
 | Database | SQLite | WAL mode, parameterized queries only |
-| GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups |
+| GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups; City required for map markers, ASN optional enrichment |
 | Threat / usage | AbuseIPDB | 30-day SQLite cache, optional API key |
 | Source intel | Tor Project + Spamhaus DROP | background-refreshed local cache |
 | Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
@@ -68,8 +70,8 @@ image that runs on older x86-64 hardware, rebuild with
 | Variable | Default | Purpose |
 |---|---|---|
 | `MSMAP_DB_PATH` | `/data/msmap.db` | SQLite database path |
-| `MSMAP_CITY_MMDB` | `/var/lib/msmap/geoip/GeoLite2-City.mmdb` | GeoIP city database |
-| `MSMAP_ASN_MMDB` | `/var/lib/msmap/geoip/GeoLite2-ASN.mmdb` | GeoIP ASN database |
+| `MSMAP_CITY_MMDB` | `/var/lib/msmap/geoip/GeoLite2-City.mmdb` | GeoLite2 City database; required for map markers |
+| `MSMAP_ASN_MMDB` | `/var/lib/msmap/geoip/GeoLite2-ASN.mmdb` | GeoLite2 ASN database; optional ASN enrichment |
 | `MSMAP_LISTEN_PORT` | `5140` | UDP syslog ingest port |
 | `MSMAP_HTTP_PORT` | `8080` | Web UI / API port |
 | `MSMAP_HTTP_THREADS` | `4` | libmicrohttpd thread-pool size (`1`-`16`) |
@@ -85,11 +87,11 @@ image that runs on older x86-64 hardware, rebuild with
 | Path | Purpose |
 |---|---|
 | `/data` | SQLite database and caches — persist this across restarts |
-| `/var/lib/msmap/geoip` | MaxMind `.mmdb` files — optional, mount read-only |
+| `/var/lib/msmap/geoip` | GeoLite2 `.mmdb` files — City is required for map markers, ASN is optional; mount read-only |
 
 ### docker run
 
-Minimum deployment:
+Recommended map deployment:
 
 ```bash
 docker run -d \
@@ -104,6 +106,10 @@ docker run -d \
 ```
 
 `ghcr.io/mtstanfield/msmap:latest` assumes an `x86-64-v3` capable CPU.
+
+Service startup without GeoIP data is still possible, but the web map will not
+render source markers until a GeoLite2 City database is mounted at
+`/var/lib/msmap/geoip/GeoLite2-City.mmdb`.
 
 With AbuseIPDB threat scoring:
 
@@ -178,19 +184,23 @@ volumes:
 
 Notes:
 
-- `geoipupdate` is optional, but recommended if you want country/ASN lookups.
+- `geoipupdate` is optional as an update mechanism, but a GeoLite2 City
+  database is required for map markers to render.
+- `GeoLite2-ASN.mmdb` is optional and only affects ASN enrichment.
 - `ABUSEIPDB_API_KEY` is optional; without it, existing cached AbuseIPDB data is
   still readable but new threat/usage lookups are disabled.
 - `MSMAP_HOME_HOST` is optional; without it, the home marker, home-directed
   arcs, and RFC1918 destination rewrite are disabled.
 
-### GeoLite2 databases (optional, recommended)
+### GeoLite2 databases (required for map markers)
 
 Download `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` from
 [MaxMind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)
 (free account required) and place them in the directory mounted at
-`/var/lib/msmap/geoip/`. msmap reloads changed `.mmdb` files automatically —
-no restart needed after a geoipupdate run.
+`/var/lib/msmap/geoip/`. `GeoLite2-City.mmdb` is required for map markers and
+country/location data. `GeoLite2-ASN.mmdb` is optional and only adds ASN
+enrichment. msmap reloads changed `.mmdb` files automatically — no restart
+needed after a geoipupdate run.
 
 ### Mikrotik router configuration
 
@@ -346,7 +356,7 @@ and desktop-sized UI lazy-loads recent raw events from `GET /api/detail`.
 | Protocol | All / TCP / UDP |
 | Source IP | Exact source IP match |
 | Destination Port | Exact destination port match |
-| Country | 2-letter ISO code (requires GeoIP) |
+| Country | 2-letter ISO code (requires GeoLite2 City) |
 | Threat | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
 | Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
@@ -402,9 +412,9 @@ Clicking a marker shows:
 
 - First/last seen timestamps for the aggregate source IP marker
 - Hit count within the selected window
-- Country and ASN (GeoIP — shown when `.mmdb` files are mounted)
-  Marker placement remains approximate and should be read as a location hint,
-  not an exact device position.
+- Country and map placement from GeoLite2 City; ASN from GeoLite2 ASN when
+  mounted. Marker placement remains approximate and should be read as a
+  location hint, not an exact device position.
 - **Threat score** chip from AbuseIPDB
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** badge from Tor Project bulk exit data
@@ -480,6 +490,7 @@ Notes:
 - If `proto` is omitted, the UI/default API behavior excludes ICMP.
 - Response rows are aggregate markers, not raw events.
 - Responses include threat, usage, and source-intel flags.
+- Without GeoLite2 City data, the web map will not render source markers.
 
 ### `GET /api/detail`
 
