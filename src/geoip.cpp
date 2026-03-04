@@ -246,4 +246,21 @@ bool GeoIp::reload_if_changed() noexcept
     return open();
 }
 
+void GeoIp::set_city_state_for_test(bool city_ready, std::int64_t city_mtime) noexcept
+{
+    city_open_ = city_ready;
+    city_mtime_ = city_mtime;
+}
+
+bool GeoIp::apply_city_reload_result_for_test(bool new_city_ok,
+                                              std::int64_t new_city_mtime) noexcept
+{
+    if (!new_city_ok) {
+        return false;
+    }
+    city_open_ = true;
+    city_mtime_ = new_city_mtime;
+    return true;
+}
+
 } // namespace msmap

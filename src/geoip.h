@@ -74,6 +74,17 @@ public:
     /// a time() call and an integer comparison.
     bool reload_if_changed() noexcept;
 
+    /// Test hook: seed City reload state without requiring a real .mmdb.
+    void set_city_state_for_test(bool city_ready, std::int64_t city_mtime) noexcept;
+
+    /// Test hook: apply the City commit policy and report whether the new City
+    /// database would replace the current one.
+    bool apply_city_reload_result_for_test(bool new_city_ok,
+                                           std::int64_t new_city_mtime) noexcept;
+
+    /// Test hook: expose the current City mtime tracked by the reload logic.
+    [[nodiscard]] std::int64_t city_mtime_for_test() const noexcept { return city_mtime_; }
+
 private:
     /// (Re-)open mmdb files using the stored paths. City reload is
     /// transactional: on failure, the last good loaded City DB remains active.

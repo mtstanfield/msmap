@@ -67,3 +67,23 @@ TEST_CASE("reload_if_changed() on invalid GeoIp is a safe no-op")
     REQUIRE_FALSE(geoip.reload_if_changed());
     REQUIRE_FALSE(geoip.reload_if_changed());
 }
+
+TEST_CASE("failed City reload keeps the last good City state active")
+{
+    msmap::GeoIp geoip{"/nonexistent/GeoLite2-City.mmdb", ""};
+    geoip.set_city_state_for_test(true, 123);
+
+    REQUIRE_FALSE(geoip.apply_city_reload_result_for_test(false, 456));
+    REQUIRE(geoip.city_ready());
+    REQUIRE(geoip.city_mtime_for_test() == 123);
+}
+
+TEST_CASE("successful City reload replaces the tracked City state")
+{
+    msmap::GeoIp geoip{"/nonexistent/GeoLite2-City.mmdb", ""};
+    geoip.set_city_state_for_test(true, 123);
+
+    REQUIRE(geoip.apply_city_reload_result_for_test(true, 456));
+    REQUIRE(geoip.city_ready());
+    REQUIRE(geoip.city_mtime_for_test() == 456);
+}
