@@ -602,7 +602,7 @@ html, body {
 .popup-summary {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     padding: 8px 8px 7px;
     border: 1px solid transparent;
     border-radius: 4px;
@@ -635,8 +635,8 @@ html, body {
 .popup-signal-strip {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding-top: 1px;
+    gap: 7px;
+    padding-top: 0;
 }
 
 .popup-meta-grid {
@@ -963,7 +963,7 @@ html, body {
 
     .popup-summary {
         padding: 7px 7px 6px;
-        gap: 5px;
+        gap: 4px;
     }
 
     .popup-row .ip {
@@ -985,7 +985,7 @@ html, body {
     }
 
     .popup-signal-strip {
-        gap: 5px;
+        gap: 6px;
     }
 
     .popup-usage {
