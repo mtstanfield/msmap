@@ -274,8 +274,6 @@ let activePopupIp = '';
 let activePopup   = null;
 let activePopupRow = null;
 let lastMapSuccessAt = 0;
-let mapFeedState = 'unknown';
-let lastStatus = null;
 let statusPollTimer = null;
 let statusInFlight = false;
 
@@ -656,10 +654,6 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-function passesFilters(r) {
-    return true;
-}
-
 function detailSlotId(srcIp) {
     return 'detail-' + srcIp.replace(/[^A-Za-z0-9_-]/g, '-');
 }
@@ -779,7 +773,6 @@ function formatUtcMidnightCountdown(nowSec) {
 }
 
 function setOperatorStatus(status) {
-    lastStatus = status;
     if (!status || status.ok !== true) {
         statEvents.style.display = 'none';
         statSources.style.display = 'none';
@@ -892,7 +885,6 @@ function setOperatorStatus(status) {
 }
 
 function setMapFeedState(nextState) {
-    mapFeedState = nextState;
     statDot.classList.remove('is-unknown', 'is-healthy', 'is-stale');
     statDot.classList.add(
         nextState === 'healthy' ? 'is-healthy' :
@@ -1892,7 +1884,6 @@ function renderMap(rows) {
     const arcCandidates = [];
 
     for (const r of rows) {
-        if (!passesFilters(r)) { continue; }
         if (r.lat === null || r.lon === null || r.lat === undefined || r.lon === undefined) {
             continue;
         }
