@@ -80,7 +80,11 @@ std::string detail_page_to_json(const DetailPage& page)
     out += "{\"rows\":";
     out += connections_to_json(page.rows);
     out += ",\"next_cursor\":";
-    json::append_int_or_null(out, page.next_cursor);
+    if (page.next_cursor.has_value()) {
+        json::append_string(out, *page.next_cursor);
+    } else {
+        out += "null";
+    }
     out += '}';
     return out;
 }
@@ -216,19 +220,6 @@ std::string safe_param(const char* v, std::size_t max_len)
     return (sv.size() <= max_len) ? std::string{sv} : std::string{};
 }
 
-std::optional<std::int64_t> parse_positive_i64_exact(const char* raw)
-{
-    if (raw == nullptr || *raw == '\0') {
-        return std::nullopt;
-    }
-    char* end = nullptr;
-    const auto parsed = std::strtoll(raw, &end, 10);
-    if (end == raw || *end != '\0' || parsed <= 0) {
-        return std::nullopt;
-    }
-    return parsed;
-}
-
 std::optional<int> parse_bounded_int_exact(const char* raw, int min_val, int max_val)
 {
     if (raw == nullptr || *raw == '\0') {
@@ -255,10 +246,10 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
 
     // Timestamps: must be positive epoch values with no trailing junk.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "since");
-    if (const auto n = parse_positive_i64_exact(v); n.has_value()) { f.since = *n; }
+    if (const auto n = parse_positive_i64_exact(safe_param(v, 19)); n.has_value()) { f.since = *n; }
 
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "until");
-    if (const auto n = parse_positive_i64_exact(v); n.has_value()) { f.until = *n; }
+    if (const auto n = parse_positive_i64_exact(safe_param(v, 19)); n.has_value()) { f.until = *n; }
 
     // IP address: IPv6 max representation is 45 chars (e.g. compressed form).
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
@@ -288,9 +279,7 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
     }
 
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "cursor");
-    if (const auto n = parse_bounded_int_exact(v, 0, 1'000'000); n.has_value()) {
-        f.offset = *n;
-    }
+    f.cursor = safe_param(v, 64);
 
     // Row limit: cap detail pages to 500.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "limit");
@@ -310,7 +299,7 @@ MapFilters parse_map_filters(MHD_Connection* conn)
     std::int64_t window_secs = 900;
     if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "window");
         v != nullptr) {
-        if (const auto n = parse_positive_i64_exact(v); n.has_value() &&
+        if (const auto n = parse_positive_i64_exact(safe_param(v, 19)); n.has_value() &&
             (*n == 900 || *n == 3600 || *n == 21600 || *n == 86400)) {
             window_secs = *n;
         }
@@ -359,7 +348,7 @@ std::int64_t map_window_from_request(MHD_Connection* conn)
     if (v == nullptr) {
         return 900;
     }
-    const auto n = parse_positive_i64_exact(v);
+    const auto n = parse_positive_i64_exact(safe_param(v, 19));
     return (n.has_value() && (*n == 900 || *n == 3600 || *n == 21600 || *n == 86400))
         ? *n : 900;
 }

@@ -1562,9 +1562,7 @@ async function loadDetail(row, cursor) {
             state.rows = rows;
             state.selectedIndex = 0;
         }
-        state.nextCursor = Number.isInteger(body.next_cursor) && body.next_cursor >= 0
-            ? String(body.next_cursor)
-            : '';
+        state.nextCursor = typeof body.next_cursor === 'string' ? body.next_cursor : '';
         clearDetailRetryTimer(state);
         state.loaded = true;
         state.error = '';

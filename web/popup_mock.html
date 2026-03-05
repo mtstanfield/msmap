@@ -86,8 +86,104 @@
             overflow: hidden;
         }
 
+        .mock-coarse-hotspot {
+            position: absolute;
+            width: 54px;
+            height: 54px;
+            border-radius: 999px;
+            border: 1px dashed rgba(139, 148, 158, 0.85);
+            background: rgba(139, 148, 158, 0.14);
+            display: grid;
+            place-items: center;
+            color: #c9d1d9;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 0 0 10px rgba(139, 148, 158, 0.10);
+            z-index: 700;
+        }
+
+        .mock-coarse-hotspot::after {
+            content: "coarse";
+            position: absolute;
+            top: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8b949e;
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .mock-coarse-bucket {
+            position: absolute;
+            left: 14px;
+            bottom: 52px;
+            width: min(280px, calc(100vw - 28px));
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 25%),
+                rgba(22, 27, 34, 0.94);
+            color: #e6edf3;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            z-index: 1001;
+        }
+
+        .mock-coarse-bucket-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px 7px;
+            border-bottom: 1px solid rgba(48, 54, 61, 0.9);
+        }
+
+        .mock-coarse-title {
+            color: #8b949e;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .mock-coarse-count {
+            color: #c9d1d9;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .mock-coarse-list {
+            margin: 0;
+            padding: 8px 10px 10px;
+            list-style: none;
+            display: grid;
+            gap: 5px;
+        }
+
+        .mock-coarse-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            font-size: 11px;
+            color: #c9d1d9;
+        }
+
+        .mock-coarse-item-label {
+            color: #8b949e;
+        }
+
         #status-bar {
             z-index: 1002;
+        }
+
+        @media (max-width: 900px) {
+            .mock-coarse-bucket {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: 84px;
+            }
         }
     </style>
 </head>
@@ -100,12 +196,26 @@
             <span class="cluster-spike-badge">!</span>
         </div>
         <div class="mock-cluster low" style="left: 66%; top: 26%;">42</div>
+        <div class="mock-coarse-hotspot" style="left: 48%; top: 43%;">844</div>
 
         <div class="mock-marker high" style="left: 31%; top: 51%;"></div>
         <div class="mock-marker medium" style="left: 35%; top: 54%;"></div>
         <div class="mock-marker low" style="left: 37%; top: 48%;"></div>
         <div class="mock-marker unknown" style="left: 44%; top: 63%;"></div>
         <div class="mock-marker clean" style="left: 58%; top: 58%;"></div>
+
+        <aside class="mock-coarse-bucket" aria-label="Coarse geolocation bucket">
+            <div class="mock-coarse-bucket-head">
+                <span class="mock-coarse-title">Coarse Geolocation Bucket</span>
+                <span class="mock-coarse-count">844 sources</span>
+            </div>
+            <ul class="mock-coarse-list">
+                <li class="mock-coarse-item"><span class="mock-coarse-item-label">US (centroid-heavy)</span><span>521</span></li>
+                <li class="mock-coarse-item"><span class="mock-coarse-item-label">DE</span><span>112</span></li>
+                <li class="mock-coarse-item"><span class="mock-coarse-item-label">NL</span><span>84</span></li>
+                <li class="mock-coarse-item"><span class="mock-coarse-item-label">Other</span><span>127</span></li>
+            </ul>
+        </aside>
 
         <div class="leaflet-popup leaflet-zoom-animated">
             <div class="leaflet-popup-content-wrapper">
@@ -227,6 +337,12 @@
                     <option>ICMP</option>
                 </select>
 
+                <label class="filter-label">Coarse Geo</label>
+                <div class="filter-header-toggle">
+                    <button type="button" class="filter-header-toggle-button is-active" data-coarse-mode="bucket">Bucketed</button>
+                    <button type="button" class="filter-header-toggle-button" data-coarse-mode="raw">Raw</button>
+                </div>
+
                 <label class="filter-label">Threats</label>
                 <div class="filter-threat">
                     <button type="button" class="filter-threat-button filter-threat-button-all is-active" data-threat="all">All</button>
@@ -315,8 +431,11 @@
             const tabLegend = document.getElementById('filter-tab-legend');
             const threatButtons = document.querySelectorAll('.filter-threat-button');
             const threatText = document.querySelector('.filter-threat-text');
-            const arcButtons = document.querySelectorAll('.filter-header-toggle-button');
+            const arcButtons = document.querySelectorAll('[data-arcs]');
             const popupCopy = document.querySelector('.popup-ip-copy');
+            const coarseButtons = document.querySelectorAll('[data-coarse-mode]');
+            const coarseBucket = document.querySelector('.mock-coarse-bucket');
+            const coarseHotspot = document.querySelector('.mock-coarse-hotspot');
 
             toggle.addEventListener('click', () => {
                 const isHidden = panel.style.display === 'none';
@@ -347,6 +466,16 @@
                 button.addEventListener('click', () => {
                     arcButtons.forEach((b) => b.classList.remove('is-active'));
                     button.classList.add('is-active');
+                });
+            });
+
+            coarseButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    coarseButtons.forEach((b) => b.classList.remove('is-active'));
+                    button.classList.add('is-active');
+                    const isBucketed = button.getAttribute('data-coarse-mode') === 'bucket';
+                    coarseBucket.style.display = isBucketed ? '' : 'none';
+                    coarseHotspot.style.display = isBucketed ? '' : 'none';
                 });
             });
 

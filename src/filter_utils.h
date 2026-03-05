@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cctype>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -47,6 +49,32 @@ inline std::optional<std::string> normalize_asn_filter(std::string_view raw)
         }
     }
     return trimmed;
+}
+
+inline std::optional<std::int64_t> parse_positive_i64_exact(std::string_view raw) noexcept
+{
+    if (raw.empty()) {
+        return std::nullopt;
+    }
+
+    std::int64_t value = 0;
+    for (const char ch : raw) {
+        if (ch < '0' || ch > '9') {
+            return std::nullopt;
+        }
+        constexpr std::int64_t k_max_div10 = std::numeric_limits<std::int64_t>::max() / 10;
+        if (value > k_max_div10) {
+            return std::nullopt;
+        }
+        value *= 10;
+        const auto digit = static_cast<std::int64_t>(ch - '0');
+        if (value > std::numeric_limits<std::int64_t>::max() - digit) {
+            return std::nullopt;
+        }
+        value += digit;
+    }
+
+    return (value > 0) ? std::optional<std::int64_t>{value} : std::nullopt;
 }
 
 } // namespace msmap

@@ -314,3 +314,27 @@ TEST_CASE("normalize_asn_filter: trims and enforces practical ASN charset", "[ht
         CHECK_FALSE(msmap::normalize_asn_filter(long_asn).has_value());
     }
 }
+
+TEST_CASE("parse_positive_i64_exact: validates strict decimal positive integers", "[http][parse]")
+{
+    SECTION("accepts valid positive integers")
+    {
+        const auto parsed = msmap::parse_positive_i64_exact("86400");
+        REQUIRE(parsed.has_value());
+        CHECK(*parsed == 86400);
+    }
+
+    SECTION("rejects empty, zero, negatives, and non-digits")
+    {
+        CHECK_FALSE(msmap::parse_positive_i64_exact("").has_value());
+        CHECK_FALSE(msmap::parse_positive_i64_exact("0").has_value());
+        CHECK_FALSE(msmap::parse_positive_i64_exact("-1").has_value());
+        CHECK_FALSE(msmap::parse_positive_i64_exact("+1").has_value());
+        CHECK_FALSE(msmap::parse_positive_i64_exact("10s").has_value());
+    }
+
+    SECTION("rejects overflow")
+    {
+        CHECK_FALSE(msmap::parse_positive_i64_exact("9223372036854775808").has_value());
+    }
+}

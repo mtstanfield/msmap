@@ -1,4 +1,5 @@
 #include "db.h"
+#include "filter_utils.h"
 #include "geoip.h"
 
 #include <algorithm>
@@ -12,7 +13,6 @@
 #include <optional>
 #include <sqlite3.h>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace msmap {
@@ -81,6 +81,10 @@ constexpr const char* kCreateIndexDstPort =
     "CREATE INDEX IF NOT EXISTS idx_dst_port ON connections(dst_port)";
 constexpr const char* kCreateIndexCountry =
     "CREATE INDEX IF NOT EXISTS idx_country  ON connections(country)";
+constexpr const char* kCreateIndexSrcIpTsId =
+    "CREATE INDEX IF NOT EXISTS idx_src_ip_ts_id ON connections(src_ip, ts DESC, id DESC)";
+constexpr const char* kCreateIndexTsSrcIp =
+    "CREATE INDEX IF NOT EXISTS idx_ts_src_ip ON connections(ts DESC, src_ip)";
 
 // Expression index for duplicate suppression.
 // COALESCE(port, -1) makes NULL ports (ICMP) participate in the unique key.
@@ -299,66 +303,53 @@ int bind_where_clause(sqlite3_stmt* stmt,
     return idx;
 }
 
-void update_map_row(MapRow& out, const ConnectionRow& row, bool inserted)
+ConnectionRow read_connection_row_from_offset(sqlite3_stmt* stmt, int base_col) noexcept
 {
-    if (inserted) {
-        out.src_ip          = row.src_ip;
-        out.first_ts        = row.ts;
-        out.last_ts         = row.ts;
-        out.count           = 0;
-        out.threat_latest   = row.threat;
-        out.threat_max      = row.threat;
-        out.sample_dst_port = row.dst_port;
-        out.usage_type      = row.usage_type;
-        out.tor_exit        = row.tor_exit;
-        out.spamhaus_drop   = row.spamhaus_drop;
-    }
-
-    out.count += 1;
-    out.first_ts = std::min(out.first_ts, row.ts);
-    out.last_ts  = std::max(out.last_ts, row.ts);
-
-    if (row.threat.has_value() &&
-        (!out.threat_max.has_value() || *row.threat > *out.threat_max)) {
-        out.threat_max = row.threat;
-    }
-    if (out.usage_type.empty() && !row.usage_type.empty()) {
-        out.usage_type = row.usage_type;
-    }
-    if (!out.tor_exit.has_value() && row.tor_exit.has_value()) {
-        out.tor_exit = row.tor_exit;
-    }
-    if (!out.spamhaus_drop.has_value() && row.spamhaus_drop.has_value()) {
-        out.spamhaus_drop = row.spamhaus_drop;
-    }
-
-    if (!out.lat.has_value() && row.lat.has_value() && row.lon.has_value()) {
-        out.lat     = row.lat;
-        out.lon     = row.lon;
-        out.country = row.country;
-        out.asn     = row.asn;
-        if (row.dst_port.has_value()) {
-            out.sample_dst_port = row.dst_port;
-        }
-    }
+    ConnectionRow row;
+    row.ts            = sqlite3_column_int64(stmt, base_col + 0);
+    row.src_ip        = col_text(stmt, base_col + 1);
+    row.src_port      = col_opt_int(stmt, base_col + 2);
+    row.dst_ip        = col_text(stmt, base_col + 3);
+    row.dst_port      = col_opt_int(stmt, base_col + 4);
+    row.proto         = col_text(stmt, base_col + 5);
+    row.tcp_flags     = col_text(stmt, base_col + 6);
+    row.rule          = col_text(stmt, base_col + 7);
+    row.country       = col_text(stmt, base_col + 8);
+    row.lat           = col_opt_double(stmt, base_col + 9);
+    row.lon           = col_opt_double(stmt, base_col + 10);
+    row.asn           = col_text(stmt, base_col + 11);
+    row.threat        = col_opt_int(stmt, base_col + 12);
+    row.usage_type    = col_text(stmt, base_col + 13);
+    row.tor_exit      = col_opt_bool(stmt, base_col + 14);
+    row.spamhaus_drop = col_opt_bool(stmt, base_col + 15);
+    return row;
 }
 
-std::vector<MapRow> collect_geo_rows(std::unordered_map<std::string, MapRow>& by_ip)
+std::optional<std::pair<std::int64_t, std::int64_t>>
+parse_detail_cursor(std::string_view cursor) noexcept
 {
-    std::vector<MapRow> rows;
-    rows.reserve(by_ip.size());
-    for (auto& [_, row] : by_ip) {
-        if (row.lat.has_value() && row.lon.has_value()) {
-            rows.push_back(std::move(row));
-        }
+    if (cursor.empty() || cursor.size() > 64) {
+        return std::nullopt;
     }
-    std::sort(rows.begin(), rows.end(), [](const MapRow& lhs, const MapRow& rhs) {
-        if (lhs.last_ts != rhs.last_ts) {
-            return lhs.last_ts > rhs.last_ts;
-        }
-        return lhs.src_ip < rhs.src_ip;
-    });
-    return rows;
+    const auto sep = cursor.find(':');
+    if (sep == std::string_view::npos || sep == 0 || sep + 1 >= cursor.size()) {
+        return std::nullopt;
+    }
+    if (cursor.find(':', sep + 1) != std::string_view::npos) {
+        return std::nullopt;
+    }
+
+    const auto ts = parse_positive_i64_exact(cursor.substr(0, sep));
+    const auto id = parse_positive_i64_exact(cursor.substr(sep + 1));
+    if (!ts.has_value() || !id.has_value()) {
+        return std::nullopt;
+    }
+    return std::pair<std::int64_t, std::int64_t>{*ts, *id};
+}
+
+std::string make_detail_cursor(std::int64_t ts, std::int64_t id)
+{
+    return std::to_string(ts) + ":" + std::to_string(id);
 }
 
 } // anonymous namespace
@@ -395,6 +386,8 @@ Database::Database(const std::string& path) noexcept
         !exec(kCreateIndexSrcIp)                ||
         !exec(kCreateIndexDstPort)              ||
         !exec(kCreateIndexCountry)              ||
+        !exec(kCreateIndexSrcIpTsId)            ||
+        !exec(kCreateIndexTsSrcIp)              ||
         !exec(kCreateIndexDedup)) {
         db_.reset(); // mark invalid
         return;
@@ -642,14 +635,66 @@ Database::query_connections(const QueryFilters& f) const noexcept
 
 DetailPage Database::query_detail_page(const QueryFilters& f) const noexcept
 {
-    QueryFilters page = f;
-    page.limit = (page.limit > 0 && page.limit <= 500) ? page.limit : 100;
-    page.offset = std::max(page.offset, 0);
-
     DetailPage result;
-    result.rows = query_connections(page);
-    if (static_cast<int>(result.rows.size()) == page.limit) {
-        result.next_cursor = page.offset + page.limit;
+    if (!db_) {
+        return result;
+    }
+
+    const std::lock_guard<std::mutex> lock{mutex_};
+
+    const int cap = (f.limit > 0 && f.limit <= 500) ? f.limit : 100;
+    const auto cursor = parse_detail_cursor(f.cursor);
+
+    std::string sql =
+        "SELECT connections.id, ts, src_ip, src_port, dst_ip, dst_port, "
+        "proto, tcp_flags, rule, "
+        "country, lat, lon, asn, threat, usage_type, "
+        "intel.tor_exit, intel.spamhaus_drop "
+        "FROM connections "
+        "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
+    const WhereInputs inputs{f.src_ip, f.asn, f.proto, "", f.exclude_icmp,
+                             f.since, f.until, f.dst_port};
+    const BoundFilterState state = build_where_clause(sql, inputs);
+    if (cursor.has_value()) {
+        sql += state.has_since || state.has_until || state.has_src_ip || state.has_asn ||
+                       state.has_proto || state.has_threat || state.exclude_icmp || state.has_port
+            ? " AND "
+            : " WHERE ";
+        sql += "(ts < ? OR (ts = ? AND connections.id < ?))";
+    }
+    sql += " ORDER BY ts DESC, connections.id DESC LIMIT ?";
+
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db_.get(), sql.c_str(), -1, &raw, nullptr)
+            != SQLITE_OK) {
+        std::clog << "[WARN] query_detail_page prepare: "
+                  << sqlite3_errmsg(db_.get()) << '\n';
+        return result;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+
+    int idx = bind_where_clause(stmt.get(), state, inputs);
+    if (cursor.has_value()) {
+        (void)sqlite3_bind_int64(stmt.get(), idx++, cursor->first);
+        (void)sqlite3_bind_int64(stmt.get(), idx++, cursor->first);
+        (void)sqlite3_bind_int64(stmt.get(), idx++, cursor->second);
+    }
+    (void)sqlite3_bind_int(stmt.get(), idx, cap + 1);
+
+    std::int64_t last_ts = 0;
+    std::int64_t last_id = 0;
+    bool has_more = false;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        if (static_cast<int>(result.rows.size()) >= cap) {
+            has_more = true;
+            break;
+        }
+        last_id = sqlite3_column_int64(stmt.get(), 0);
+        last_ts = sqlite3_column_int64(stmt.get(), 1);
+        result.rows.push_back(read_connection_row_from_offset(stmt.get(), 1));
+    }
+    if (has_more && !result.rows.empty()) {
+        result.next_cursor = make_detail_cursor(last_ts, last_id);
     }
     return result;
 }
@@ -713,16 +758,50 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
     const std::lock_guard<std::mutex> lock{mutex_};
 
     std::string sql =
-        "SELECT ts, src_ip, src_port, dst_ip, dst_port, "
-        "proto, tcp_flags, rule, "
-        "country, lat, lon, asn, threat, usage_type, "
-        "intel.tor_exit, intel.spamhaus_drop "
+        "WITH filtered AS ("
+        "SELECT connections.id, ts, src_ip, dst_port, country, lat, lon, asn, "
+        "threat, usage_type, intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
     const WhereInputs inputs{f.src_ip, f.asn, f.proto, f.threat, f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);
-    sql += " ORDER BY ts DESC";
+    sql += "), "
+           "latest AS ("
+           "SELECT src_ip, threat AS threat_latest, dst_port AS sample_dst_port, "
+           "country, lat, lon, asn, tor_exit, spamhaus_drop "
+           "FROM ("
+           "SELECT src_ip, threat, dst_port, country, lat, lon, asn, tor_exit, spamhaus_drop, "
+           "ROW_NUMBER() OVER (PARTITION BY src_ip ORDER BY ts DESC, id DESC) AS rn "
+           "FROM filtered"
+           ") WHERE rn = 1"
+           "), "
+           "usage_pick AS ("
+           "SELECT src_ip, usage_type "
+           "FROM ("
+           "SELECT src_ip, usage_type, "
+           "ROW_NUMBER() OVER ("
+           "PARTITION BY src_ip ORDER BY "
+           "CASE WHEN usage_type IS NOT NULL AND usage_type != '' THEN 0 ELSE 1 END, "
+           "ts DESC, id DESC"
+           ") AS rn "
+           "FROM filtered"
+           ") WHERE rn = 1"
+           "), "
+           "agg AS ("
+           "SELECT src_ip, MIN(ts) AS first_ts, MAX(ts) AS last_ts, COUNT(*) AS count, "
+           "MAX(threat) AS threat_max "
+           "FROM filtered GROUP BY src_ip"
+           ") "
+           "SELECT agg.src_ip, agg.first_ts, agg.last_ts, agg.count, "
+           "latest.lat, latest.lon, latest.country, latest.asn, "
+           "latest.threat_latest, agg.threat_max, latest.sample_dst_port, "
+           "usage_pick.usage_type, latest.tor_exit, latest.spamhaus_drop "
+           "FROM agg "
+           "JOIN latest ON latest.src_ip = agg.src_ip "
+           "LEFT JOIN usage_pick ON usage_pick.src_ip = agg.src_ip "
+           "WHERE latest.lat IS NOT NULL AND latest.lon IS NOT NULL "
+           "ORDER BY agg.last_ts DESC, agg.src_ip ASC";
 
     sqlite3_stmt* raw = nullptr;
     if (sqlite3_prepare_v2(db_.get(), sql.c_str(), -1, &raw, nullptr)
@@ -735,13 +814,26 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
 
     (void)bind_where_clause(stmt.get(), state, inputs);
 
-    std::unordered_map<std::string, MapRow> by_ip;
+    std::vector<MapRow> rows;
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
-        const ConnectionRow row = read_connection_row(stmt.get());
-        auto [it, inserted] = by_ip.try_emplace(row.src_ip);
-        update_map_row(it->second, row, inserted);
+        MapRow row;
+        row.src_ip          = col_text(stmt.get(), 0);
+        row.first_ts        = sqlite3_column_int64(stmt.get(), 1);
+        row.last_ts         = sqlite3_column_int64(stmt.get(), 2);
+        row.count           = sqlite3_column_int(stmt.get(), 3);
+        row.lat             = col_opt_double(stmt.get(), 4);
+        row.lon             = col_opt_double(stmt.get(), 5);
+        row.country         = col_text(stmt.get(), 6);
+        row.asn             = col_text(stmt.get(), 7);
+        row.threat_latest   = col_opt_int(stmt.get(), 8);
+        row.threat_max      = col_opt_int(stmt.get(), 9);
+        row.sample_dst_port = col_opt_int(stmt.get(), 10);
+        row.usage_type      = col_text(stmt.get(), 11);
+        row.tor_exit        = col_opt_bool(stmt.get(), 12);
+        row.spamhaus_drop   = col_opt_bool(stmt.get(), 13);
+        rows.push_back(std::move(row));
     }
-    return collect_geo_rows(by_ip);
+    return rows;
 }
 
 } // namespace msmap

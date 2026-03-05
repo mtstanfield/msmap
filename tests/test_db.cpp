@@ -597,7 +597,7 @@ TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
     CHECK(icmp_rows.front().proto == "ICMP");
 }
 
-TEST_CASE("query_detail_page: returns next cursor when another page exists")
+TEST_CASE("query_detail_page: keyset cursor paginates and tolerates malformed cursor")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -611,10 +611,24 @@ TEST_CASE("query_detail_page: returns next cursor when another page exists")
     msmap::QueryFilters filters;
     filters.src_ip = entry.src_ip;
     filters.limit = 2;
-    const auto page = db.query_detail_page(filters);
-    REQUIRE(page.rows.size() == 2);
-    REQUIRE(page.next_cursor.has_value());
-    CHECK(*page.next_cursor == 2);
+    const auto first = db.query_detail_page(filters);
+    REQUIRE(first.rows.size() == 2);
+    REQUIRE(first.next_cursor.has_value());
+    CHECK_FALSE(first.next_cursor->empty());
+    CHECK(first.rows.at(0).ts == 1002);
+    CHECK(first.rows.at(1).ts == 1001);
+
+    filters.cursor = *first.next_cursor;
+    const auto second = db.query_detail_page(filters);
+    REQUIRE(second.rows.size() == 1);
+    CHECK(second.rows.at(0).ts == 1000);
+    CHECK_FALSE(second.next_cursor.has_value());
+
+    filters.cursor = "bad-cursor-value";
+    const auto fallback = db.query_detail_page(filters);
+    REQUIRE(fallback.rows.size() == 2);
+    CHECK(fallback.rows.at(0).ts == 1002);
+    CHECK(fallback.rows.at(1).ts == 1001);
 }
 
 TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")

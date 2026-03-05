@@ -65,7 +65,8 @@ struct QueryFilters {
     std::string  proto;         // exact match;  empty = any
     bool         exclude_icmp{false}; // when true and proto unset, hide ICMP
     int          dst_port{0};   // exact match;  0 = any
-    int          offset{0};     // pagination offset; 0 = first page
+    std::string  cursor;        // opaque keyset cursor for detail paging
+    int          offset{0};     // pagination offset; query_connections only
     int          limit{25000};  // row cap (enforced max: 25 000)
 };
 
@@ -99,7 +100,7 @@ struct MapRow {
 
 struct DetailPage {
     std::vector<ConnectionRow> rows;
-    std::optional<int>         next_cursor;
+    std::optional<std::string> next_cursor;
 };
 
 struct StatusSnapshot {
