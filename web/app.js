@@ -957,7 +957,7 @@ async function fetchStatus() {
     }
     statusInFlight = true;
     try {
-        const resp = await fetch('/api/status', { cache: 'default' });
+        const resp = await fetch('/api/status', { cache: 'no-store' });
         if (!resp.ok) {
             setOperatorStatus(null);
             return;
@@ -1269,7 +1269,7 @@ async function fetchHome({ ignoreRetryGate = false } = {}) {
     }
     homeFetchInFlight = true;
     try {
-        const resp = await fetch('/api/home', { cache: 'default' });
+        const resp = await fetch('/api/home', { cache: 'no-store' });
         if (!resp.ok) {
             if (resp.status === 404) {
                 clearHomeState();
@@ -1578,7 +1578,7 @@ async function fetchDetailPage(srcIp, cursor, anchorTs, windowSecs) {
 
     let resp;
     try {
-        resp = await fetch('/api/detail?' + params.toString());
+        resp = await fetch('/api/detail?' + params.toString(), { cache: 'no-store' });
     } catch (_) {
         throw makeDetailError('temporary',
             'Recent events temporarily unavailable under load.',
@@ -1943,7 +1943,7 @@ async function poll() {
     pollInFlight = true;
     updateMapFeedIndicator();
     try {
-        const resp = await fetch('/api/map' + buildMapQueryString(), { cache: 'default' });
+        const resp = await fetch('/api/map' + buildMapQueryString(), { cache: 'no-store' });
         if (!resp.ok) {
             setError('API ' + resp.status);
             updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
@@ -2001,7 +2001,9 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         void fetchStatus();
         scheduleStatusPoll();
-        requestPollNow();
+        if (!pollInFlight) {
+            requestPollNow();
+        }
         return;
     }
     if (statusPollTimer !== null) {
