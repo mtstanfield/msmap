@@ -2,72 +2,13 @@
 // @ts-check
 'use strict';
 
-/**
- * @typedef {{
- *   src_ip: string,
- *   lat: number|null|undefined,
- *   lon: number|null|undefined,
- *   count: number,
- *   first_ts: number,
- *   last_ts: number,
- *   threat_max: number|null|undefined,
- *   country?: string,
- *   asn?: string,
- *   usage_type?: string,
- *   spamhaus_drop?: boolean,
- *   tor_exit?: boolean
- * }} MapRow
- */
-
-/**
- * @typedef {{
- *   ts: number,
- *   src_ip: string,
- *   dst_ip: string,
- *   src_port: number|null,
- *   dst_port: number|null,
- *   proto: string,
- *   tcp_flags?: string,
- *   rule: string
- * }} DetailRow
- */
-
-/**
- * @typedef {{
- *   rows: DetailRow[],
- *   selectedIndex: number,
- *   nextCursor: string,
- *   loading: boolean,
- *   error: string,
- *   errorKind: string,
- *   retryAfterMs: number,
- *   retryTimerId: ReturnType<typeof setTimeout>|null,
- *   loaded: boolean,
- *   windowSecs: number,
- *   anchorTs: number
- * }} DetailEntryState
- */
-
-/**
- * @typedef {{
- *   ok?: boolean,
- *   now?: number,
- *   rows_24h?: number,
- *   distinct_sources_24h?: number,
- *   intel_enabled?: boolean,
- *   intel_refresh_attempted?: boolean,
- *   intel_last_refresh_ts?: number,
- *   abuse_enabled?: boolean,
- *   abuse_rate_remaining?: number|null,
- *   abuse_quota_exhausted?: boolean,
- *   abuse_can_accept_new_lookups?: boolean,
- *   abuse_has_pending_work?: boolean,
- *   abuse_quota_retry_after_ts?: number|null,
- *   home_configured?: boolean,
- *   home_valid?: boolean,
- *   home_updated_at?: number|null
- * }} StatusPayload
- */
+/** @typedef {import('./types.js').FilterPersistedState} FilterPersistedState */
+/** @typedef {import('./types.js').FilterRuntimeState} FilterRuntimeState */
+/** @typedef {import('./types.js').MapRuntimeState} MapRuntimeState */
+/** @typedef {import('./types.js').PopupRuntimeState} PopupRuntimeState */
+/** @typedef {import('./types.js').StatusRuntimeState} StatusRuntimeState */
+/** @typedef {import('./types.js').HomeRuntimeState} HomeRuntimeState */
+/** @typedef {import('./types.js').ArcRuntimeState} ArcRuntimeState */
 
 const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
@@ -85,6 +26,7 @@ const MAX_ARCS_POLL =   10;
 
 const STORAGE_KEY = 'msmap_filters';
 const MOTION_SESSION_KEY = 'msmap_motion';
+/** @type {Readonly<FilterPersistedState>} */
 const DEFAULT_FILTERS = Object.freeze({
     time: '900',
     proto: '',
@@ -146,6 +88,7 @@ function queryAllButtons(selector) {
     return /** @type {HTMLButtonElement[]} */ (Array.from(document.querySelectorAll(selector)));
 }
 
+/** @type {FilterRuntimeState} */
 const filterState = {
     appliedTextFilters: {
         ip: DEFAULT_FILTERS.ip,
@@ -158,6 +101,7 @@ const filterState = {
     activeMotion: 'on',
 };
 
+/** @type {MapRuntimeState} */
 const mapState = {
     mappedCount: 0,
     totalSeen: 0,
@@ -170,6 +114,7 @@ const mapState = {
     lastMapSuccessAt: 0,
 };
 
+/** @type {PopupRuntimeState} */
 const popupState = {
     activePopupIp: '',
     activePopup: null,
@@ -177,11 +122,13 @@ const popupState = {
     detailStateByIp: new Map(),
 };
 
+/** @type {StatusRuntimeState} */
 const statusState = {
     statusPollTimer: null,
     statusInFlight: false,
 };
 
+/** @type {HomeRuntimeState} */
 const homeState = {
     homePt: null,
     homeMarker: null,
@@ -191,6 +138,7 @@ const homeState = {
     lastHomeUpdatedAt: null,
 };
 
+/** @type {ArcRuntimeState} */
 const arcState = {
     activeArcs: new Set(),
 };
@@ -223,13 +171,21 @@ const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
     maxClusterRadius:    50,
     chunkedLoading:      true,
+    /** @param {any} clusterMarker */
     iconCreateFunction(clusterMarker) {
+        /** @type {any[]} */
         const children = clusterMarker.getAllChildMarkers();
         const total = children.length;
-        const hasHigh = children.some((m) => m.options.threat === 'high');
-        const hasMedium = children.some((m) => m.options.threat === 'medium');
-        const hasLow = children.some((m) => m.options.threat === 'low');
-        const hasSpike = children.some((m) => m.options.spiking === true);
+        let hasHigh = false;
+        let hasMedium = false;
+        let hasLow = false;
+        let hasSpike = false;
+        for (const child of children) {
+            if (child?.options?.threat === 'high') { hasHigh = true; }
+            if (child?.options?.threat === 'medium') { hasMedium = true; }
+            if (child?.options?.threat === 'low') { hasLow = true; }
+            if (child?.options?.spiking === true) { hasSpike = true; }
+        }
         let cls;
         if (hasHigh) {
             cls = 'high';
@@ -282,7 +238,7 @@ const legendHome    = mustGetById('legend-home');
 const statDot = /** @type {HTMLElement} */ (mustGetById('stat-time').querySelector('.status-dot'));
 const statusOpSeparators = queryAllHtml('.status-sep-ops');
 
-Object.assign(window, {
+const msmapDeps = {
     NORMAL_REFRESH_MS,
     HIDDEN_REFRESH_MS,
     ERROR_REFRESH_MS,
@@ -338,4 +294,7 @@ Object.assign(window, {
     legendHome,
     statDot,
     statusOpSeparators,
-});
+};
+
+window.msmapDeps = msmapDeps;
+Object.assign(window, msmapDeps);

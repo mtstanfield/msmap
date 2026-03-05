@@ -2,10 +2,24 @@
 // @ts-check
 'use strict';
 
+/** @typedef {import('./types.js').MapRow} MapRow */
+/** @typedef {import('./types.js').DetailRow} DetailRow */
+/** @typedef {import('./types.js').DetailEntryState} DetailEntryState */
+/** @typedef {import('./types.js').StatusPayload} StatusPayload */
+/** @typedef {import('./types.js').DetailError} DetailError */
+
+/**
+ * @param {number} ts
+ * @returns {string}
+ */
 function fmtTs(ts) {
     return new Date(ts * 1000).toLocaleString();
 }
 
+/**
+ * @param {number} ts
+ * @returns {string}
+ */
 function fmtTsCompact(ts) {
     return new Date(ts * 1000).toLocaleString(undefined, {
         month: 'numeric',
@@ -15,15 +29,27 @@ function fmtTsCompact(ts) {
     });
 }
 
+/**
+ * @param {number} ts
+ * @returns {string}
+ */
 function buildResponsiveTimestamp(ts) {
     return '<span class="popup-time-full">' + escapeHtml(fmtTs(ts)) + '</span>' +
         '<span class="popup-time-compact">' + escapeHtml(fmtTsCompact(ts)) + '</span>';
 }
 
+/**
+ * @param {number|null|undefined} p
+ * @returns {string}
+ */
 function fmtPort(p) {
     return (p !== null && p !== undefined) ? ':' + p : '';
 }
 
+/**
+ * @param {number|null|undefined} threat
+ * @returns {string}
+ */
 function markerColor(threat) {
     if (threat === null || threat === undefined) { return '#adbac7'; }
     if (threat === 0)   { return '#3fb950'; }
@@ -32,6 +58,10 @@ function markerColor(threat) {
     return '#f85149';
 }
 
+/**
+ * @param {MapRow} row
+ * @returns {import('./types.js').ThreatLevel}
+ */
 function markerThreat(row) {
     if (row.spamhaus_drop === true) { return 'high'; }
     const threat = row.threat_max;
@@ -42,6 +72,10 @@ function markerThreat(row) {
     return 'high';
 }
 
+/**
+ * @param {number|null|undefined} score
+ * @returns {string}
+ */
 function threatClass(score) {
     if (score === null || score === undefined) { return 'threat-unknown'; }
     if (score === 0)   { return 'threat-clean'; }
@@ -50,6 +84,10 @@ function threatClass(score) {
     return 'threat-high';
 }
 
+/**
+ * @param {string} s
+ * @returns {string}
+ */
 function escapeHtml(s) {
     return String(s)
         .replace(/&/g, '&amp;')
@@ -58,10 +96,18 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
+/**
+ * @param {string} srcIp
+ * @returns {string}
+ */
 function detailSlotId(srcIp) {
     return 'detail-' + srcIp.replace(/[^A-Za-z0-9_-]/g, '-');
 }
 
+/**
+ * @param {DetailEntryState} state
+ * @returns {string}
+ */
 function detailStateLabel(state) {
     const total = state.rows.length;
     if (!state.nextCursor) {
@@ -70,14 +116,28 @@ function detailStateLabel(state) {
     return total + '+';
 }
 
+/**
+ * @param {DetailEntryState} state
+ * @param {number} [nowMs]
+ * @returns {boolean}
+ */
 function detailRetryBlocked(state, nowMs = Date.now()) {
     return state.errorKind === 'temporary' && nowMs < state.retryAfterMs;
 }
 
+/**
+ * @param {'temporary'|'generic'} kind
+ * @param {string} message
+ * @param {number} [retryAfterMs]
+ * @returns {DetailError}
+ */
 function makeDetailError(kind, message, retryAfterMs = 0) {
     return { kind, message, retryAfterMs };
 }
 
+/**
+ * @param {DetailEntryState} state
+ */
 function clearDetailRetryTimer(state) {
     if (state.retryTimerId !== null) {
         clearTimeout(state.retryTimerId);
@@ -85,6 +145,11 @@ function clearDetailRetryTimer(state) {
     }
 }
 
+/**
+ * @param {MapRow} row
+ * @param {DetailEntryState} state
+ * @param {number} delayMs
+ */
 function scheduleDetailRetryUnlock(row, state, delayMs) {
     clearDetailRetryTimer(state);
     if (delayMs <= 0) { return; }
@@ -94,15 +159,27 @@ function scheduleDetailRetryUnlock(row, state, delayMs) {
     }, delayMs);
 }
 
+/**
+ * @param {number} mapped
+ * @param {number} total
+ */
 function setStatusCounts(mapped, total) {
     statMappedValue.textContent = mapped.toLocaleString();
     statTotalValue.textContent = total.toLocaleString();
 }
 
+/**
+ * @param {string} text
+ */
 function setStatusFreshness(text) {
     statTimeValue.textContent = text;
 }
 
+/**
+ * @param {number} generatedAt
+ * @param {number} [nowMs]
+ * @returns {string}
+ */
 function formatMapFreshness(generatedAt, nowMs = Date.now()) {
     if (!Number.isFinite(generatedAt) || generatedAt <= 0) {
         return 'Updated';
@@ -125,6 +202,10 @@ function formatMapFreshness(generatedAt, nowMs = Date.now()) {
     return 'Updated ' + ageHours + 'h ago';
 }
 
+/**
+ * @param {number} value
+ * @returns {string}
+ */
 function formatCompactCount(value) {
     return new Intl.NumberFormat(undefined, {
         notation: 'compact',
@@ -132,6 +213,11 @@ function formatCompactCount(value) {
     }).format(value);
 }
 
+/**
+ * @param {number} targetSec
+ * @param {number} nowSec
+ * @returns {string|null}
+ */
 function formatCountdownUntil(targetSec, nowSec) {
     if (!Number.isFinite(targetSec) || !Number.isFinite(nowSec) || nowSec < 0) {
         return null;
@@ -153,6 +239,10 @@ function formatCountdownUntil(targetSec, nowSec) {
     return '~' + hours + 'h' + mins + 'm';
 }
 
+/**
+ * @param {number} nowSec
+ * @returns {string|null}
+ */
 function formatUtcMidnightCountdown(nowSec) {
     if (!Number.isFinite(nowSec) || nowSec < 0) {
         return null;
@@ -162,6 +252,9 @@ function formatUtcMidnightCountdown(nowSec) {
     return formatCountdownUntil(nextMidnightSec, nowSec);
 }
 
+/**
+ * @param {StatusPayload|null} status
+ */
 function setOperatorStatus(status) {
     if (!status || status.ok !== true) {
         statEvents.style.display = 'none';
@@ -192,8 +285,8 @@ function setOperatorStatus(status) {
         statIntelValue.classList.add('status-state-off');
         statIntel.dataset.tooltip = 'Threat intel feeds are disabled.';
     } else {
-        const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
-        const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
+        const now = typeof status.now === 'number' ? status.now : Math.floor(Date.now() / 1000);
+        const refreshTs = typeof status.intel_last_refresh_ts === 'number' ? status.intel_last_refresh_ts : 0;
         if (refreshTs <= 0) {
             if (status.intel_refresh_attempted === true) {
                 statIntelValue.textContent = 'stale';
@@ -243,8 +336,8 @@ function setOperatorStatus(status) {
     } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
         statAbuseValue.classList.add('status-state-stale');
-        const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
-        const retryAfterTs = Number.isFinite(status.abuse_quota_retry_after_ts)
+        const now = typeof status.now === 'number' ? status.now : Math.floor(Date.now() / 1000);
+        const retryAfterTs = typeof status.abuse_quota_retry_after_ts === 'number'
             ? status.abuse_quota_retry_after_ts
             : null;
         const retryCountdown = retryAfterTs !== null
@@ -274,6 +367,9 @@ function setOperatorStatus(status) {
     }
 }
 
+/**
+ * @param {'healthy'|'stale'|'unknown'} nextState
+ */
 function setMapFeedState(nextState) {
     statDot.classList.remove('is-unknown', 'is-healthy', 'is-stale');
     statDot.classList.add(
@@ -283,6 +379,9 @@ function setMapFeedState(nextState) {
     );
 }
 
+/**
+ * @param {boolean} visible
+ */
 function setHomeLegendVisible(visible) {
     legendHome.style.display = visible ? '' : 'none';
 }
@@ -297,12 +396,18 @@ function clearHomeState() {
     setHomeLegendVisible(false);
 }
 
+/**
+ * @param {StatusPayload|null|undefined} status
+ * @returns {number|null}
+ */
 function readHomeUpdatedAt(status) {
-    return Number.isFinite(status?.home_updated_at)
-        ? Math.trunc(status.home_updated_at)
-        : null;
+    const value = status?.home_updated_at;
+    return typeof value === 'number' ? Math.trunc(value) : null;
 }
 
+/**
+ * @param {StatusPayload|null|undefined} status
+ */
 function syncHomeStateFromStatus(status) {
     const wasExpectedValid = homeState.homeStatusExpectedValid;
     const homeConfigured = status?.home_configured === true;
@@ -356,6 +461,9 @@ async function fetchStatus() {
     }
 }
 
+/**
+ * @param {number} [delayMs]
+ */
 function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
     if (document.visibilityState === 'hidden') {
         if (statusState.statusPollTimer !== null) {
@@ -377,6 +485,9 @@ function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
     }, delayMs);
 }
 
+/**
+ * @param {number} [now]
+ */
 function updateMapFeedIndicator(now = Date.now()) {
     if (mapState.lastMapSuccessAt === 0) {
         setMapFeedState('unknown');
@@ -386,6 +497,10 @@ function updateMapFeedIndicator(now = Date.now()) {
     setMapFeedState((now - mapState.lastMapSuccessAt) <= staleAfterMs ? 'healthy' : 'stale');
 }
 
+/**
+ * @param {string} srcIp
+ * @returns {DetailEntryState}
+ */
 function ensureDetailState(srcIp) {
     const windowSecs = currentWindowSecs();
     const existing = popupState.detailStateByIp.get(srcIp);
@@ -397,6 +512,7 @@ function ensureDetailState(srcIp) {
         clearTimeout(existing.retryTimerId);
     }
 
+    /** @type {DetailEntryState} */
     const fresh = {
         rows: [],
         selectedIndex: 0,
@@ -414,6 +530,10 @@ function ensureDetailState(srcIp) {
     return fresh;
 }
 
+/**
+ * @param {string} srcIp
+ * @param {DetailEntryState} state
+ */
 function touchDetailState(srcIp, state) {
     if (popupState.detailStateByIp.has(srcIp)) {
         popupState.detailStateByIp.delete(srcIp);
@@ -441,6 +561,10 @@ function currentDetailAnchorTs() {
     return Math.floor(Date.now() / 1000);
 }
 
+/**
+ * @param {DetailEntryState} state
+ * @returns {number}
+ */
 function ensureDetailAnchor(state) {
     if (!Number.isFinite(state.anchorTs) || state.anchorTs <= 0) {
         state.anchorTs = currentDetailAnchorTs();
@@ -459,6 +583,10 @@ function buildMapQueryString() {
     return '?' + params.toString();
 }
 
+/**
+ * @param {number|null|undefined} score
+ * @returns {string}
+ */
 function buildThreatChip(score) {
     if (score === null || score === undefined) { return ''; }
     return '<span class="popup-chip ' + threatClass(score) + '">Threat ' + score + '</span>';
@@ -480,6 +608,10 @@ function shodanIconSvg() {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg>';
 }
 
+/**
+ * @param {MapRow} r
+ * @returns {string}
+ */
 function buildIntelBadges(r) {
     const chips = [];
     const threat = buildThreatChip(r.threat_max);
@@ -494,6 +626,10 @@ function buildIntelBadges(r) {
     return '<div class="popup-chip-row">' + chips.join('') + '</div>';
 }
 
+/**
+ * @param {string} srcIp
+ * @returns {string}
+ */
 function buildLinkouts(srcIp) {
     const safeIp = encodeURIComponent(srcIp);
     const links = [
@@ -508,6 +644,11 @@ function buildLinkouts(srcIp) {
     ).join('') + '</div>';
 }
 
+/**
+ * @param {string} label
+ * @param {string} value
+ * @returns {string}
+ */
 function buildSummaryItem(label, value) {
     if (value === null || value === undefined || value === '') { return ''; }
     return [
@@ -518,6 +659,10 @@ function buildSummaryItem(label, value) {
     ].join('');
 }
 
+/**
+ * @param {MapRow} r
+ * @returns {string}
+ */
 function buildAggregateSummary(r) {
     const metaItems = [
         buildSummaryItem('Hits', escapeHtml(String(r.count))),
@@ -549,6 +694,10 @@ function buildAggregateSummary(r) {
     ].join('');
 }
 
+/**
+ * @param {DetailRow} row
+ * @returns {string}
+ */
 function buildDetailCard(row) {
     return [
         '<div class="popup-detail-card">',
@@ -575,6 +724,10 @@ function buildDetailCard(row) {
     ].join('');
 }
 
+/**
+ * @param {string} srcIp
+ * @returns {string}
+ */
 function buildDetailPane(srcIp) {
     const state = ensureDetailState(srcIp);
     const slotId = detailSlotId(srcIp);
@@ -641,12 +794,19 @@ function buildDetailPane(srcIp) {
     ].join('');
 }
 
+/**
+ * @param {string} msg
+ */
 function setError(msg) {
     statError.textContent = msg;
     statError.style.display = msg ? '' : 'none';
 }
 
-async function fetchHome({ ignoreRetryGate = false } = {}) {
+/**
+ * @param {{ignoreRetryGate?: boolean}} [opts]
+ */
+async function fetchHome(opts = {}) {
+    const { ignoreRetryGate = false } = opts;
     if (homeState.homeFetchInFlight) {
         return;
     }
@@ -705,6 +865,11 @@ function addHomeMarker() {
     homeState.homeMarker.addTo(lmap);
 }
 
+/**
+ * @param {number} srcLon
+ * @param {number} dstLon
+ * @returns {number}
+ */
 function shortestWrappedLon(srcLon, dstLon) {
     let best = srcLon;
     let bestDistance = Math.abs(srcLon - dstLon);
@@ -731,6 +896,11 @@ function clearActiveArcs() {
     arcState.activeArcs.clear();
 }
 
+/**
+ * @param {number} srcLat
+ * @param {number} srcLon
+ * @param {string} color
+ */
 function fireArc(srcLat, srcLon, color) {
     if (!homeState.homePt) { return; }
 
@@ -786,6 +956,7 @@ function fireArc(srcLat, srcLon, color) {
     svg.appendChild(dot);
     lmap.getPanes().overlayPane.appendChild(svg);
 
+    /** @type {import('./types.js').ArcHandle} */
     const activeArc = { svg: svg, rafId: null, removeTimeoutId: null };
     arcState.activeArcs.add(activeArc);
 
@@ -797,6 +968,9 @@ function fireArc(srcLat, srcLon, color) {
     path.style.strokeDashoffset = '0';
 
     const t0 = performance.now();
+    /**
+     * @param {number} now
+     */
     function step(now) {
         if (!arcState.activeArcs.has(activeArc)) { return; }
 
@@ -829,9 +1003,13 @@ function fireArc(srcLat, srcLon, color) {
     activeArc.rafId = requestAnimationFrame(step);
 }
 
+/**
+ * @param {MapRow} row
+ * @returns {boolean}
+ */
 function shouldCandidateArc(row) {
     return !mapState.isInitialLoad &&
-        homeState.homePt &&
+        homeState.homePt !== null &&
         motionEnabled() &&
         typeof row.last_ts === 'number' &&
         row.last_ts > mapState.lastMapTs &&
@@ -839,31 +1017,51 @@ function shouldCandidateArc(row) {
         Number.isFinite(row.lon);
 }
 
+/**
+ * @param {number} lat
+ * @param {number} lon
+ * @returns {string}
+ */
 function arcOriginKey(lat, lon) {
     const roundedLat = Math.round(lat * 2) / 2;
     const roundedLon = Math.round(lon * 2) / 2;
     return String(roundedLat) + ':' + String(roundedLon);
 }
 
+/**
+ * @param {MapRow} row
+ * @param {string} color
+ * @returns {{srcIp: string, lat: number, lon: number, lastTs: number, threat: number, count: number, color: string, dedupeKey: string}}
+ */
 function makeArcCandidate(row, color) {
+    const lat = typeof row.lat === 'number' ? row.lat : 0;
+    const lon = typeof row.lon === 'number' ? row.lon : 0;
     return {
         srcIp: row.src_ip,
-        lat: row.lat,
-        lon: row.lon,
+        lat,
+        lon,
         lastTs: row.last_ts,
         threat: (row.threat_max !== null && row.threat_max !== undefined) ? row.threat_max : -1,
         count: Number.isFinite(row.count) ? row.count : 0,
         color: color,
-        dedupeKey: arcOriginKey(row.lat, row.lon),
+        dedupeKey: arcOriginKey(lat, lon),
     };
 }
 
+/**
+ * @param {{srcIp: string, lat: number, lon: number, lastTs: number, threat: number, count: number, color: string, dedupeKey: string}} left
+ * @param {{srcIp: string, lat: number, lon: number, lastTs: number, threat: number, count: number, color: string, dedupeKey: string}} right
+ * @returns {number}
+ */
 function compareArcCandidates(left, right) {
     if (left.lastTs !== right.lastTs) { return right.lastTs - left.lastTs; }
     if (left.threat !== right.threat) { return right.threat - left.threat; }
     return left.srcIp.localeCompare(right.srcIp);
 }
 
+/**
+ * @param {Array<{srcIp: string, lat: number, lon: number, lastTs: number, threat: number, count: number, color: string, dedupeKey: string}>} candidates
+ */
 function dedupeArcCandidates(candidates) {
     const seenKeys = new Set();
     const deduped = [];
@@ -875,6 +1073,9 @@ function dedupeArcCandidates(candidates) {
     return deduped;
 }
 
+/**
+ * @param {Array<{srcIp: string, lat: number, lon: number, lastTs: number, threat: number, count: number, color: string, dedupeKey: string}>} candidates
+ */
 function renderArcBatch(candidates) {
     const ranked = candidates.slice().sort(compareArcCandidates);
     for (const candidate of dedupeArcCandidates(ranked).slice(0, MAX_ARCS_POLL)) {
@@ -882,6 +1083,10 @@ function renderArcBatch(candidates) {
     }
 }
 
+/**
+ * @param {MapRow} r
+ * @returns {string}
+ */
 function buildAggregatePopup(r) {
     const detail = isMobileMapUi() ? '' : buildDetailPane(r.src_ip);
     return ['<div class="popup-row">', buildAggregateSummary(r), detail, '</div>'].join('');
@@ -898,6 +1103,10 @@ function createPopupOptions() {
     };
 }
 
+/**
+ * @param {MapRow} row
+ * @param {any|null} [latlng]
+ */
 function updatePopupContent(row, latlng = null) {
     if (!popupState.activePopup || popupState.activePopupIp !== row.src_ip) { return; }
     popupState.activePopupRow = row;
@@ -909,6 +1118,10 @@ function updatePopupContent(row, latlng = null) {
     bindPopupControls();
 }
 
+/**
+ * @param {any} marker
+ * @param {MapRow} row
+ */
 function openAggregatePopup(marker, row) {
     popupState.activePopupIp = row.src_ip;
     popupState.activePopupRow = row;
@@ -942,6 +1155,13 @@ function openAggregatePopup(marker, row) {
     updatePopupContent(row, marker.getLatLng());
 }
 
+/**
+ * @param {string} srcIp
+ * @param {string} cursor
+ * @param {number} anchorTs
+ * @param {number} windowSecs
+ * @returns {Promise<import('./types.js').DetailResponseBody>}
+ */
 async function fetchDetailPage(srcIp, cursor, anchorTs, windowSecs) {
     const since = Math.max(0, anchorTs - windowSecs);
     const params = new URLSearchParams({
@@ -966,6 +1186,10 @@ async function fetchDetailPage(srcIp, cursor, anchorTs, windowSecs) {
     return body;
 }
 
+/**
+ * @param {MapRow} row
+ * @param {string} cursor
+ */
 async function loadDetail(row, cursor) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
@@ -1010,6 +1234,9 @@ async function loadDetail(row, cursor) {
     }
 }
 
+/**
+ * @param {MapRow} row
+ */
 async function showOlderDetail(row) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading) { return; }
@@ -1029,6 +1256,9 @@ async function showOlderDetail(row) {
     }
 }
 
+/**
+ * @param {MapRow} row
+ */
 function showNewerDetail(row) {
     const state = ensureDetailState(row.src_ip);
     if (state.loading || state.selectedIndex === 0) { return; }
@@ -1037,7 +1267,9 @@ function showNewerDetail(row) {
 }
 
 function bindPopupControls() {
-    const popupEl = popupState.activePopup ? popupState.activePopup.getElement() : null;
+    const popupEl = /** @type {HTMLElement|null} */ (
+        popupState.activePopup ? popupState.activePopup.getElement() : null
+    );
     if (!popupEl) { return; }
     if (popupEl.dataset.mmPopupControlsBound === '1') { return; }
 
@@ -1047,7 +1279,8 @@ function bindPopupControls() {
 
     ['mousedown', 'pointerdown', 'dblclick'].forEach((eventName) => {
         popupEl.addEventListener(eventName, (event) => {
-            if (!event.target.closest('[data-action], [data-copy-ip]')) { return; }
+            const target = /** @type {Element|null} */ (event.target instanceof Element ? event.target : null);
+            if (!target || !target.closest('[data-action], [data-copy-ip]')) { return; }
             event.stopPropagation();
         });
     });
@@ -1057,7 +1290,11 @@ function bindPopupControls() {
         if (!popupRow || popupRow.src_ip !== popupState.activePopupIp) {
             return;
         }
-        const copyButton = event.target.closest('[data-copy-ip]');
+        const target = /** @type {Element|null} */ (event.target instanceof Element ? event.target : null);
+        if (!target) {
+            return;
+        }
+        const copyButton = target.closest('[data-copy-ip]');
         if (copyButton && popupEl.contains(copyButton)) {
             event.preventDefault();
             event.stopPropagation();
@@ -1065,7 +1302,7 @@ function bindPopupControls() {
             return;
         }
 
-        const button = event.target.closest('[data-action]');
+        const button = target.closest('[data-action]');
         if (!button || !popupEl.contains(button)) { return; }
 
         event.preventDefault();
@@ -1099,10 +1336,14 @@ function bindPopupControls() {
     });
 }
 
+/**
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
 async function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        return true;
+        return;
     }
     const probe = document.createElement('textarea');
     probe.value = text;
@@ -1124,6 +1365,10 @@ async function copyText(text) {
     }
 }
 
+/**
+ * @param {Element} button
+ * @param {'copied'|'failed'} state
+ */
 function showPopupCopyState(button, state) {
     button.classList.remove('is-copied', 'is-copy-failed');
     button.classList.add(state === 'copied' ? 'is-copied' : 'is-copy-failed');
@@ -1141,6 +1386,9 @@ function showPopupCopyState(button, state) {
     }, state === 'copied' ? 1200 : 1600);
 }
 
+/**
+ * @param {Element} button
+ */
 async function copyPopupIp(button) {
     const ip = button.getAttribute('data-copy-ip');
     if (!ip) { return; }
@@ -1152,6 +1400,10 @@ async function copyPopupIp(button) {
     }
 }
 
+/**
+ * @param {MapRow} row
+ * @returns {boolean}
+ */
 function isSpikeMarker(row) {
     const windowSecs = currentWindowSecs();
     if (windowSecs !== 900 && windowSecs !== 3600) { return false; }
@@ -1170,6 +1422,10 @@ function isSpikeMarker(row) {
     return count >= 25 && span <= 900 && age <= 300;
 }
 
+/**
+ * @param {any} marker
+ * @param {boolean} spiking
+ */
 function applySpikeMarkerState(marker, spiking) {
     const el = marker.getElement();
     if (!el) { return; }
@@ -1196,14 +1452,21 @@ function applySpikeMarkerState(marker, spiking) {
 }
 
 function refreshVisibleMarkerMotionState() {
-    cluster.eachLayer((layer) => {
+    /**
+     * @param {any} layer
+     */
+    const updateLayer = (layer) => {
         if (!(layer instanceof L.CircleMarker)) {
             return;
         }
         applySpikeMarkerState(layer, layer.options.spiking === true);
-    });
+    };
+    cluster.eachLayer(updateLayer);
 }
 
+/**
+ * @param {MapRow[]} rows
+ */
 function renderMap(rows) {
     const reopenIp = popupState.activePopupIp;
     let reopenMarker = null;
@@ -1265,6 +1528,9 @@ function renderMap(rows) {
     }
 }
 
+/**
+ * @param {number} delayMs
+ */
 function scheduleNextPoll(delayMs) {
     if (mapState.pollTimer !== null) {
         clearTimeout(mapState.pollTimer);
@@ -1347,7 +1613,7 @@ function pollNow() {
 }
 
 function initMapUi() {
-    lmap.on('popupclose', (event) => {
+    lmap.on('popupclose', (/** @type {any} */ event) => {
         if (popupState.activePopup && event.popup === popupState.activePopup) {
             popupState.activePopup = null;
             popupState.activePopupIp = '';
@@ -1394,6 +1660,13 @@ function startMsmap() {
         scheduleNextPoll(HIDDEN_REFRESH_MS);
     });
 }
+
+Object.assign(window.msmapDeps, {
+    clearActiveArcs,
+    refreshVisibleMarkerMotionState,
+    pollNow,
+    startMsmap,
+});
 
 Object.assign(window, {
     clearActiveArcs,

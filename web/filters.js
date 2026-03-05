@@ -2,6 +2,11 @@
 // @ts-check
 'use strict';
 
+/** @typedef {import('./types.js').FilterPersistedState} MsmapFilterPersistedState */
+
+/**
+ * @returns {MsmapFilterPersistedState}
+ */
 function currentFilterState() {
     return {
         time:        fTime.value,
@@ -37,9 +42,14 @@ function saveFilters() {
 
 function parseUrlFilterState() {
     const params = new URLSearchParams(window.location.search);
+    /** @type {Partial<MsmapFilterPersistedState>} */
     const state = {};
     let found = false;
 
+    /**
+     * @param {'window'|'proto'|'ip'|'port'|'asn'|'threat'} param
+     * @param {keyof MsmapFilterPersistedState} key
+     */
     const setIfPresent = (param, key) => {
         if (!params.has(param)) { return; }
         state[key] = params.get(param) ?? '';
@@ -87,6 +97,9 @@ function loadFilters() {
     setMotionValue(readStoredMotion(), { save: false, repoll: false, force: true });
 }
 
+/**
+ * @param {string} tabName
+ */
 function setFilterPanelTab(tabName) {
     const nextTab = tabName === 'legend' ? 'legend' : 'filters';
     filterState.activeFilterPanelTab = nextTab;
@@ -100,6 +113,9 @@ function setFilterPanelTab(tabName) {
     filterTabLegend.hidden = nextTab !== 'legend';
 }
 
+/**
+ * @param {boolean} open
+ */
 function setFilterPanelOpen(open) {
     filterPanel.style.display = open ? '' : 'none';
     filterToggle.classList.toggle('active', open);
@@ -118,12 +134,21 @@ function currentWindowSecs() {
     return (n === 900 || n === 3600 || n === 21600 || n === 86400) ? n : 900;
 }
 
+/**
+ * @param {HTMLSelectElement} el
+ * @param {string} value
+ * @param {string} fallback
+ */
 function setSelectValue(el, value, fallback) {
     const normalized = String(value);
     const allowed = Array.from(el.options, (option) => option.value);
     el.value = allowed.includes(normalized) ? normalized : fallback;
 }
 
+/**
+ * @param {HTMLInputElement} el
+ * @param {boolean} valid
+ */
 function setInputValidity(el, valid) {
     el.classList.toggle('filter-input-invalid', !valid);
     if (valid) {
@@ -133,6 +158,10 @@ function setInputValidity(el, valid) {
     el.title = 'Enter a complete valid value or clear the field.';
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function threatFilterLabel(value) {
     switch (value) {
         case 'unknown': return 'Unknown';
@@ -144,12 +173,21 @@ function threatFilterLabel(value) {
     }
 }
 
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isValidThreat(value) {
     return value === '' || value === 'unknown' || value === 'clean' ||
         value === 'low' || value === 'medium' || value === 'high';
 }
 
-function setMotionValue(value, { save = true, repoll = true, force = false } = {}) {
+/**
+ * @param {string|null} value
+ * @param {{save?: boolean, repoll?: boolean, force?: boolean}} [opts]
+ */
+function setMotionValue(value, opts = {}) {
+    const { save = true, repoll = true, force = false } = opts;
     const next = value === 'off' ? 'off' : 'on';
     const changed = next !== filterState.activeMotion;
     filterState.activeMotion = next;
@@ -170,12 +208,17 @@ function setMotionValue(value, { save = true, repoll = true, force = false } = {
         } catch (_) {}
     }
     if (repoll && (changed || force)) {
-        clearActiveArcs();
-        refreshVisibleMarkerMotionState();
+        window.msmapDeps.clearActiveArcs();
+        window.msmapDeps.refreshVisibleMarkerMotionState();
     }
 }
 
-function setThreatValue(value, { save = true, repoll = true, force = false } = {}) {
+/**
+ * @param {string} value
+ * @param {{save?: boolean, repoll?: boolean, force?: boolean}} [opts]
+ */
+function setThreatValue(value, opts = {}) {
+    const { save = true, repoll = true, force = false } = opts;
     const next = isValidThreat(value) ? value : DEFAULT_FILTERS.threat;
     const changed = next !== filterState.activeThreat;
     filterState.activeThreat = next;
@@ -190,10 +233,14 @@ function setThreatValue(value, { save = true, repoll = true, force = false } = {
         saveFilters();
     }
     if (repoll && (changed || force)) {
-        pollNow();
+        window.msmapDeps.pollNow();
     }
 }
 
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isValidIpv4(value) {
     const parts = value.split('.');
     if (parts.length !== 4) { return false; }
@@ -204,6 +251,10 @@ function isValidIpv4(value) {
     });
 }
 
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isValidIpv6(value) {
     if (!/^[0-9A-Fa-f:.]+$/.test(value) || value.includes(':::')) {
         return false;
@@ -214,7 +265,12 @@ function isValidIpv6(value) {
         return false;
     }
 
+    /** @type {(string|'ipv4')[]} */
     const groups = [];
+    /**
+     * @param {string} segment
+     * @returns {boolean}
+     */
     const addGroups = (segment) => {
         if (!segment) { return true; }
         for (const part of segment.split(':')) {
@@ -245,6 +301,10 @@ function isValidIpv6(value) {
     return count < 8;
 }
 
+/**
+ * @param {string} value
+ * @returns {{valid: boolean, normalized: string}}
+ */
 function validateIpValue(value) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -254,6 +314,10 @@ function validateIpValue(value) {
     return { valid, normalized: valid ? trimmed : filterState.appliedTextFilters.ip };
 }
 
+/**
+ * @param {string} value
+ * @returns {{valid: boolean, normalized: string}}
+ */
 function validatePortValue(value) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -269,6 +333,10 @@ function validatePortValue(value) {
     return { valid: true, normalized: String(port) };
 }
 
+/**
+ * @param {string} value
+ * @returns {{valid: boolean, normalized: string}}
+ */
 function validateAsnValue(value) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -320,7 +388,7 @@ function applyTextFilters() {
 
     if (changed) {
         saveFilters();
-        pollNow();
+        window.msmapDeps.pollNow();
     }
 }
 
@@ -351,15 +419,15 @@ function resetToDefaults() {
     filterState.appliedTextFilters.port = DEFAULT_FILTERS.port;
     filterState.appliedTextFilters.asn = DEFAULT_FILTERS.asn;
     updateTextValidity();
-    clearActiveArcs();
+    window.msmapDeps.clearActiveArcs();
     saveFilters();
-    pollNow();
+    window.msmapDeps.pollNow();
 }
 
 function applyNonTextFilters() {
-    clearActiveArcs();
+    window.msmapDeps.clearActiveArcs();
     saveFilters();
-    pollNow();
+    window.msmapDeps.pollNow();
 }
 
 function initFilterUi() {
@@ -374,7 +442,7 @@ function initFilterUi() {
     });
     filterTabButtons.forEach((button) => {
         button.addEventListener('click', () => {
-            setFilterPanelTab(button.dataset.panelTab);
+            setFilterPanelTab(button.dataset.panelTab || 'filters');
         });
         button.addEventListener('keydown', (event) => {
             const keyEvent = /** @type {KeyboardEvent} */ (event);
@@ -442,6 +510,22 @@ function initFilterUi() {
         });
     });
 }
+
+Object.assign(window.msmapDeps, {
+    currentFilterState,
+    saveFilters,
+    loadFilters,
+    motionEnabled,
+    currentWindowSecs,
+    setThreatValue,
+    setMotionValue,
+    validateIpValue,
+    validatePortValue,
+    validateAsnValue,
+    updateTextValidity,
+    isMobileMapUi,
+    initFilterUi,
+});
 
 Object.assign(window, {
     currentFilterState,

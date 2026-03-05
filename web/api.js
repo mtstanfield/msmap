@@ -2,6 +2,16 @@
 // @ts-check
 'use strict';
 
+/** @typedef {import('./types.js').ApiFailure} ApiFailure */
+/** @typedef {import('./types.js').ApiResult<import('./types.js').StatusPayload>} StatusApiResult */
+/** @typedef {import('./types.js').ApiResult<import('./types.js').HomePayload>} HomeApiResult */
+/** @typedef {import('./types.js').ApiResult<import('./types.js').MapResponseBody>} MapApiResult */
+/** @typedef {import('./types.js').ApiResult<import('./types.js').DetailResponseBody>} DetailApiResult */
+
+/**
+ * @param {Response} resp
+ * @returns {number}
+ */
 function parseRetryAfterMsFromHeader(resp) {
     const raw = resp.headers.get('Retry-After');
     if (!raw) { return 0; }
@@ -16,6 +26,12 @@ function parseRetryAfterMsFromHeader(resp) {
     return Math.max(0, atMs - Date.now());
 }
 
+/**
+ * @template T
+ * @param {string} path
+ * @param {number} timeoutMs
+ * @returns {Promise<import('./types.js').ApiResult<T>>}
+ */
 async function requestJson(path, timeoutMs) {
     const controller = new AbortController();
     const timerId = setTimeout(() => controller.abort(), timeoutMs);
@@ -38,7 +54,7 @@ async function requestJson(path, timeoutMs) {
         }
         return { ok: true, data: body };
     } catch (err) {
-        if (err && err.name === 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
             return { ok: false, status: 0, retryAfterMs: 0, kind: 'timeout', message: 'Request timed out' };
         }
         return { ok: false, status: 0, retryAfterMs: 0, kind: 'network', message: 'Network request failed' };
@@ -47,18 +63,32 @@ async function requestJson(path, timeoutMs) {
     }
 }
 
+/**
+ * @returns {Promise<StatusApiResult>}
+ */
 async function fetchStatusApi() {
     return requestJson('/api/status', 8000);
 }
 
+/**
+ * @returns {Promise<HomeApiResult>}
+ */
 async function fetchHomeApi() {
     return requestJson('/api/home', 8000);
 }
 
+/**
+ * @param {string} queryString
+ * @returns {Promise<MapApiResult>}
+ */
 async function fetchMapApi(queryString) {
     return requestJson('/api/map' + queryString, 12000);
 }
 
+/**
+ * @param {string} queryString
+ * @returns {Promise<DetailApiResult>}
+ */
 async function fetchDetailApi(queryString) {
     return requestJson('/api/detail?' + queryString, 10000);
 }

@@ -4,8 +4,8 @@
     "checkJs": true,
     "noEmit": true,
     "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "node",
@@ -13,6 +13,7 @@
     "skipLibCheck": true
   },
   "include": [
+    "web/types.js",
     "web/state.js",
     "web/filters.js",
     "web/api.js",

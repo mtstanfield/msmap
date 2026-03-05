@@ -2,4 +2,4 @@
 // @ts-check
 'use strict';
 
-startMsmap();
+window.msmapDeps.startMsmap();

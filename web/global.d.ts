@@ -1,6 +1,7 @@
 declare const L: any;
 
 interface Window {
+  msmapDeps: any;
   msmapApi: {
     fetchStatusApi: () => Promise<any>;
     fetchHomeApi: () => Promise<any>;
