@@ -714,7 +714,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 8px 8px 7px;
+    padding: 8px 8px 6px;
     border: 1px solid transparent;
     border-radius: 4px;
     background: transparent;
@@ -771,6 +771,10 @@ html, body {
     padding-top: 2px;
 }
 
+.popup-meta-grid .popup-meta-item:last-child {
+    padding-bottom: 2px;
+}
+
 .popup-meta-label {
     color: #8b949e;
     font-size: 9px;
@@ -816,8 +820,8 @@ html, body {
 }
 
 .popup-detail-wrap {
-    margin-top: 8px;
-    padding-top: 7px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px solid rgba(88, 166, 255, 0.18);
 }
 
@@ -988,7 +992,8 @@ html, body {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-top: 7px;
+    margin-top: 6px;
+    padding: 0 9px;
 }
 
 .popup-detail-nav {
