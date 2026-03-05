@@ -7,6 +7,7 @@ const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
 const ERROR_REFRESH_MS  = 60000;
 const STATUS_REFRESH_MS = 60000;
+const HOME_FETCH_RETRY_MS = 60000;
 const DETAIL_PAGE_SIZE  = 20;
 const DETAIL_RETRY_COOLDOWN_MS = 10000;
 const TEXT_FILTER_DEBOUNCE_MS = 400;
@@ -277,8 +278,10 @@ let statusInFlight = false;
 
 let homePt     = null;
 let homeMarker = null;
-// Stop retrying /api/home after a stable 404; the config only changes on reload.
-let homeFetchDisabled = false;
+let homeFetchInFlight = false;
+let homeRetryAfterMs = 0;
+let homeStatusExpectedValid = false;
+let lastHomeUpdatedAt = null;
 const detailStateByIp = new Map();
 const activeArcs = new Set();
 
@@ -899,6 +902,55 @@ function setHomeLegendVisible(visible) {
     legendHome.style.display = visible ? '' : 'none';
 }
 
+function clearHomeState() {
+    clearActiveArcs();
+    homePt = null;
+    if (homeMarker) {
+        homeMarker.remove();
+        homeMarker = null;
+    }
+    setHomeLegendVisible(false);
+}
+
+function readHomeUpdatedAt(status) {
+    return Number.isFinite(status?.home_updated_at)
+        ? Math.trunc(status.home_updated_at)
+        : null;
+}
+
+function syncHomeStateFromStatus(status) {
+    const wasExpectedValid = homeStatusExpectedValid;
+    const homeConfigured = status?.home_configured === true;
+    const homeValid = status?.home_valid === true;
+    const nextUpdatedAt = readHomeUpdatedAt(status);
+
+    homeStatusExpectedValid = homeConfigured && homeValid;
+    if (!homeStatusExpectedValid) {
+        homeRetryAfterMs = 0;
+        lastHomeUpdatedAt = nextUpdatedAt;
+        clearHomeState();
+        return;
+    }
+
+    let shouldFetch = false;
+    if (!wasExpectedValid) {
+        shouldFetch = true;
+    }
+    if (!homePt) {
+        shouldFetch = true;
+    }
+    if (lastHomeUpdatedAt !== nextUpdatedAt) {
+        shouldFetch = true;
+    }
+    if (homeRetryAfterMs > 0 && Date.now() >= homeRetryAfterMs) {
+        shouldFetch = true;
+    }
+    lastHomeUpdatedAt = nextUpdatedAt;
+    if (shouldFetch) {
+        void fetchHome({ ignoreRetryGate: true });
+    }
+}
+
 async function fetchStatus() {
     if (statusInFlight) {
         return;
@@ -912,6 +964,7 @@ async function fetchStatus() {
         }
         const body = await resp.json();
         setOperatorStatus(body);
+        syncHomeStateFromStatus(body);
     } catch (_) {
         setOperatorStatus(null);
     } finally {
@@ -1207,27 +1260,33 @@ function setError(msg) {
     statError.style.display = msg ? '' : 'none';
 }
 
-async function fetchHome() {
-    if (homeFetchDisabled) {
+async function fetchHome({ ignoreRetryGate = false } = {}) {
+    if (homeFetchInFlight) {
         return;
     }
+    if (!ignoreRetryGate && homeRetryAfterMs > 0 && Date.now() < homeRetryAfterMs) {
+        return;
+    }
+    homeFetchInFlight = true;
     try {
-        const resp = await fetch('/api/home');
+        const resp = await fetch('/api/home', { cache: 'default' });
         if (!resp.ok) {
             if (resp.status === 404) {
-                clearActiveArcs();
-                homePt = null;
-                if (homeMarker) { homeMarker.remove(); homeMarker = null; }
-                setHomeLegendVisible(false);
-                homeFetchDisabled = true;
+                clearHomeState();
+            }
+            if (homeStatusExpectedValid) {
+                homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
             }
             return;
         }
-        homeFetchDisabled = false;
         const fresh = await resp.json();
         if (!fresh || !Number.isFinite(fresh.lat) || !Number.isFinite(fresh.lon)) {
+            if (homeStatusExpectedValid) {
+                homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
+            }
             return;
         }
+        homeRetryAfterMs = 0;
 
         const changed = !homePt || homePt.lat !== fresh.lat || homePt.lon !== fresh.lon;
         if (changed) {
@@ -1236,7 +1295,13 @@ async function fetchHome() {
             if (homeMarker) { homeMarker.remove(); homeMarker = null; }
             addHomeMarker();
         }
-    } catch (_) {}
+    } catch (_) {
+        if (homeStatusExpectedValid) {
+            homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
+        }
+    } finally {
+        homeFetchInFlight = false;
+    }
 }
 
 function addHomeMarker() {
@@ -1876,7 +1941,6 @@ async function poll() {
         return;
     }
     pollInFlight = true;
-    await fetchHome();
     updateMapFeedIndicator();
     try {
         const resp = await fetch('/api/map' + buildMapQueryString(), { cache: 'default' });
@@ -1947,20 +2011,18 @@ document.addEventListener('visibilitychange', () => {
     scheduleNextPoll(HIDDEN_REFRESH_MS);
 });
 
-fetchHome().then(() => {
-    addHomeMarker();
-    loadFilters();
-    appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
-    appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
-    appliedTextFilters.asn = validateAsnValue(fAsn.value).normalized;
-    fIp.value = appliedTextFilters.ip;
-    fPort.value = appliedTextFilters.port;
-    fAsn.value = appliedTextFilters.asn;
-    updateTextValidity();
-    saveFilters();
-    setOperatorStatus(null);
-    updateMapFeedIndicator();
-    void fetchStatus();
-    scheduleStatusPoll();
-    pollNow();
-});
+loadFilters();
+appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
+appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
+appliedTextFilters.asn = validateAsnValue(fAsn.value).normalized;
+fIp.value = appliedTextFilters.ip;
+fPort.value = appliedTextFilters.port;
+fAsn.value = appliedTextFilters.asn;
+updateTextValidity();
+saveFilters();
+setOperatorStatus(null);
+setHomeLegendVisible(false);
+updateMapFeedIndicator();
+void fetchStatus();
+scheduleStatusPoll();
+pollNow();

@@ -189,6 +189,8 @@ std::string status_to_json(const StatusPayload& snapshot)
     out += snapshot.home_configured ? "true" : "false";
     out += ",\"home_valid\":";
     out += snapshot.home_valid ? "true" : "false";
+    out += ",\"home_updated_at\":";
+    append_i64_or_null(out, snapshot.home_updated_at);
     out += ",\"intel_last_refresh_ts\":";
     append_i64_or_null(out, snapshot.intel_last_refresh_ts);
     out += ",\"intel_refresh_attempted\":";

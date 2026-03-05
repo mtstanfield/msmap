@@ -29,6 +29,7 @@ struct StatusPayload {
     bool                          intel_enabled{false};
     bool                          home_configured{false};
     bool                          home_valid{false};
+    std::optional<std::int64_t>   home_updated_at;
     std::optional<std::int64_t>   intel_last_refresh_ts;
     bool                          intel_refresh_attempted{false};
     std::optional<std::int64_t>   abuse_cache_rows;

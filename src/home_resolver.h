@@ -1,7 +1,9 @@
 #pragma once
 
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 
@@ -52,6 +54,9 @@ public:
 
     /// Return a copy of the current HomePoint.  Thread-safe.
     [[nodiscard]] HomePoint get() const noexcept;
+    /// Monotonic wall-clock timestamp (unix seconds) for the most recent
+    /// successful update applied to result_. nullopt means no valid point yet.
+    [[nodiscard]] std::optional<std::int64_t> updated_at() const noexcept;
 
 private:
     /// Perform one DNS + GeoIP resolution cycle.  Returns the new HomePoint.
@@ -70,6 +75,7 @@ private:
     mutable std::mutex      mutex_;
     std::condition_variable cv_;
     HomePoint               result_;   // protected by mutex_
+    std::optional<std::int64_t> updated_at_; // protected by mutex_
     bool                    stop_{false};
     std::thread             worker_thread_;
     // Destruction order: worker_thread_ must be last so the thread is joined

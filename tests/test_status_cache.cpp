@@ -1,6 +1,7 @@
 #include "abuse_cache.h"
 #include "db.h"
 #include "geoip.h"
+#include "home_resolver.h"
 #include "status_cache.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -207,4 +208,20 @@ TEST_CASE("status cache: abuse syncing reflects pending background work", "[stat
     REQUIRE(snapshot->abuse_has_pending_work);
     REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
     REQUIRE(snapshot->abuse_can_accept_new_lookups);
+}
+
+TEST_CASE("status cache: home resolver reports configured but invalid when GeoIP cannot locate home", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    const msmap::GeoIp geoip{"/nonexistent/GeoLite2-City.mmdb", ""};
+    msmap::HomeResolver home{"127.0.0.1", geoip};
+
+    msmap::StatusCache status{db, &home, nullptr, nullptr, false, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->home_configured);
+    REQUIRE_FALSE(snapshot->home_valid);
+    REQUIRE_FALSE(snapshot->home_updated_at.has_value());
 }

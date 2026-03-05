@@ -8,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 
 namespace msmap {
@@ -26,6 +27,9 @@ HomeResolver::HomeResolver(const std::string& hostname, const GeoIp& geoip) noex
     {
         const std::lock_guard<std::mutex> lock{mutex_};
         result_ = initial;
+        if (initial.valid) {
+            updated_at_ = static_cast<std::int64_t>(std::time(nullptr));
+        }
     }
 
     // Start background re-check thread.
@@ -50,6 +54,12 @@ HomePoint HomeResolver::get() const noexcept
 {
     const std::lock_guard<std::mutex> lock{mutex_};
     return result_;
+}
+
+std::optional<std::int64_t> HomeResolver::updated_at() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{mutex_};
+    return updated_at_;
 }
 
 // ── Private ───────────────────────────────────────────────────────────────────
@@ -114,8 +124,8 @@ void HomeResolver::worker() noexcept
                               fresh.lat != result_.lat ||
                               fresh.lon != result_.lon);
         result_ = fresh;
-
         if (changed) {
+            updated_at_ = static_cast<std::int64_t>(std::time(nullptr));
             std::clog << "[INFO] HomeResolver: '" << hostname_
                       << "' re-resolved to " << fresh.resolved_ip << " ("
                       << fresh.lat << ", " << fresh.lon << ")\n";

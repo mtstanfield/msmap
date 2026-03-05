@@ -556,6 +556,7 @@ Response fields include:
 - `intel_enabled`
 - `home_configured`
 - `home_valid`
+- `home_updated_at` (unix seconds; `null` until a valid home point exists)
 - `intel_last_refresh_ts`
 - `intel_refresh_attempted`
 - `abuse_cache_rows`
@@ -564,7 +565,10 @@ Response fields include:
 
 This endpoint is informational, served from an in-process cached snapshot, and
 intended to be short-cacheable at nginx. The browser only polls it while the
-tab is visible, much less frequently than `GET /api/map`.
+tab is visible, much less frequently than `GET /api/map`. The frontend uses
+`home_valid` + `home_updated_at` as the control plane for home marker refresh,
+and calls `GET /api/home` only on startup/changes (or short retry after a
+transient home fetch failure).
 
 ---
 

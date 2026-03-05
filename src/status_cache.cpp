@@ -40,6 +40,8 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
     payload.intel_enabled = intel_enabled;
     payload.home_configured = home_resolver != nullptr;
     payload.home_valid = payload.home_configured && home_resolver->get().valid;
+    payload.home_updated_at =
+        payload.home_configured ? home_resolver->updated_at() : std::nullopt;
     payload.intel_last_refresh_ts =
         intel_cache != nullptr ? intel_cache->last_refresh_ts() : std::nullopt;
     payload.intel_refresh_attempted =
@@ -147,6 +149,8 @@ void StatusCache::refresh_snapshot() noexcept
     payload.intel_enabled = intel_enabled_;
     payload.home_configured = home_resolver_ != nullptr;
     payload.home_valid = payload.home_configured && home_resolver_->get().valid;
+    payload.home_updated_at =
+        payload.home_configured ? home_resolver_->updated_at() : std::nullopt;
     payload.intel_last_refresh_ts =
         intel_cache_ != nullptr ? intel_cache_->last_refresh_ts() : std::nullopt;
     payload.intel_refresh_attempted =
