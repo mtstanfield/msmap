@@ -3,1333 +3,357 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>msmap Popup Mock</title>
+    <title>msmap UI Mock</title>
     <link rel="stylesheet" href="app.css">
     <style>
         body {
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            padding: 24px;
-            box-sizing: border-box;
-            background:
-                radial-gradient(circle at top, rgba(88, 166, 255, 0.12), transparent 32%),
-                linear-gradient(180deg, #0d1117, #11161d 45%, #0d1117);
-            color: #e6edf3;
-        }
-
-        .mock-stage {
-            width: min(980px, 100%);
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 20px;
-        }
-
-        .mock-panel {
-            padding: 16px;
-            border: 1px solid rgba(48, 54, 61, 0.9);
-            border-radius: 14px;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
-                rgba(22, 27, 34, 0.86);
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
-        }
-
-        .mock-panel h1 {
-            margin: 0 0 4px;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: #c9d1d9;
-        }
-
-        .mock-panel p {
-            margin: 0 0 12px;
-            font-size: 12px;
-            line-height: 1.45;
-            color: #8b949e;
-        }
-
-        .mock-map {
-            min-height: 320px;
-            padding: 18px;
-            border-radius: 12px;
-            border: 1px solid rgba(48, 54, 61, 0.7);
-            background:
-                radial-gradient(circle at 30% 20%, rgba(88, 166, 255, 0.12), transparent 28%),
-                linear-gradient(180deg, rgba(13, 17, 23, 0.92), rgba(13, 17, 23, 0.78)),
-                #0d1117;
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
-        }
-
-        .mock-map.mobile {
-            width: 292px;
-            max-width: 100%;
-            min-height: 468px;
-            margin: 0 auto;
-            justify-content: center;
-        }
-
-        .mock-map.mobile .popup-time-full {
-            display: none;
-        }
-
-        .mock-map.mobile .popup-time-compact {
-            display: inline;
-        }
-
-        .mock-map .leaflet-popup {
-            position: static;
             margin: 0;
+            background: #0b0f15;
         }
 
-        .mock-map .leaflet-popup-content-wrapper {
-            overflow: hidden;
-        }
-
-        .mock-footer-wrap {
-            min-height: 0;
-            padding: 0;
-            border-radius: 10px;
-            border: 1px solid rgba(48, 54, 61, 0.7);
+        #map {
             background:
-                linear-gradient(180deg, rgba(13, 17, 23, 0.92), rgba(13, 17, 23, 0.78)),
-                #0d1117;
-            overflow: hidden;
+                radial-gradient(circle at 18% 30%, rgba(88, 166, 255, 0.15), transparent 26%),
+                radial-gradient(circle at 66% 22%, rgba(248, 81, 73, 0.12), transparent 28%),
+                radial-gradient(circle at 78% 72%, rgba(63, 185, 80, 0.12), transparent 32%),
+                linear-gradient(180deg, #0d1117, #11161d 45%, #0d1117);
         }
 
-        .mock-footer-wrap #status-bar {
-            position: static;
-        }
-
-        .mock-footer-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-        }
-
-        .mock-footer-grid .mock-footer-wrap {
-            min-width: 0;
-        }
-
-        .mock-footer-mobile {
-            width: 292px;
-            max-width: 100%;
-            margin: 0 auto;
-        }
-
-        .mock-footer-mobile #status-bar {
-            flex-wrap: wrap;
-            align-items: flex-start;
-            padding: 6px 10px;
-            gap: 8px;
-        }
-
-        .mock-footer-mobile #status-left,
-        .mock-footer-mobile #status-right {
-            width: 100%;
-            justify-content: space-between;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .mock-footer-mobile .status-group {
-            gap: 8px;
-        }
-
-        .mock-footer-mobile #status-right {
-            font-size: 11px;
-        }
-
-        .mock-footer-mobile.metadata-hidden #stat-brand,
-        .mock-footer-mobile.metadata-hidden #status-right a,
-        .mock-footer-mobile.metadata-hidden #stat-built {
-            display: none;
-        }
-
-        .mock-footer-mobile.live-mobile-footer #stat-events,
-        .mock-footer-mobile.live-mobile-footer #stat-events + .status-sep-ops,
-        .mock-footer-mobile.live-mobile-footer #stat-sources,
-        .mock-footer-mobile.live-mobile-footer #stat-sources + .status-sep-ops {
-            display: none;
-        }
-
-        .mock-control-panel {
-            width: 200px;
-            margin-left: auto;
-        }
-
-        .mock-control-panel.mobile {
-            width: 188px;
-            max-width: 100%;
-            margin: 0 auto;
-        }
-
-        .mock-control-panel .filter-tab-body {
-            max-height: 220px;
-        }
-
-        .mock-control-panel.mobile .filter-tab-body {
-            max-height: 260px;
-        }
-
-        .leaflet-popup-tip-container,
-        .leaflet-popup-close-button {
-            display: none;
-        }
-
-        .mock-panel-wide {
-            grid-column: 1 / -1;
-        }
-
-        .spiderfy-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 14px;
-        }
-
-        .spiderfy-case {
-            padding: 12px;
-            border: 1px solid rgba(48, 54, 61, 0.9);
-            border-radius: 12px;
-            background: rgba(13, 17, 23, 0.72);
-        }
-
-        .spiderfy-case-header {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 8px;
-            font-size: 11px;
-            color: #8b949e;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-
-        .spiderfy-case-header strong {
-            color: #c9d1d9;
-            font-size: 12px;
-            letter-spacing: 0.04em;
-        }
-
-        .spiderfy-demo {
-            position: relative;
-            height: 188px;
-            border: 1px solid rgba(48, 54, 61, 0.75);
-            border-radius: 10px;
-            overflow: hidden;
-            cursor: pointer;
-            background:
-                radial-gradient(circle at 50% 50%, rgba(88, 166, 255, 0.08), transparent 22%),
-                linear-gradient(180deg, rgba(13, 17, 23, 0.95), rgba(13, 17, 23, 0.82)),
-                #0d1117;
-        }
-
-        .spiderfy-demo::before,
-        .spiderfy-demo::after {
-            content: "";
+        .mock-grid {
             position: absolute;
             inset: 0;
             pointer-events: none;
+            background-image:
+                linear-gradient(rgba(139, 148, 158, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 148, 158, 0.08) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: radial-gradient(circle at center, #000 35%, transparent 100%);
         }
 
-        .spiderfy-demo::before {
-            background:
-                linear-gradient(rgba(139, 148, 158, 0.06) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(139, 148, 158, 0.06) 1px, transparent 1px);
-            background-size: 24px 24px;
-        }
-
-        .spiderfy-demo::after {
-            inset: 50% auto auto 50%;
-            width: 6px;
-            height: 6px;
-            margin: -3px 0 0 -3px;
-            border-radius: 999px;
-            background: rgba(88, 166, 255, 0.45);
-            box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.18), 0 0 14px rgba(88, 166, 255, 0.3);
-        }
-
-        .spiderfy-overlay {
+        .mock-marker {
             position: absolute;
-            inset: 0;
-        }
-
-        .spiderfy-node {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 12px;
-            height: 12px;
-            margin: -6px 0 0 -6px;
+            width: 10px;
+            height: 10px;
             border-radius: 999px;
-            background: #f85149;
-            box-shadow: 0 0 0 1px rgba(13, 17, 23, 0.5);
-            color: #f0f6fc;
-            font: 700 8px/12px ui-monospace, SFMono-Regular, Consolas, monospace;
-            text-align: center;
-            transform: translate(0, 0);
-            opacity: 0;
-            transition: transform 200ms ease-out, opacity 140ms ease-out;
+            box-shadow: 0 0 0 1px rgba(13, 17, 23, 0.55);
         }
 
-        .spiderfy-node[data-threat="medium"] {
-            background: #f0883e;
-        }
+        .mock-marker.high { background: #f85149; }
+        .mock-marker.medium { background: #f0883e; }
+        .mock-marker.low { background: #d29922; }
+        .mock-marker.clean { background: #3fb950; }
+        .mock-marker.unknown { background: #8b949e; }
 
-        .spiderfy-node[data-threat="low"] {
-            background: #d29922;
-        }
-
-        .spiderfy-node[data-spike="false"] {
-            color: transparent;
-            text-shadow: none;
-        }
-
-        .spiderfy-demo.is-open .spiderfy-node {
-            opacity: 1;
-            transform: translate(var(--dx), var(--dy));
-        }
-
-        .spiderfy-demo .marker-new {
-            animation: marker-ripple 0.7s ease-out;
-        }
-
-        .spiderfy-cluster {
+        .mock-cluster {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 40px;
-            height: 40px;
-            margin: -20px 0 0 -20px;
+            width: 38px;
+            height: 38px;
             border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 700;
+            display: grid;
+            place-items: center;
             color: #e6edf3;
-            background: rgba(248, 81, 73, 0.32);
-            box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.16);
-            transition: opacity 160ms ease-out, transform 200ms ease-out;
+            font-weight: 700;
+            font-size: 12px;
+            border: 1px solid rgba(13, 17, 23, 0.55);
+            box-sizing: border-box;
         }
 
-        .spiderfy-cluster > span {
-            position: relative;
-            width: 28px;
-            height: 28px;
-            border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(248, 81, 73, 0.62);
+        .mock-cluster.high {
+            background: rgba(248, 81, 73, 0.65);
+            box-shadow: 0 0 0 12px rgba(248, 81, 73, 0.30);
         }
 
-        .spiderfy-cluster .cluster-spike-badge {
+        .mock-cluster.low {
+            background: rgba(210, 153, 34, 0.65);
+            box-shadow: 0 0 0 12px rgba(210, 153, 34, 0.28);
+        }
+
+        .mock-cluster .cluster-spike-badge {
             top: 2px;
             right: 2px;
         }
 
-        .spiderfy-demo.is-open .spiderfy-cluster {
-            opacity: 0.32;
-            transform: scale(0.92);
+        .leaflet-popup {
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            z-index: 900;
         }
 
-        .spiderfy-meta {
-            margin-top: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            font-size: 11px;
-            color: #8b949e;
+        .leaflet-popup-content-wrapper {
+            overflow: hidden;
         }
 
-        .spiderfy-status {
-            color: #c9d1d9;
-        }
-
-        .spiderfy-reset {
-            padding: 3px 8px;
-            border: 1px solid rgba(48, 54, 61, 0.95);
-            border-radius: 999px;
-            background: rgba(22, 27, 34, 0.9);
-            color: #c9d1d9;
-            font: inherit;
-            cursor: pointer;
-        }
-
-        .spiderfy-reset:hover {
-            border-color: rgba(88, 166, 255, 0.6);
-            color: #e6edf3;
-        }
-
-        .popup-variant-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-        }
-
-        .popup-variant-card {
-            padding: 12px;
-            border: 1px solid rgba(48, 54, 61, 0.9);
-            border-radius: 12px;
-            background: rgba(13, 17, 23, 0.72);
-        }
-
-        .popup-variant-card h2 {
-            margin: 0 0 4px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: #c9d1d9;
-        }
-
-        .popup-variant-card p {
-            margin: 0 0 10px;
-            font-size: 11px;
-            line-height: 1.35;
-            color: #8b949e;
-        }
-
-        .mock-map.popup-variant-shell-soft .leaflet-popup-content-wrapper {
-            border-color: rgba(48, 54, 61, 0.62);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.42);
-        }
-
-        .mock-map.popup-variant-shell-soft .popup-summary,
-        .mock-map.popup-variant-shell-soft .popup-detail-card {
-            border-color: rgba(48, 54, 61, 0.78);
-        }
-
-        .mock-map.popup-variant-shell-open .leaflet-popup-content-wrapper {
-            border-color: transparent;
-            background: rgba(22, 27, 34, 0.92);
-            box-shadow: 0 1px 7px rgba(0, 0, 0, 0.28);
-        }
-
-        .mock-map.popup-variant-shell-open .popup-summary,
-        .mock-map.popup-variant-shell-open .popup-detail-card {
-            border-color: transparent;
-            background: transparent;
-            padding-left: 0;
-            padding-right: 0;
-        }
-
-        .mock-map.popup-variant-shell-open .popup-meta-item {
-            border-top-color: rgba(88, 166, 255, 0.16);
-        }
-
-        .mock-map.popup-variant-shell-open .popup-detail-wrap {
-            border-top-color: rgba(88, 166, 255, 0.18);
-        }
-
-        .mock-map.popup-variant-shell-open .popup-detail-card {
-            padding-top: 1px;
-            padding-bottom: 0;
-        }
-
-        .mock-map.popup-variant-shell-open .popup-flow-value {
-            gap: 2px 5px;
-        }
-
-        .mock-map.mobile.popup-variant-shell-open .popup-summary {
-            padding-top: 2px;
-            padding-bottom: 1px;
-        }
-
-        .mock-map.popup-variant-codeblock .popup-detail-card {
-            border: 1px solid rgba(48, 54, 61, 0.92);
-            border-radius: 3px;
-            background: rgba(13, 17, 23, 0.94);
-            padding: 7px 8px 6px;
-            box-shadow: inset 0 0 0 1px rgba(88, 166, 255, 0.06);
-        }
-
-        .mock-map.popup-variant-codeblock .popup-detail-row {
-            grid-template-columns: 36px minmax(0, 1fr);
-            gap: 7px;
-        }
-
-        @media (max-width: 900px) {
-            .mock-stage {
-                grid-template-columns: minmax(0, 1fr);
-            }
-
-            .spiderfy-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .popup-variant-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-
-            .mock-footer-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
-        }
-
-        @media (max-width: 640px) {
-            .spiderfy-grid {
-                grid-template-columns: minmax(0, 1fr);
-            }
+        #status-bar {
+            z-index: 1002;
         }
     </style>
 </head>
 <body>
-    <div class="mock-stage">
-        <section class="mock-panel mock-panel-wide">
-            <h1>Spiderfy Layout</h1>
-            <p>Click a cluster to compare small, medium, large, and very large spiderfies. Ripple is removed; this mock is only for expansion density and readability.</p>
-            <div class="spiderfy-grid">
-                <div class="spiderfy-case">
-                    <div class="spiderfy-case-header"><strong>Small</strong><span>6 nodes</span></div>
-                    <div class="spiderfy-demo" data-count="6" data-label="Expand only">
-                        <div class="spiderfy-cluster" aria-hidden="true"><span>6<i class="cluster-spike-badge">!</i></span></div>
-                        <div class="spiderfy-overlay"></div>
-                    </div>
-                    <div class="spiderfy-meta">
-                        <span class="spiderfy-status">Expand only</span>
-                        <button type="button" class="spiderfy-reset">Reset</button>
-                    </div>
-                </div>
-                <div class="spiderfy-case">
-                    <div class="spiderfy-case-header"><strong>Medium</strong><span>10 nodes</span></div>
-                    <div class="spiderfy-demo" data-count="10" data-label="Expand only">
-                        <div class="spiderfy-cluster" aria-hidden="true"><span>10<i class="cluster-spike-badge">!</i></span></div>
-                        <div class="spiderfy-overlay"></div>
-                    </div>
-                    <div class="spiderfy-meta">
-                        <span class="spiderfy-status">Expand only</span>
-                        <button type="button" class="spiderfy-reset">Reset</button>
-                    </div>
-                </div>
-                <div class="spiderfy-case">
-                    <div class="spiderfy-case-header"><strong>Large</strong><span>18 nodes</span></div>
-                    <div class="spiderfy-demo" data-count="18" data-label="Expand only">
-                        <div class="spiderfy-cluster" aria-hidden="true"><span>18<i class="cluster-spike-badge">!</i></span></div>
-                        <div class="spiderfy-overlay"></div>
-                    </div>
-                    <div class="spiderfy-meta">
-                        <span class="spiderfy-status">Expand only</span>
-                        <button type="button" class="spiderfy-reset">Reset</button>
-                    </div>
-                </div>
-                <div class="spiderfy-case">
-                    <div class="spiderfy-case-header"><strong>Very Large</strong><span>32 nodes</span></div>
-                    <div class="spiderfy-demo" data-count="32" data-label="Expand only">
-                        <div class="spiderfy-cluster" aria-hidden="true"><span>32<i class="cluster-spike-badge">!</i></span></div>
-                        <div class="spiderfy-overlay"></div>
-                    </div>
-                    <div class="spiderfy-meta">
-                        <span class="spiderfy-status">Expand only</span>
-                        <button type="button" class="spiderfy-reset">Reset</button>
-                    </div>
-                </div>
-            </div>
-        </section>
+    <div id="map">
+        <div class="mock-grid"></div>
 
-        <section class="mock-panel">
-            <h1>Live Desktop Popup</h1>
-            <p>Current desktop popup with the larger type, flattened shell, and codeblock-style event viewer.</p>
-            <div class="mock-map popup-variant-shell-open popup-variant-codeblock">
-                <div class="leaflet-popup leaflet-zoom-animated"><div class="leaflet-popup-content-wrapper"><div class="leaflet-popup-content"><div class="popup-row"><div class="popup-summary"><div class="popup-summary-top"><div class="popup-header"><div class="popup-kicker">Source</div><span class="ip">203.0.113.47</span></div><div class="popup-linkouts"><a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a></div></div><div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-high">Threat 91</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">Data Center / Web Hosting / Transit</span></div></div><div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div></div></div><div class="popup-detail-wrap"><div class="popup-detail-bar"><div class="popup-detail-heading">Recent events</div></div><div class="popup-detail-card"><div class="popup-detail-row"><span class="popup-detail-label">time</span><span class="popup-detail-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-detail-row popup-flow"><span class="popup-detail-label">flow</span><div class="popup-flow-value"><span class="mono">203.0.113.47:49822</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">198.51.100.12:8291</span></div></div><div class="popup-detail-row"><span class="popup-detail-label">proto</span><span class="popup-detail-value mono">TCP (syn)</span></div><div class="popup-detail-row popup-detail-row-rule"><span class="popup-detail-label">rule</span><span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span></div></div><div class="popup-detail-footer"><span class="popup-detail-position">2 / 20+</span><div class="popup-detail-nav"><button type="button" class="popup-detail-button">&larr;</button><button type="button" class="popup-detail-button">&rarr;</button></div></div></div></div></div></div></div>
-            </div>
-        </section>
+        <div class="mock-cluster high" style="left: 18%; top: 40%;">
+            188
+            <span class="cluster-spike-badge">!</span>
+        </div>
+        <div class="mock-cluster low" style="left: 66%; top: 26%;">42</div>
 
-        <section class="mock-panel mock-panel-wide">
-            <h1>Detail Overload States</h1>
-            <p>Desktop drilldown behavior when recent-event loading is temporarily unavailable under load.</p>
-            <div class="mock-footer-grid">
-                <div>
-                    <h1 style="margin-bottom: 8px;">Initial Load Unavailable</h1>
-                    <div class="mock-map popup-variant-shell-open popup-variant-codeblock">
-                        <div class="leaflet-popup leaflet-zoom-animated"><div class="leaflet-popup-content-wrapper"><div class="leaflet-popup-content"><div class="popup-row"><div class="popup-summary"><div class="popup-summary-top"><div class="popup-header"><div class="popup-kicker">Source</div><span class="ip">203.0.113.47</span></div><div class="popup-linkouts"><a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a></div></div><div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-high">Threat 91</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">Data Center / Web Hosting / Transit</span></div></div><div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div></div></div><div id="detail-203-0-113-47" class="popup-detail-state popup-detail-temporary"><div>Recent events temporarily unavailable under load.</div><div class="popup-detail-hint">Try again in a few seconds.</div></div></div></div></div>
-                    </div>
-                </div>
-                <div>
-                    <h1 style="margin-bottom: 8px;">Older Page Unavailable</h1>
-                    <div class="mock-map popup-variant-shell-open popup-variant-codeblock">
-                        <div class="leaflet-popup leaflet-zoom-animated"><div class="leaflet-popup-content-wrapper"><div class="leaflet-popup-content"><div class="popup-row"><div class="popup-summary"><div class="popup-summary-top"><div class="popup-header"><div class="popup-kicker">Source</div><span class="ip">203.0.113.47</span></div><div class="popup-linkouts"><a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a><a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a></div></div><div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-high">Threat 91</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">Data Center / Web Hosting / Transit</span></div></div><div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div></div></div><div class="popup-detail-wrap"><div class="popup-detail-bar"><div class="popup-detail-heading">Recent events</div></div><div class="popup-detail-card"><div class="popup-detail-row"><span class="popup-detail-label">time</span><span class="popup-detail-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-detail-row popup-flow"><span class="popup-detail-label">flow</span><div class="popup-flow-value"><span class="mono">203.0.113.47:49822</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">198.51.100.12:8291</span></div></div><div class="popup-detail-row"><span class="popup-detail-label">proto</span><span class="popup-detail-value mono">TCP (syn)</span></div><div class="popup-detail-row popup-detail-row-rule"><span class="popup-detail-label">rule</span><span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span></div></div><div class="popup-detail-footer"><span class="popup-detail-position">20 / 20+</span><div class="popup-detail-nav"><button type="button" class="popup-detail-button" disabled>&larr;</button><button type="button" class="popup-detail-button">&rarr;</button></div></div><div class="popup-detail-hint">Older events temporarily unavailable under load. Try again in a few seconds.</div></div></div></div></div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <div class="mock-marker high" style="left: 31%; top: 51%;"></div>
+        <div class="mock-marker medium" style="left: 35%; top: 54%;"></div>
+        <div class="mock-marker low" style="left: 37%; top: 48%;"></div>
+        <div class="mock-marker unknown" style="left: 44%; top: 63%;"></div>
+        <div class="mock-marker clean" style="left: 58%; top: 58%;"></div>
 
-        <section class="mock-panel">
-            <h1>Legend</h1>
-            <p>Current filter-panel legend with live symbol key styling.</p>
-            <div class="mock-map" style="min-height: 0;">
-                <div id="filter-legend" style="width: 200px; margin-top: 0;">
-                    <div id="legend-home">
-                        <div class="legend-title">Home</div>
-                        <div class="legend-list">
-                            <div class="legend-entry">
-                                <span class="legend-symbol-wrap" aria-hidden="true">
-                                    <span class="legend-home-swatch"></span>
-                                </span>
-                                <span class="legend-label">Home location</span>
+        <div class="leaflet-popup leaflet-zoom-animated">
+            <div class="leaflet-popup-content-wrapper">
+                <div class="leaflet-popup-content">
+                    <div class="popup-row">
+                        <div class="popup-summary">
+                            <div class="popup-summary-top">
+                                <div class="popup-header">
+                                    <div class="popup-kicker">Source</div>
+                                    <button type="button" class="popup-ip-copy" aria-label="Copy source IP" title="Copy source IP">
+                                        <span class="ip">203.0.113.47</span>
+                                    </button>
+                                </div>
+                                <div class="popup-linkouts">
+                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                </div>
+                            </div>
+                            <div class="popup-signal-strip">
+                                <div class="popup-chip-row">
+                                    <span class="popup-chip threat-high">Threat 91</span>
+                                    <span class="popup-chip popup-chip-intel">Tor exit</span>
+                                    <span class="popup-chip popup-chip-intel">DROP</span>
+                                </div>
+                                <div class="popup-usage">
+                                    <span class="popup-usage-label">type</span>
+                                    <span class="popup-usage-value">Data Center / Web Hosting / Transit</span>
+                                </div>
+                            </div>
+                            <div class="popup-meta-grid">
+                                <div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div>
+                                <div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div>
+                                <div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value"><span class="popup-time-full">3/5/2026, 10:14:52 AM</span><span class="popup-time-compact">3/5, 10:14 AM</span></span></div>
+                                <div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value"><span class="popup-time-full">3/5/2026, 10:17:08 AM</span><span class="popup-time-compact">3/5, 10:17 AM</span></span></div>
+                                <div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div>
+                            </div>
+                        </div>
+
+                        <div class="popup-detail-wrap">
+                            <div class="popup-detail-bar">
+                                <div class="popup-detail-heading">Recent events</div>
+                            </div>
+                            <div class="popup-detail-card">
+                                <div class="popup-detail-row">
+                                    <span class="popup-detail-label">time</span>
+                                    <span class="popup-detail-value"><span class="popup-time-full">3/5/2026, 10:17:08 AM</span><span class="popup-time-compact">3/5, 10:17 AM</span></span>
+                                </div>
+                                <div class="popup-detail-row popup-flow">
+                                    <span class="popup-detail-label">flow</span>
+                                    <div class="popup-flow-value">
+                                        <span class="mono">203.0.113.47:49822</span>
+                                        <span class="popup-flow-arrow" aria-hidden="true">&rarr;</span>
+                                        <span class="mono">198.51.100.12:8291</span>
+                                    </div>
+                                </div>
+                                <div class="popup-detail-row">
+                                    <span class="popup-detail-label">proto</span>
+                                    <span class="popup-detail-value mono">TCP (syn)</span>
+                                </div>
+                                <div class="popup-detail-row popup-detail-row-rule">
+                                    <span class="popup-detail-label">rule</span>
+                                    <span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span>
+                                </div>
+                            </div>
+                            <div class="popup-detail-footer">
+                                <span class="popup-detail-position">2 / 20+</span>
+                                <div class="popup-detail-nav">
+                                    <button type="button" class="popup-detail-button">&larr;</button>
+                                    <button type="button" class="popup-detail-button">&rarr;</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="legend-title">Threat</div>
-                    <div class="legend-list">
-                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
-                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
-                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
-                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
-                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="filter-toggle" class="active" aria-label="Toggle filters">&equiv;</button>
+    <div id="filter-panel">
+        <div class="filter-header">
+            <div class="filter-header-actions">
+                <div class="filter-header-toggle-group">
+                    <span class="filter-header-toggle-label">Arcs</span>
+                    <div class="filter-header-toggle">
+                        <button type="button" class="filter-header-toggle-button is-active" data-arcs="on">On</button>
+                        <button type="button" class="filter-header-toggle-button" data-arcs="off">Off</button>
                     </div>
+                </div>
+                <button id="f-defaults" type="button">Defaults</button>
+            </div>
+        </div>
+
+        <div class="filter-tabs" role="tablist" aria-label="Panel tabs">
+            <button type="button" class="filter-tab-button is-active" data-tab="filters">Filters</button>
+            <button type="button" class="filter-tab-button" data-tab="legend">Legend</button>
+        </div>
+
+        <div class="filter-tab-body">
+            <div id="filter-tab-filters" class="filter-tab-panel">
+                <label class="filter-label" for="f-window">Window</label>
+                <select id="f-window">
+                    <option>15m</option>
+                    <option selected>1h</option>
+                    <option>6h</option>
+                    <option>24h</option>
+                </select>
+
+                <label class="filter-label" for="f-asn">ASN Search</label>
+                <input id="f-asn" type="text" value="amazon">
+
+                <label class="filter-label" for="f-proto">Protocol</label>
+                <select id="f-proto">
+                    <option selected>All</option>
+                    <option>TCP</option>
+                    <option>UDP</option>
+                    <option>ICMP</option>
+                </select>
+
+                <label class="filter-label">Threats</label>
+                <div class="filter-threat">
+                    <button type="button" class="filter-threat-button filter-threat-button-all is-active" data-threat="all">All</button>
+                    <button type="button" class="filter-threat-button" data-threat="unknown"><span class="filter-threat-dot threat-unknown"></span></button>
+                    <button type="button" class="filter-threat-button" data-threat="clean"><span class="filter-threat-dot threat-clean"></span></button>
+                    <button type="button" class="filter-threat-button" data-threat="low"><span class="filter-threat-dot threat-low"></span></button>
+                    <button type="button" class="filter-threat-button" data-threat="medium"><span class="filter-threat-dot threat-medium"></span></button>
+                    <button type="button" class="filter-threat-button" data-threat="high"><span class="filter-threat-dot threat-high"></span></button>
+                </div>
+                <div class="filter-threat-text">Threats: all</div>
+            </div>
+
+            <div id="filter-tab-legend" class="filter-tab-panel" hidden>
+                <div id="filter-legend">
                     <div class="legend-title">Spikes</div>
                     <div class="legend-list">
                         <div class="legend-entry">
-                            <span class="legend-symbol-wrap" aria-hidden="true">
+                            <span class="legend-symbol-wrap">
                                 <span class="legend-symbol legend-symbol-cluster">
-                                <span class="legend-symbol-cluster-core"></span>
-                                <i class="cluster-spike-badge">!</i>
+                                    <span class="legend-symbol-cluster-core"></span>
+                                    <span class="cluster-spike-badge">!</span>
                                 </span>
                             </span>
-                            <span class="legend-label">Cluster spike</span>
+                            <span class="legend-label">Spike cluster</span>
                         </div>
                         <div class="legend-entry">
-                            <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
-                            <span class="legend-label">Node spike</span>
+                            <span class="legend-symbol-wrap">
+                                <span class="legend-symbol legend-symbol-node">!</span>
+                            </span>
+                            <span class="legend-label">Spike node</span>
                         </div>
                     </div>
+
                     <div class="legend-title">Intel</div>
                     <div class="legend-list">
                         <div class="legend-entry">
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
-                            <span class="legend-label">Tor exit</span>
+                            <span class="legend-label">Tor exit indicator</span>
                         </div>
                         <div class="legend-entry">
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
-                            <span class="legend-label">Spamhaus DROP</span>
+                            <span class="legend-label">Spamhaus DROP indicator</span>
+                        </div>
+                        <div class="legend-entry">
+                            <span class="legend-symbol-wrap"><span class="legend-home-swatch"></span></span>
+                            <span class="legend-label">Configured home location</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
-
-        <section class="mock-panel mock-panel-wide">
-            <h1>Tabbed Control Panel</h1>
-            <p>Desktop and mobile examples of the tabbed control panel, plus a native select comparison for the threat control.</p>
-            <div class="mock-footer-grid">
-                <div>
-                    <h1 style="margin-bottom: 8px;">Desktop Dot Strip</h1>
-                    <div id="filter-panel" class="mock-control-panel" style="position: static; top: auto; right: auto; display: flex;">
-                        <div class="filter-header">
-                            <div class="filter-header-actions">
-                                <div class="filter-header-toggle-group" role="group" aria-label="Motion">
-                                    <span class="filter-header-toggle-label">Motion</span>
-                                    <div class="filter-header-toggle">
-                                        <button class="filter-header-toggle-button is-active" type="button" aria-pressed="true">On</button>
-                                        <button class="filter-header-toggle-button" type="button" aria-pressed="false">Off</button>
-                                    </div>
-                                </div>
-                                <button id="f-defaults" type="button">Defaults</button>
-                            </div>
-                        </div>
-                        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
-                            <button class="filter-tab-button is-active" type="button" role="tab" aria-selected="true">Filters</button>
-                            <button class="filter-tab-button" type="button" role="tab" aria-selected="false">Legend</button>
-                        </div>
-                        <div class="filter-tab-body">
-                            <div class="filter-tab-panel">
-                                <label class="filter-label">Time range</label>
-                                <select><option>Last 15 minutes</option></select>
-                                <label class="filter-label">Protocol</label>
-                                <select><option>All</option></select>
-                                <label class="filter-label">Source IP</label>
-                                <input type="text" placeholder="1.2.3.4">
-                                <label class="filter-label">Destination Port</label>
-                                <input type="text" placeholder="any">
-                                <label class="filter-label">ASN</label>
-                                <input type="text" placeholder="AS14618 / amazon">
-                                <div class="filter-threat" role="radiogroup" aria-label="Threat">
-                                    <button type="button" class="filter-threat-button filter-threat-button-all" role="radio" aria-checked="false">All</button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-unknown" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button is-active" role="radio" aria-checked="true"><span class="filter-threat-dot threat-clean" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-low" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-medium" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-high" aria-hidden="true"></span></button>
-                                </div>
-                                <div class="filter-threat-text">Threats: Clean</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mock-control-panel" style="position: static; top: auto; right: auto; display: flex; margin-top: 12px;">
-                        <div class="filter-header">
-                            <div class="filter-header-actions">
-                                <div class="filter-header-toggle-group" role="group" aria-label="Motion">
-                                    <span class="filter-header-toggle-label">Motion</span>
-                                    <div class="filter-header-toggle">
-                                        <button class="filter-header-toggle-button is-active" type="button" aria-pressed="true">On</button>
-                                        <button class="filter-header-toggle-button" type="button" aria-pressed="false">Off</button>
-                                    </div>
-                                </div>
-                                <button type="button">Defaults</button>
-                            </div>
-                        </div>
-                        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
-                            <button class="filter-tab-button is-active" type="button" role="tab" aria-selected="true">Filters</button>
-                            <button class="filter-tab-button" type="button" role="tab" aria-selected="false">Legend</button>
-                        </div>
-                        <div class="filter-tab-body">
-                            <div class="filter-tab-panel">
-                                <label class="filter-label">Threat</label>
-                                <select>
-                                    <option>All</option>
-                                    <option>Unknown</option>
-                                    <option selected>Clean</option>
-                                    <option>Low</option>
-                                    <option>Medium</option>
-                                    <option>High</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h1 style="margin-bottom: 8px;">Mobile Dot Strip</h1>
-                    <div id="filter-panel" class="mock-control-panel mobile" style="position: static; top: auto; right: auto; display: flex;">
-                        <div class="filter-header">
-                            <div class="filter-header-actions">
-                                <div class="filter-header-toggle-group" role="group" aria-label="Motion">
-                                    <span class="filter-header-toggle-label">Motion</span>
-                                    <div class="filter-header-toggle">
-                                        <button class="filter-header-toggle-button is-active" type="button" aria-pressed="true">On</button>
-                                        <button class="filter-header-toggle-button" type="button" aria-pressed="false">Off</button>
-                                    </div>
-                                </div>
-                                <button id="f-defaults" type="button">Defaults</button>
-                            </div>
-                        </div>
-                        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
-                            <button class="filter-tab-button is-active" type="button" role="tab" aria-selected="true">Filters</button>
-                            <button class="filter-tab-button" type="button" role="tab" aria-selected="false">Legend</button>
-                        </div>
-                        <div class="filter-tab-body">
-                            <div class="filter-tab-panel">
-                                <label class="filter-label">Time range</label>
-                                <select><option>Last 15 minutes</option></select>
-                                <label class="filter-label">Protocol</label>
-                                <select><option>All</option></select>
-                                <label class="filter-label">ASN</label>
-                                <input type="text" placeholder="AS14618 / amazon">
-                                <div class="filter-threat" role="radiogroup" aria-label="Threat">
-                                    <button type="button" class="filter-threat-button filter-threat-button-all" role="radio" aria-checked="false">All</button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-unknown" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-clean" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-low" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button is-active" role="radio" aria-checked="true"><span class="filter-threat-dot threat-medium" aria-hidden="true"></span></button>
-                                    <button type="button" class="filter-threat-button" role="radio" aria-checked="false"><span class="filter-threat-dot threat-high" aria-hidden="true"></span></button>
-                                </div>
-                                <div class="filter-threat-text">Threats: Medium</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel mock-panel-wide">
-            <h1>Live Footer</h1>
-            <p>Current desktop footer with the split <code>Feeds</code> and <code>Abuse</code> status items. The Abuse tooltip includes the current requests remaining.</p>
-            <div class="mock-footer-wrap">
-                <div id="status-bar">
-                    <div id="status-left">
-                        <div class="status-group status-tooltip-target status-tooltip-align-left" tabindex="0" data-tooltip="Current visible aggregate markers and the total hits they represent after client-side filters.">
-                            <span class="status-item">
-                                <span class="status-label">Mapped</span>
-                                <span class="status-value status-value-ops">184</span>
-                            </span>
-                            <span class="status-sep" aria-hidden="true">&middot;</span>
-                            <span class="status-item">
-                                <span class="status-label">Hits</span>
-                                <span class="status-value status-value-ops">12.4K</span>
-                            </span>
-                        </div>
-                        <div id="status-ops" class="status-group">
-                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Retained connection rows in the last 24 hours.">
-                                <span class="status-label">Events</span>
-                                <span class="status-value status-value-ops">248K</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Distinct source IPs retained in the last 24 hours.">
-                                <span class="status-label">Sources</span>
-                                <span class="status-value status-value-ops">18.7K</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Status of the Tor Project and Spamhaus DROP background feed refresh.">
-                                <span class="status-label">Feeds</span>
-                                <span class="status-value status-value-ops status-state-ok">ok</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-item-ops status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="AbuseIPDB can accept new lookups. 742 requests remaining today.">
-                                <span class="status-label">Abuse</span>
-                                <span class="status-value status-value-ops status-state-ok">ok</span>
-                            </span>
-                        </div>
-                    </div>
-                    <div id="status-right">
-                        <div class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Freshness of the current /api/map data shown on the map.">
-                            <span class="status-dot is-healthy" aria-hidden="true"></span>
-                            <span id="stat-time-value">Updated 18s ago</span>
-                        </div>
-                        <span id="stat-brand">
-                            <span class="brand-mark" aria-hidden="true">🌐</span>
-                            <span class="brand-name">msmap</span>
-                        </span>
-                        <a href="#" rel="noopener noreferrer">GitHub</a>
-                        <span id="stat-built">built 2026-03-03 11:14 UTC</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel mock-panel-wide">
-            <h1>Live Mobile Footer</h1>
-            <p>Current mobile footer stack with <code>Feeds</code> and <code>Abuse</code> added back to the top row, while <code>Events</code> and <code>Sources</code> stay hidden.</p>
-            <div class="mock-footer-wrap mock-footer-mobile live-mobile-footer">
-                <div id="status-bar">
-                    <div id="status-left">
-                        <div class="status-group">
-                            <span class="status-item">
-                                <span class="status-label">Mapped</span>
-                                <span class="status-value status-value-ops">184</span>
-                            </span>
-                            <span class="status-sep" aria-hidden="true">&middot;</span>
-                            <span class="status-item">
-                                <span class="status-label">Hits</span>
-                                <span class="status-value status-value-ops">12.4K</span>
-                            </span>
-                        </div>
-                        <div id="status-ops" class="status-group">
-                            <span id="stat-events" class="status-item status-item-ops">
-                                <span class="status-label">Events</span>
-                                <span class="status-value status-value-ops">248K</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span id="stat-sources" class="status-item status-item-ops">
-                                <span class="status-label">Sources</span>
-                                <span class="status-value status-value-ops">18.7K</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-item-ops">
-                                <span class="status-label">Feeds</span>
-                                <span class="status-value status-value-ops status-state-ok">ok</span>
-                            </span>
-                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-item-ops">
-                                <span class="status-label">Abuse</span>
-                                <span class="status-value status-value-ops status-state-ok">ok</span>
-                            </span>
-                        </div>
-                    </div>
-                    <div id="status-right">
-                        <div class="status-group status-freshness">
-                            <span class="status-dot is-healthy" aria-hidden="true"></span>
-                            <span>Updated 18s ago</span>
-                        </div>
-                        <span id="stat-brand">
-                            <span class="brand-mark" aria-hidden="true">🌐</span>
-                            <span class="brand-name">msmap</span>
-                        </span>
-                        <a href="#" rel="noopener noreferrer">GitHub</a>
-                        <span id="stat-built">built 2026-03-03 11:14 UTC</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel mock-panel-wide">
-            <h1>Mobile Footer Variants</h1>
-            <p>Variant 1 replaces the metadata row with full ops status. Variant 2 keeps only <code>Updated</code>, <code>Feeds</code>, and <code>Abuse</code> on the second row.</p>
-            <div class="mock-footer-grid">
-                <div>
-                    <h1 style="margin-bottom: 8px;">Variant 1</h1>
-                    <p>Two rows: <code>Mapped</code>/<code>Hits</code>, then <code>Events</code>/<code>Sources</code>/<code>Feeds</code>/<code>Abuse</code>.</p>
-                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
-                        <div id="status-bar">
-                            <div id="status-left">
-                                <div class="status-group">
-                                    <span class="status-item">
-                                        <span class="status-label">Mapped</span>
-                                        <span class="status-value status-value-ops">184</span>
-                                    </span>
-                                    <span class="status-sep" aria-hidden="true">&middot;</span>
-                                    <span class="status-item">
-                                        <span class="status-label">Hits</span>
-                                        <span class="status-value status-value-ops">12.4K</span>
-                                    </span>
-                                </div>
-                                <div id="status-ops" class="status-group">
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Events</span>
-                                        <span class="status-value status-value-ops">248K</span>
-                                    </span>
-                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Sources</span>
-                                        <span class="status-value status-value-ops">18.7K</span>
-                                    </span>
-                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Feeds</span>
-                                        <span class="status-value status-value-ops status-state-ok">ok</span>
-                                    </span>
-                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Abuse</span>
-                                        <span class="status-value status-value-ops status-state-ok">ok</span>
-                                    </span>
-                                </div>
-                            </div>
-                            <div id="status-right">
-                                <div class="status-group status-freshness">
-                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
-                                    <span>Updated 18s ago</span>
-                                </div>
-                                <span id="stat-brand">
-                                    <span class="brand-mark" aria-hidden="true">🌐</span>
-                                    <span class="brand-name">msmap</span>
-                                </span>
-                                <a href="#" rel="noopener noreferrer">GitHub</a>
-                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h1 style="margin-bottom: 8px;">Variant 2</h1>
-                    <p>Two rows: <code>Mapped</code>/<code>Hits</code>, then only <code>Updated</code>, <code>Feeds</code>, and <code>Abuse</code>.</p>
-                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
-                        <div id="status-bar">
-                            <div id="status-left">
-                                <div class="status-group">
-                                    <span class="status-item">
-                                        <span class="status-label">Mapped</span>
-                                        <span class="status-value status-value-ops">184</span>
-                                    </span>
-                                    <span class="status-sep" aria-hidden="true">&middot;</span>
-                                    <span class="status-item">
-                                        <span class="status-label">Hits</span>
-                                        <span class="status-value status-value-ops">12.4K</span>
-                                    </span>
-                                </div>
-                            </div>
-                            <div id="status-right">
-                                <div class="status-group status-freshness">
-                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
-                                    <span>Updated 18s ago</span>
-                                </div>
-                                <span class="status-item status-item-ops">
-                                    <span class="status-label">Feeds</span>
-                                    <span class="status-value status-value-ops status-state-ok">ok</span>
-                                </span>
-                                <span class="status-item status-item-ops">
-                                    <span class="status-label">Abuse</span>
-                                    <span class="status-value status-value-ops status-state-ok">ok</span>
-                                </span>
-                                <span id="stat-brand">
-                                    <span class="brand-mark" aria-hidden="true">🌐</span>
-                                    <span class="brand-name">msmap</span>
-                                </span>
-                                <a href="#" rel="noopener noreferrer">GitHub</a>
-                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h1 style="margin-bottom: 8px;">Variant 3</h1>
-                    <p>Top row combines <code>Mapped</code>, <code>Hits</code>, <code>Feeds</code>, and <code>Abuse</code>. Second row keeps <code>Updated</code>.</p>
-                    <div class="mock-footer-wrap mock-footer-mobile metadata-hidden">
-                        <div id="status-bar">
-                            <div id="status-left">
-                                <div class="status-group">
-                                    <span class="status-item">
-                                        <span class="status-label">Mapped</span>
-                                        <span class="status-value status-value-ops">184</span>
-                                    </span>
-                                    <span class="status-sep" aria-hidden="true">&middot;</span>
-                                    <span class="status-item">
-                                        <span class="status-label">Hits</span>
-                                        <span class="status-value status-value-ops">12.4K</span>
-                                    </span>
-                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Feeds</span>
-                                        <span class="status-value status-value-ops status-state-ok">ok</span>
-                                    </span>
-                                    <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                                    <span class="status-item status-item-ops">
-                                        <span class="status-label">Abuse</span>
-                                        <span class="status-value status-value-ops status-state-ok">ok</span>
-                                    </span>
-                                </div>
-                            </div>
-                            <div id="status-right">
-                                <div class="status-group status-freshness">
-                                    <span class="status-dot is-healthy" aria-hidden="true"></span>
-                                    <span>Updated 18s ago</span>
-                                </div>
-                                <span id="stat-brand">
-                                    <span class="brand-mark" aria-hidden="true">🌐</span>
-                                    <span class="brand-name">msmap</span>
-                                </span>
-                                <a href="#" rel="noopener noreferrer">GitHub</a>
-                                <span id="stat-built">built 2026-03-03 11:14 UTC</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel mock-panel-wide">
-            <h1>Popup Shell Variants</h1>
-            <p>Compare the current shell, a softer outer frame, and a borderless shell with stronger internal separators.</p>
-            <div class="popup-variant-grid">
-                <div class="popup-variant-card">
-                    <h2>Current</h2>
-                    <p>Existing outer frame and internal card borders.</p>
-                    <div class="mock-map">
-                        <div class="leaflet-popup leaflet-zoom-animated">
-                            <div class="leaflet-popup-content-wrapper">
-                                <div class="leaflet-popup-content">
-                                    <div class="popup-row">
-                                        <div class="popup-summary">
-                                            <div class="popup-summary-top">
-                                                <div class="popup-header">
-                                                    <div class="popup-kicker">Source</div>
-                                                    <button type="button" class="popup-ip-copy" data-copy-ip="203.0.113.47" aria-label="Copy source IP" title="Copy source IP"><span class="ip">203.0.113.47</span></button>
-                                                </div>
-                                                <div class="popup-linkouts">
-                                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a>
-                                                </div>
-                                            </div>
-                                            <div class="popup-signal-strip">
-                                                <div class="popup-chip-row">
-                                                    <span class="popup-chip threat-high">Threat 91</span>
-                                                    <span class="popup-chip popup-chip-intel">Tor exit</span>
-                                                    <span class="popup-chip popup-chip-intel">DROP</span>
-                                                </div>
-                                                <div class="popup-usage">
-                                                    <span class="popup-usage-label">type</span>
-                                                    <span class="popup-usage-value">Data Center / Web Hosting / Transit</span>
-                                                </div>
-                                            </div>
-                                            <div class="popup-meta-grid">
-                                                <div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div>
-                                                <div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div>
-                                                <div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div>
-                                                <div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div>
-                                                <div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div>
-                                            </div>
-                                        </div>
-                                        <div class="popup-detail-wrap">
-                                            <div class="popup-detail-bar"><div class="popup-detail-heading">Recent events</div></div>
-                                            <div class="popup-detail-card">
-                                                <div class="popup-detail-row"><span class="popup-detail-label">time</span><span class="popup-detail-value">3/3/2026, 10:17:08 AM</span></div>
-                                                <div class="popup-detail-row popup-flow"><span class="popup-detail-label">flow</span><div class="popup-flow-value"><span class="mono">203.0.113.47:49822</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">198.51.100.12:8291</span></div></div>
-                                                <div class="popup-detail-row"><span class="popup-detail-label">proto</span><span class="popup-detail-value mono">TCP (syn)</span></div>
-                                                <div class="popup-detail-row popup-detail-row-rule"><span class="popup-detail-label">rule</span><span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span></div>
-                                            </div>
-                                            <div class="popup-detail-footer"><span class="popup-detail-position">2 / 20+</span><div class="popup-detail-nav"><button type="button" class="popup-detail-button">&larr;</button><button type="button" class="popup-detail-button">&rarr;</button></div></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="popup-variant-card">
-                    <h2>Softer Shell</h2>
-                    <p>Keep the outer boundary, but reduce its visual weight.</p>
-                    <div class="mock-map popup-variant-shell-soft">
-                        <div class="leaflet-popup leaflet-zoom-animated">
-                            <div class="leaflet-popup-content-wrapper">
-                                <div class="leaflet-popup-content">
-                                    <div class="popup-row">
-                                        <div class="popup-summary">
-                                            <div class="popup-summary-top">
-                                                <div class="popup-header"><div class="popup-kicker">Source</div><button type="button" class="popup-ip-copy" data-copy-ip="203.0.113.47" aria-label="Copy source IP" title="Copy source IP"><span class="ip">203.0.113.47</span></button></div>
-                                                <div class="popup-linkouts">
-                                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a>
-                                                </div>
-                                            </div>
-                                            <div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-high">Threat 91</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">Data Center / Web Hosting / Transit</span></div></div>
-                                            <div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div></div>
-                                        </div>
-                                        <div class="popup-detail-wrap"><div class="popup-detail-bar"><div class="popup-detail-heading">Recent events</div></div><div class="popup-detail-card"><div class="popup-detail-row"><span class="popup-detail-label">time</span><span class="popup-detail-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-detail-row popup-flow"><span class="popup-detail-label">flow</span><div class="popup-flow-value"><span class="mono">203.0.113.47:49822</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">198.51.100.12:8291</span></div></div><div class="popup-detail-row"><span class="popup-detail-label">proto</span><span class="popup-detail-value mono">TCP (syn)</span></div><div class="popup-detail-row popup-detail-row-rule"><span class="popup-detail-label">rule</span><span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span></div></div><div class="popup-detail-footer"><span class="popup-detail-position">2 / 20+</span><div class="popup-detail-nav"><button type="button" class="popup-detail-button">&larr;</button><button type="button" class="popup-detail-button">&rarr;</button></div></div></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="popup-variant-card">
-                    <h2>No Shell Border</h2>
-                    <p>Remove the perimeter border and lean on internal separators.</p>
-                    <div class="mock-map popup-variant-shell-open">
-                        <div class="leaflet-popup leaflet-zoom-animated">
-                            <div class="leaflet-popup-content-wrapper">
-                                <div class="leaflet-popup-content">
-                                    <div class="popup-row">
-                                        <div class="popup-summary">
-                                            <div class="popup-summary-top">
-                                                <div class="popup-header"><div class="popup-kicker">Source</div><button type="button" class="popup-ip-copy" data-copy-ip="203.0.113.47" aria-label="Copy source IP" title="Copy source IP"><span class="ip">203.0.113.47</span></button></div>
-                                                <div class="popup-linkouts">
-                                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a>
-                                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a>
-                                                </div>
-                                            </div>
-                                            <div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-high">Threat 91</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">Data Center / Web Hosting / Transit</span></div></div>
-                                            <div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value">3/3/2026, 10:14:52 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div></div>
-                                        </div>
-                                        <div class="popup-detail-wrap"><div class="popup-detail-bar"><div class="popup-detail-heading">Recent events</div></div><div class="popup-detail-card"><div class="popup-detail-row"><span class="popup-detail-label">time</span><span class="popup-detail-value">3/3/2026, 10:17:08 AM</span></div><div class="popup-detail-row popup-flow"><span class="popup-detail-label">flow</span><div class="popup-flow-value"><span class="mono">203.0.113.47:49822</span><span class="popup-flow-arrow" aria-hidden="true">&rarr;</span><span class="mono">198.51.100.12:8291</span></div></div><div class="popup-detail-row"><span class="popup-detail-label">proto</span><span class="popup-detail-value mono">TCP (syn)</span></div><div class="popup-detail-row popup-detail-row-rule"><span class="popup-detail-label">rule</span><span class="popup-detail-value">INPUT:DROP-WAN MANAGEMENT PORTS</span></div></div><div class="popup-detail-footer"><span class="popup-detail-position">2 / 20+</span><div class="popup-detail-nav"><button type="button" class="popup-detail-button">&larr;</button><button type="button" class="popup-detail-button">&rarr;</button></div></div></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel">
-            <h1>Live Mobile Popup</h1>
-            <p>Current mobile popup with the flattened shell treatment.</p>
-            <div class="mock-map mobile popup-variant-shell-open">
-                <div class="leaflet-popup leaflet-zoom-animated">
-                    <div class="leaflet-popup-content-wrapper">
-                        <div class="leaflet-popup-content">
-                            <div class="popup-row">
-                                <div class="popup-summary">
-                                    <div class="popup-summary-top">
-                                        <div class="popup-header"><div class="popup-kicker">Source</div><button type="button" class="popup-ip-copy" data-copy-ip="198.51.100.203" aria-label="Copy source IP" title="Copy source IP"><span class="ip">198.51.100.203</span></button></div>
-                                        <div class="popup-linkouts">
-                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"/></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"/></svg></a>
-                                        </div>
-                                    </div>
-                                    <div class="popup-signal-strip"><div class="popup-chip-row"><span class="popup-chip threat-medium">Threat 54</span><span class="popup-chip popup-chip-intel">Tor exit</span><span class="popup-chip popup-chip-intel">DROP</span></div><div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">ISP / Residential</span></div></div>
-                                    <div class="popup-meta-grid"><div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">7</span></div><div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">US</span></div><div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 9:58:11 AM</span><span class="popup-time-compact">3/3, 9:58 AM</span></span></div><div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 10:02:44 AM</span><span class="popup-time-compact">3/3, 10:02 AM</span></span></div><div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS7922 Comcast Cable</span></div></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="mock-panel">
-            <h1>Long-String Stress</h1>
-            <p>Intentional worst-case strings for overflow and wrapping sanity checks.</p>
-            <div class="mock-map">
-                <div class="leaflet-popup leaflet-zoom-animated">
-                    <div class="leaflet-popup-content-wrapper">
-                        <div class="leaflet-popup-content">
-                            <div class="popup-row">
-                                <div class="popup-summary">
-                                    <div class="popup-summary-top">
-                                        <div class="popup-header">
-                                            <div class="popup-kicker">Source</div>
-                                            <button type="button" class="popup-ip-copy" data-copy-ip="2001:0db8:85a3:0000:0000:8a2e:0370:7334" aria-label="Copy source IP" title="Copy source IP"><span class="ip">2001:0db8:85a3:0000:0000:8a2e:0370:7334</span></button>
-                                        </div>
-                                        <div class="popup-linkouts">
-                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise">
-                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"/></svg>
-                                            </a>
-                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB">
-                                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"/></svg>
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <div class="popup-signal-strip">
-                                        <div class="popup-chip-row">
-                                            <span class="popup-chip threat-high">Threat 100</span>
-                                            <span class="popup-chip popup-chip-intel">Tor exit</span>
-                                        </div>
-                                        <div class="popup-usage">
-                                            <span class="popup-usage-label">type</span>
-                                            <span class="popup-usage-value">Enterprise Software-as-a-Service Platform / Content Delivery / Edge Compute / Reverse Proxy / Multi-Tenant Infrastructure</span>
-                                        </div>
-                                    </div>
-                                    <div class="popup-meta-grid">
-                                        <div class="popup-meta-item">
-                                            <span class="popup-meta-label">Hits</span>
-                                            <span class="popup-meta-value">2,941</span>
-                                        </div>
-                                        <div class="popup-meta-item">
-                                            <span class="popup-meta-label">Country</span>
-                                            <span class="popup-meta-value">DE</span>
-                                        </div>
-                                        <div class="popup-meta-item">
-                                            <span class="popup-meta-label">First</span>
-                                            <span class="popup-meta-value"><span class="popup-time-full">3/2/2026, 11:58:11 PM</span><span class="popup-time-compact">3/2, 11:58 PM</span></span>
-                                        </div>
-                                        <div class="popup-meta-item">
-                                            <span class="popup-meta-label">Last</span>
-                                            <span class="popup-meta-value"><span class="popup-time-full">3/3/2026, 10:42:44 AM</span><span class="popup-time-compact">3/3, 10:42 AM</span></span>
-                                        </div>
-                                        <div class="popup-meta-item">
-                                            <span class="popup-meta-label">ASN</span>
-                                            <span class="popup-meta-value">AS424242 Example International Backbone and Extremely Long Network Operator Name GmbH &amp; Co. KG</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="popup-detail-wrap">
-                                    <div class="popup-detail-bar">
-                                        <div class="popup-detail-heading">Recent events</div>
-                                    </div>
-                                    <div class="popup-detail-card">
-                                        <div class="popup-detail-row">
-                                            <span class="popup-detail-label">time</span>
-                                            <span class="popup-detail-value"><span class="popup-time-full">3/3/2026, 10:42:44 AM</span><span class="popup-time-compact">3/3, 10:42 AM</span></span>
-                                        </div>
-                                        <div class="popup-detail-row popup-flow">
-                                            <span class="popup-detail-label">flow</span>
-                                            <div class="popup-flow-value">
-                                                <span class="mono">2001:0db8:85a3:0000:0000:8a2e:0370:7334:61337</span>
-                                                <span class="popup-flow-arrow" aria-hidden="true">&rarr;</span>
-                                                <span class="mono">2001:0db8:0000:0000:0000:ffff:c633:640c:65535</span>
-                                            </div>
-                                        </div>
-                                        <div class="popup-detail-row">
-                                            <span class="popup-detail-label">proto</span>
-                                            <span class="popup-detail-value mono">TCP (syn,ack,ecn,cwr,nonce)</span>
-                                        </div>
-                                        <div class="popup-detail-row popup-detail-row-rule">
-                                            <span class="popup-detail-label">rule</span>
-                                            <span class="popup-detail-value">INPUT:DROP-WAN SUSPICIOUS-REMOTE-MANAGEMENT-PROBE-WITH-REPEATED-PATHOLOGICAL-SUBSYSTEM-SIGNATURE-AND-EXPERIMENTAL-METADATA-TAG</span>
-                                        </div>
-                                    </div>
-                                    <div class="popup-detail-footer">
-                                        <span class="popup-detail-position">17 / 20+</span>
-                                        <div class="popup-detail-nav">
-                                            <button type="button" class="popup-detail-button">&larr;</button>
-                                            <button type="button" class="popup-detail-button">&rarr;</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        </div>
     </div>
+
+    <div id="status-bar">
+        <div id="status-left">
+            <div class="status-group status-item-ops">
+                <span class="status-item"><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
+                <span class="status-sep status-sep-ops">&middot;</span>
+                <span class="status-item status-tooltip-target status-tooltip-align-left" data-tooltip="AbuseIPDB quota refresh in 12h 14m."><span class="status-label">Abuse</span><span class="status-value status-value-ops status-state-syncing">syncing</span></span>
+            </div>
+            <div class="status-group">
+                <span id="stat-events" class="status-item"><span class="status-label">Events</span><span class="status-value">36.3k</span></span>
+                <span class="status-sep">&middot;</span>
+                <span id="stat-sources" class="status-item"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
+                <span class="status-sep">&middot;</span>
+                <span id="stat-total" class="status-item"><span class="status-label">Nodes</span><span class="status-value">932</span></span>
+                <span class="status-sep">&middot;</span>
+                <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-align-left" data-tooltip="Using cached /api/map response while upstream refreshes."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
+            </div>
+        </div>
+        <div id="status-right">
+            <span id="stat-brand"><span class="brand-mark">@</span><span class="brand-name">msmap</span></span>
+            <span class="status-sep">&middot;</span>
+            <a href="#" aria-label="GitHub repository">github</a>
+            <span class="status-sep">&middot;</span>
+            <span id="stat-built">build abc1234</span>
+        </div>
+    </div>
+
     <script>
         (() => {
-            const SPIDERFY_OPEN_MS = 200;
+            const panel = document.getElementById('filter-panel');
+            const toggle = document.getElementById('filter-toggle');
+            const tabButtons = document.querySelectorAll('.filter-tab-button');
+            const tabFilters = document.getElementById('filter-tab-filters');
+            const tabLegend = document.getElementById('filter-tab-legend');
+            const threatButtons = document.querySelectorAll('.filter-threat-button');
+            const threatText = document.querySelector('.filter-threat-text');
+            const arcButtons = document.querySelectorAll('.filter-header-toggle-button');
+            const popupCopy = document.querySelector('.popup-ip-copy');
 
-            function showCopyState(button, state) {
-                button.classList.remove('is-copied', 'is-copy-failed');
-                button.classList.add(state === 'copied' ? 'is-copied' : 'is-copy-failed');
-                const header = button.closest('.popup-header');
-                const kicker = header ? header.querySelector('.popup-kicker') : null;
-                if (kicker) {
-                    kicker.textContent = state === 'copied' ? 'Copied' : 'Copy failed';
-                }
-                window.setTimeout(() => {
-                    if (!button.isConnected) { return; }
-                    button.classList.remove('is-copied', 'is-copy-failed');
-                    if (kicker && kicker.isConnected) {
-                        kicker.textContent = 'Source';
-                    }
-                }, state === 'copied' ? 1200 : 1600);
-            }
+            toggle.addEventListener('click', () => {
+                const isHidden = panel.style.display === 'none';
+                panel.style.display = isHidden ? '' : 'none';
+                toggle.classList.toggle('active', isHidden);
+            });
 
-            async function copyIp(button) {
-                const value = button.getAttribute('data-copy-ip');
-                if (!value) { return; }
-                try {
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        await navigator.clipboard.writeText(value);
-                    }
-                    showCopyState(button, 'copied');
-                } catch (_) {
-                    showCopyState(button, 'failed');
-                }
-            }
-
-            for (const button of document.querySelectorAll('.popup-ip-copy[data-copy-ip]')) {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    void copyIp(button);
+            tabButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const tab = button.getAttribute('data-tab');
+                    tabButtons.forEach((b) => b.classList.toggle('is-active', b === button));
+                    const showFilters = tab === 'filters';
+                    tabFilters.hidden = !showFilters;
+                    tabLegend.hidden = showFilters;
                 });
-            }
+            });
 
-            function buildNodes(demo, count) {
-                const overlay = demo.querySelector('.spiderfy-overlay');
-                if (!overlay) { return []; }
-                overlay.innerHTML = '';
-
-                const radius = count <= 10 ? 52 : (count <= 18 ? 64 : 74);
-                const nodes = [];
-                for (let i = 0; i < count; i += 1) {
-                    const angle = (Math.PI * 2 * i) / count - (Math.PI / 2);
-                    const node = document.createElement('span');
-                    const spike = i % 3 === 0;
-                    node.className = 'spiderfy-node';
-                    node.dataset.spike = spike ? 'true' : 'false';
-                    node.dataset.threat = i % 5 === 0 ? 'medium' : (i % 2 === 0 ? 'high' : 'low');
-                    node.textContent = spike ? '!' : '!';
-                    node.style.setProperty('--dx', `${Math.cos(angle) * radius}px`);
-                    node.style.setProperty('--dy', `${Math.sin(angle) * radius}px`);
-                    overlay.appendChild(node);
-                    nodes.push(node);
-                }
-                return nodes;
-            }
-
-            function resetDemo(demo) {
-                demo.classList.remove('is-open');
-                for (const node of demo.querySelectorAll('.spiderfy-node')) {
-                    node.classList.remove('marker-new');
-                }
-            }
-
-            for (const demo of document.querySelectorAll('.spiderfy-demo')) {
-                const count = Number.parseInt(demo.dataset.count || '', 10);
-                if (!Number.isFinite(count) || count <= 0) { continue; }
-                const nodes = buildNodes(demo, count);
-
-                demo.addEventListener('click', () => {
-                    resetDemo(demo);
-                    requestAnimationFrame(() => {
-                        demo.classList.add('is-open');
-                    });
+            threatButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    threatButtons.forEach((b) => b.classList.remove('is-active'));
+                    button.classList.add('is-active');
+                    const value = button.getAttribute('data-threat') || 'all';
+                    threatText.textContent = 'Threats: ' + value;
                 });
+            });
 
-                const reset = demo.parentElement?.querySelector('.spiderfy-reset');
-                reset?.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    resetDemo(demo);
+            arcButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    arcButtons.forEach((b) => b.classList.remove('is-active'));
+                    button.classList.add('is-active');
                 });
+            });
 
-                setTimeout(() => {
-                    demo.classList.add('is-open');
-                }, SPIDERFY_OPEN_MS);
-            }
+            popupCopy.addEventListener('click', () => {
+                popupCopy.classList.add('is-copied');
+                window.setTimeout(() => popupCopy.classList.remove('is-copied'), 650);
+            });
         })();
     </script>
 </body>
