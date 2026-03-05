@@ -150,14 +150,20 @@ const cluster = L.markerClusterGroup({
     iconCreateFunction(clusterMarker) {
         const children = clusterMarker.getAllChildMarkers();
         const total = children.length;
-        const nHigh = children.filter(m => m.options.threat === 'high').length;
+        const hasHigh = children.some((m) => m.options.threat === 'high');
+        const hasMedium = children.some((m) => m.options.threat === 'medium');
+        const hasLow = children.some((m) => m.options.threat === 'low');
         const hasSpike = children.some(m => m.options.spiking === true);
-        const ratio = total > 0 ? nHigh / total : 0;
         let cls;
-        if      (ratio === 0)  { cls = 'safe'; }
-        else if (ratio < 0.34) { cls = 'low';  }
-        else if (ratio < 0.67) { cls = 'mid';  }
-        else                   { cls = 'high'; }
+        if (hasHigh) {
+            cls = 'high';
+        } else if (hasMedium) {
+            cls = 'mid';
+        } else if (hasLow) {
+            cls = 'low';
+        } else {
+            cls = 'safe';
+        }
         return L.divIcon({
             html:      '<div><span>' + total + '</span>' + (hasSpike ? '<i class="cluster-spike-badge" aria-hidden="true">!</i>' : '') + '</div>',
             className: 'marker-cluster marker-cluster-threat-' + cls + (hasSpike ? ' marker-cluster-spike' : ''),
