@@ -424,8 +424,7 @@ Database::Database(const std::string& path) noexcept
 
     if (!prepare(kInsertSql, insert_stmt_, "INSERT") ||
         !prepare(kPruneSql, prune_stmt_, "prune") ||
-        !prepare(kUpsertIpIntelSql, upsert_ip_intel_stmt_, "ip_intel upsert") ||
-        !prepare(kDistinctSourceIpsSql, distinct_source_ips_stmt_, "distinct_source_ips")) {
+        !prepare(kUpsertIpIntelSql, upsert_ip_intel_stmt_, "ip_intel upsert")) {
         return;
     }
 

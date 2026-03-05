@@ -193,7 +193,6 @@ private:
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> insert_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> prune_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> upsert_ip_intel_stmt_;
-    std::unique_ptr<sqlite3_stmt, StmtFinalizer> distinct_source_ips_stmt_;
 
     mutable std::mutex                           read_pool_mutex_;
     mutable std::condition_variable              read_pool_cv_;
