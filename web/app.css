@@ -721,10 +721,9 @@ html, body {
 }
 
 .popup-summary-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 6px;
+    display: block;
+    position: relative;
+    padding-right: 56px;
 }
 
 .popup-header {
@@ -746,7 +745,7 @@ html, body {
 .popup-signal-strip {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 6px;
     padding-top: 0;
 }
 
@@ -858,6 +857,9 @@ html, body {
     grid-auto-rows: 24px;
     gap: 4px;
     flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    right: 0;
     align-self: flex-start;
 }
 
@@ -1082,7 +1084,12 @@ html, body {
     }
 
     .popup-summary-top {
+        display: flex;
+        position: static;
+        align-items: flex-start;
+        justify-content: space-between;
         gap: 5px;
+        padding-right: 0;
     }
 
     .popup-meta-grid {
@@ -1141,6 +1148,7 @@ html, body {
 
     .popup-linkouts {
         gap: 4px;
+        position: static;
     }
 
     .popup-linkout {
