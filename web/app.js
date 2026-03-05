@@ -10,6 +10,7 @@ const STATUS_REFRESH_MS = 60000;
 const HOME_FETCH_RETRY_MS = 60000;
 const DETAIL_PAGE_SIZE  = 20;
 const DETAIL_RETRY_COOLDOWN_MS = 10000;
+const DETAIL_STATE_CACHE_MAX = 256;
 const TEXT_FILTER_DEBOUNCE_MS = 400;
 
 const ARC_DRAW_MS   =  800;
@@ -1006,6 +1007,7 @@ function ensureDetailState(srcIp) {
     const windowSecs = currentWindowSecs();
     const existing = detailStateByIp.get(srcIp);
     if (existing && existing.windowSecs === windowSecs) {
+        touchDetailState(srcIp, existing);
         return existing;
     }
     if (existing && existing.retryTimerId !== null) {
@@ -1025,8 +1027,28 @@ function ensureDetailState(srcIp) {
         windowSecs: windowSecs,
         anchorTs: 0,
     };
-    detailStateByIp.set(srcIp, fresh);
+    touchDetailState(srcIp, fresh);
     return fresh;
+}
+
+function touchDetailState(srcIp, state) {
+    if (detailStateByIp.has(srcIp)) {
+        detailStateByIp.delete(srcIp);
+    }
+    detailStateByIp.set(srcIp, state);
+    trimDetailStateCache();
+}
+
+function trimDetailStateCache() {
+    while (detailStateByIp.size > DETAIL_STATE_CACHE_MAX) {
+        const oldest = detailStateByIp.entries().next().value;
+        if (!oldest) {
+            return;
+        }
+        const [oldestIp, oldestState] = oldest;
+        clearDetailRetryTimer(oldestState);
+        detailStateByIp.delete(oldestIp);
+    }
 }
 
 function currentDetailAnchorTs() {
