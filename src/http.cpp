@@ -7,6 +7,7 @@
 #include "status_cache.h"
 
 #include <cstdlib>
+#include <cctype>
 #include <cstring>
 #include <ctime>
 #include <iostream>
@@ -235,6 +236,40 @@ std::optional<int> parse_bounded_int_exact(const char* raw, int min_val, int max
     return static_cast<int>(parsed);
 }
 
+std::optional<std::string> normalize_asn_filter_param(const char* raw)
+{
+    const std::string value = safe_param(raw, 64);
+    if (value.empty()) {
+        return std::nullopt;
+    }
+
+    std::size_t start = 0;
+    while (start < value.size() &&
+           std::isspace(static_cast<unsigned char>(value[start])) != 0) {
+        ++start;
+    }
+    std::size_t end = value.size();
+    while (end > start &&
+           std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
+        --end;
+    }
+    if (end <= start) {
+        return std::nullopt;
+    }
+
+    std::string trimmed = value.substr(start, end - start);
+    if (trimmed.size() < 3 || trimmed.size() > 64) {
+        return std::nullopt;
+    }
+    for (const char ch : trimmed) {
+        const unsigned char uch = static_cast<unsigned char>(ch);
+        if (uch < 0x20U || uch > 0x7EU) {
+            return std::nullopt;
+        }
+    }
+    return trimmed;
+}
+
 /// Parse URL query parameters from an MHD connection into a QueryFilters.
 /// All fields are validated and range-checked; invalid values are silently
 /// discarded (treated as "no constraint") rather than propagated.
@@ -257,9 +292,11 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
     f.src_ip = safe_param(v, 45);
 
-    // Country: ISO 3166-1 alpha-2, exactly 2 characters.
-    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
-    f.country = safe_param(v, 2);
+    // ASN fuzzy search: trimmed printable ASCII, 3-64 chars.
+    v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "asn");
+    if (const auto normalized = normalize_asn_filter_param(v); normalized.has_value()) {
+        f.asn = *normalized;
+    }
 
     // Protocol: allowlist — only TCP, UDP, or ICMP are valid.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
@@ -311,9 +348,11 @@ MapFilters parse_map_filters(MHD_Connection* conn)
         v != nullptr) {
         f.src_ip = safe_param(v, 45);
     }
-    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "country");
+    if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "asn");
         v != nullptr) {
-        f.country = safe_param(v, 2);
+        if (const auto normalized = normalize_asn_filter_param(v); normalized.has_value()) {
+            f.asn = *normalized;
+        }
     }
     if (const char* v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "proto");
         v != nullptr) {

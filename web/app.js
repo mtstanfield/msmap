@@ -22,14 +22,14 @@ const DEFAULT_FILTERS = Object.freeze({
     proto: '',
     ip: '',
     port: '',
-    country: '',
+    asn: '',
     threat: '',
 });
 
 const appliedTextFilters = {
     ip: DEFAULT_FILTERS.ip,
     port: DEFAULT_FILTERS.port,
-    country: DEFAULT_FILTERS.country,
+    asn: DEFAULT_FILTERS.asn,
 };
 
 let textApplyTimer = null;
@@ -40,7 +40,7 @@ function currentFilterState() {
         proto:       fProto.value,
         ip:          appliedTextFilters.ip,
         port:        appliedTextFilters.port,
-        country:     appliedTextFilters.country,
+        asn:         appliedTextFilters.asn,
         threat:      activeThreat,
     };
 }
@@ -52,7 +52,7 @@ function writeFiltersToUrl() {
     if (state.proto)                                       { params.set('proto', state.proto); }
     if (state.ip)                                          { params.set('ip', state.ip); }
     if (state.port)                                        { params.set('port', state.port); }
-    if (state.country)                                     { params.set('country', state.country); }
+    if (state.asn)                                         { params.set('asn', state.asn); }
     if (state.threat)                                      { params.set('threat', state.threat); }
     const next = params.toString();
     const base = window.location.pathname || '/';
@@ -82,7 +82,7 @@ function parseUrlFilterState() {
     setIfPresent('proto', 'proto');
     setIfPresent('ip', 'ip');
     setIfPresent('port', 'port');
-    setIfPresent('country', 'country');
+    setIfPresent('asn', 'asn');
     setIfPresent('threat', 'threat');
 
     return found ? state : null;
@@ -112,7 +112,7 @@ function loadFilters() {
         if (s.proto       !== undefined) { setSelectValue(fProto, s.proto, DEFAULT_FILTERS.proto); }
         if (s.ip          !== undefined) { fIp.value = s.ip; }
         if (s.port        !== undefined) { fPort.value = s.port; }
-        if (s.country     !== undefined) { fCountry.value = s.country; }
+        if (s.asn         !== undefined) { fAsn.value = s.asn; }
         if (s.threat      !== undefined) { setThreatValue(s.threat, { save: false, repoll: false }); }
     }
 
@@ -203,7 +203,7 @@ const fTime         = document.getElementById('f-time');
 const fProto        = document.getElementById('f-proto');
 const fIp           = document.getElementById('f-ip');
 const fPort         = document.getElementById('f-port');
-const fCountry      = document.getElementById('f-country');
+const fAsn          = document.getElementById('f-asn');
 const fThreatButtons = Array.from(document.querySelectorAll('[data-threat]'));
 const fThreatText = document.getElementById('f-threat-text');
 const fMotionOn     = document.getElementById('f-motion-on');
@@ -446,23 +446,25 @@ function validatePortValue(value) {
     return { valid: true, normalized: String(port) };
 }
 
-function validateCountryValue(value) {
-    const trimmed = value.trim().toUpperCase();
+function validateAsnValue(value) {
+    const trimmed = value.trim();
     if (!trimmed) {
         return { valid: true, normalized: '' };
     }
-    const valid = /^[A-Z]{2}$/.test(trimmed);
-    return { valid, normalized: valid ? trimmed : appliedTextFilters.country };
+    const valid = trimmed.length >= 3 &&
+        trimmed.length <= 64 &&
+        /^[\x20-\x7E]+$/.test(trimmed);
+    return { valid, normalized: valid ? trimmed : appliedTextFilters.asn };
 }
 
 function updateTextValidity() {
     const ip = validateIpValue(fIp.value);
     const port = validatePortValue(fPort.value);
-    const country = validateCountryValue(fCountry.value);
+    const asn = validateAsnValue(fAsn.value);
     setInputValidity(fIp, ip.valid);
     setInputValidity(fPort, port.valid);
-    setInputValidity(fCountry, country.valid);
-    return { ip, port, country };
+    setInputValidity(fAsn, asn.valid);
+    return { ip, port, asn };
 }
 
 function applyTextFilters() {
@@ -477,8 +479,8 @@ function applyTextFilters() {
         appliedTextFilters.port = validation.port.normalized;
         changed = true;
     }
-    if (validation.country.valid && appliedTextFilters.country !== validation.country.normalized) {
-        appliedTextFilters.country = validation.country.normalized;
+    if (validation.asn.valid && appliedTextFilters.asn !== validation.asn.normalized) {
+        appliedTextFilters.asn = validation.asn.normalized;
         changed = true;
     }
 
@@ -488,8 +490,8 @@ function applyTextFilters() {
     if (validation.port.valid) {
         fPort.value = validation.port.normalized;
     }
-    if (validation.country.valid) {
-        fCountry.value = validation.country.normalized;
+    if (validation.asn.valid) {
+        fAsn.value = validation.asn.normalized;
     }
 
     if (changed) {
@@ -517,13 +519,13 @@ function resetToDefaults() {
     fProto.value        = DEFAULT_FILTERS.proto;
     fIp.value           = DEFAULT_FILTERS.ip;
     fPort.value         = DEFAULT_FILTERS.port;
-    fCountry.value      = DEFAULT_FILTERS.country;
+    fAsn.value          = DEFAULT_FILTERS.asn;
     setThreatValue(DEFAULT_FILTERS.threat, { save: false, repoll: false, force: true });
     setMotionValue('on', { save: true, repoll: false, force: true });
 
     appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
     appliedTextFilters.port    = DEFAULT_FILTERS.port;
-    appliedTextFilters.country = DEFAULT_FILTERS.country;
+    appliedTextFilters.asn = DEFAULT_FILTERS.asn;
     updateTextValidity();
     clearActiveArcs();
     saveFilters();
@@ -562,7 +564,7 @@ fThreatButtons.forEach((button, index) => {
     });
 });
 
-[fIp, fPort, fCountry].forEach((el) => {
+[fIp, fPort, fAsn].forEach((el) => {
     el.addEventListener('input', () => {
         updateTextValidity();
         scheduleTextApply();
@@ -970,7 +972,7 @@ function buildMapQueryString() {
     if (fProto.value)               { params.set('proto', fProto.value); }
     if (appliedTextFilters.ip)      { params.set('ip', appliedTextFilters.ip); }
     if (appliedTextFilters.port)    { params.set('port', appliedTextFilters.port); }
-    if (appliedTextFilters.country) { params.set('country', appliedTextFilters.country); }
+    if (appliedTextFilters.asn)     { params.set('asn', appliedTextFilters.asn); }
     if (activeThreat)               { params.set('threat', activeThreat); }
     return '?' + params.toString();
 }
@@ -1919,10 +1921,10 @@ fetchHome().then(() => {
     loadFilters();
     appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
     appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
-    appliedTextFilters.country = validateCountryValue(fCountry.value).normalized;
+    appliedTextFilters.asn = validateAsnValue(fAsn.value).normalized;
     fIp.value = appliedTextFilters.ip;
     fPort.value = appliedTextFilters.port;
-    fCountry.value = appliedTextFilters.country;
+    fAsn.value = appliedTextFilters.asn;
     updateTextValidity();
     saveFilters();
     setOperatorStatus(null);

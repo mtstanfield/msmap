@@ -2,6 +2,7 @@
 #include "geoip.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
@@ -188,7 +189,7 @@ struct BoundFilterState {
     bool has_since{false};
     bool has_until{false};
     bool has_src_ip{false};
-    bool has_country{false};
+    bool has_asn{false};
     bool has_proto{false};
     bool has_threat{false};
     bool exclude_icmp{false};
@@ -197,7 +198,7 @@ struct BoundFilterState {
 
 struct WhereInputs {
     std::string_view src_ip;
-    std::string_view country;
+    std::string_view asn;
     std::string_view proto;
     std::string_view threat;
     bool             exclude_icmp{false};
@@ -206,13 +207,30 @@ struct WhereInputs {
     int              dst_port{};
 };
 
+std::string make_lower_like_contains_pattern(std::string_view raw)
+{
+    std::string pattern;
+    pattern.reserve(raw.size() * 2 + 2);
+    pattern.push_back('%');
+    for (const char ch : raw) {
+        const unsigned char uch = static_cast<unsigned char>(ch);
+        const char lower = static_cast<char>(std::tolower(uch));
+        if (lower == '\\' || lower == '%' || lower == '_') {
+            pattern.push_back('\\');
+        }
+        pattern.push_back(lower);
+    }
+    pattern.push_back('%');
+    return pattern;
+}
+
 BoundFilterState build_where_clause(std::string& sql, const WhereInputs& inputs)
 {
     BoundFilterState state;
     state.has_since   = inputs.since > 0;
     state.has_until   = inputs.until > 0;
     state.has_src_ip  = !inputs.src_ip.empty();
-    state.has_country = !inputs.country.empty();
+    state.has_asn = !inputs.asn.empty();
     state.has_proto   = !inputs.proto.empty();
     state.has_threat = !inputs.threat.empty();
     state.exclude_icmp = !state.has_proto && inputs.exclude_icmp;
@@ -226,7 +244,7 @@ BoundFilterState build_where_clause(std::string& sql, const WhereInputs& inputs)
     if (state.has_since)   { add_cond("ts >= ?"); }
     if (state.has_until)   { add_cond("ts <= ?"); }
     if (state.has_src_ip)  { add_cond("src_ip = ?"); }
-    if (state.has_country) { add_cond("country = ?"); }
+    if (state.has_asn)     { add_cond("LOWER(asn) LIKE ? ESCAPE '\\'"); }
     if (state.has_proto)   { add_cond("proto = ?"); }
     if (state.has_threat) {
         if (inputs.threat == "unknown") {
@@ -256,6 +274,9 @@ int bind_where_clause(sqlite3_stmt* stmt,
                       const BoundFilterState& state,
                       const WhereInputs& inputs) noexcept
 {
+    const std::string asn_pattern = state.has_asn
+        ? make_lower_like_contains_pattern(inputs.asn)
+        : std::string{};
     int idx = 1;
     if (state.has_since) {
         (void)sqlite3_bind_int64(stmt, idx++, inputs.since);
@@ -266,8 +287,8 @@ int bind_where_clause(sqlite3_stmt* stmt,
     if (state.has_src_ip) {
         (void)sqlite3_bind_text(stmt, idx++, inputs.src_ip.data(), -1, kStaticText);
     }
-    if (state.has_country) {
-        (void)sqlite3_bind_text(stmt, idx++, inputs.country.data(), -1, kStaticText);
+    if (state.has_asn) {
+        (void)sqlite3_bind_text(stmt, idx++, asn_pattern.c_str(), -1, SQLITE_TRANSIENT);
     }
     if (state.has_proto) {
         (void)sqlite3_bind_text(stmt, idx++, inputs.proto.data(), -1, kStaticText);
@@ -592,7 +613,7 @@ Database::query_connections(const QueryFilters& f) const noexcept
         "intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
-    const WhereInputs inputs{f.src_ip, f.country, f.proto, "", f.exclude_icmp,
+    const WhereInputs inputs{f.src_ip, f.asn, f.proto, "", f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);
     sql += " ORDER BY ts DESC LIMIT ? OFFSET ?";
@@ -698,7 +719,7 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
         "intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
-    const WhereInputs inputs{f.src_ip, f.country, f.proto, f.threat, f.exclude_icmp,
+    const WhereInputs inputs{f.src_ip, f.asn, f.proto, f.threat, f.exclude_icmp,
                              f.since, f.until, f.dst_port};
     const BoundFilterState state = build_where_clause(sql, inputs);
     sql += " ORDER BY ts DESC";

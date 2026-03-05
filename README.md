@@ -372,7 +372,7 @@ and desktop-sized UI lazy-loads recent raw events from `GET /api/detail`.
 | Protocol | All / TCP / UDP |
 | Source IP | Exact source IP match |
 | Destination Port | Exact destination port match |
-| Country | 2-letter ISO code (requires GeoLite2 City) |
+| ASN | Case-insensitive substring match (`AS14618`, `amazon`, etc.), min 3 chars |
 | Threat | Exact threat bucket (`All`, `Unknown`, `Clean`, `Low`, `Medium`, `High`) |
 | Legend tab | Symbol key for threat colours, spikes, and intel badges |
 
@@ -498,7 +498,7 @@ Supported query parameters:
 | `proto` | optional exact protocol filter: `TCP`, `UDP`, or `ICMP` |
 | `ip` | optional exact source IP filter |
 | `port` | optional exact destination port filter |
-| `country` | optional 2-letter country filter |
+| `asn` | optional case-insensitive ASN substring filter (3-64 chars) |
 | `threat` | optional exact threat bucket: `unknown`, `clean`, `low`, `medium`, or `high` |
 
 Notes:
@@ -517,6 +517,7 @@ Supported query parameters:
 | Parameter | Description |
 |---|---|
 | `ip` | exact source IP filter |
+| `asn` | optional case-insensitive ASN substring filter (3-64 chars) |
 | `since` | lower timestamp bound |
 | `until` | optional upper timestamp bound |
 | `proto` | optional exact protocol filter |

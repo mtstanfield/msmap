@@ -381,6 +381,70 @@ TEST_CASE("query_map_rows: aggregates repeated source IPs across full window")
     CHECK(*rows.at(1).threat_max == 75);
 }
 
+TEST_CASE("query_map_rows: ASN filter is case-insensitive fuzzy and escapes LIKE wildcards", "[db][query]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    msmap::GeoIpResult geo;
+    geo.country = "US";
+    geo.lat = 37.751;
+    geo.lon = -97.822;
+    geo.has_coords = true;
+    geo.asn = "AS14618 Amazon.com Inc.";
+
+    entry.src_ip = "198.51.100.21";
+    entry.ts = 1000;
+    REQUIRE(db.insert(entry, geo, 10));
+
+    geo.asn = "AS15169 Google LLC";
+    entry.src_ip = "198.51.100.22";
+    entry.ts = 1100;
+    REQUIRE(db.insert(entry, geo, 10));
+
+    geo.asn = "AS64500 100%_Literal Test";
+    entry.src_ip = "198.51.100.23";
+    entry.ts = 1200;
+    REQUIRE(db.insert(entry, geo, 10));
+
+    msmap::MapFilters filters;
+    filters.since = 1;
+    filters.until = 5000;
+
+    SECTION("provider substring")
+    {
+        filters.asn = "amazon";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.21");
+    }
+
+    SECTION("asn number substring")
+    {
+        filters.asn = "14618";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.21");
+    }
+
+    SECTION("case-insensitive")
+    {
+        filters.asn = "GOOGLE";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.22");
+    }
+
+    SECTION("wildcards are treated as literals")
+    {
+        filters.asn = "100%_literal";
+        const auto rows = db.query_map_rows(filters);
+        REQUIRE(rows.size() == 1);
+        CHECK(rows.front().src_ip == "198.51.100.23");
+    }
+}
+
 TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
 {
     msmap::Database db{":memory:"};

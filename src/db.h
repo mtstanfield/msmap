@@ -61,7 +61,7 @@ struct QueryFilters {
     std::int64_t since{0};      // ts >= since;  0 = no lower bound
     std::int64_t until{0};      // ts <= until;  0 = no upper bound
     std::string  src_ip;        // exact match;  empty = any
-    std::string  country;       // exact match;  empty = any
+    std::string  asn;           // case-insensitive contains match; empty = any
     std::string  proto;         // exact match;  empty = any
     bool         exclude_icmp{false}; // when true and proto unset, hide ICMP
     int          dst_port{0};   // exact match;  0 = any
@@ -73,7 +73,7 @@ struct MapFilters {
     std::int64_t since{0};      // ts >= since
     std::int64_t until{0};      // ts <= until; 0 = now
     std::string  src_ip;        // exact match; empty = any
-    std::string  country;       // exact match; empty = any
+    std::string  asn;           // case-insensitive contains match; empty = any
     std::string  proto;         // exact match; empty = any
     std::string  threat;        // exact threat bucket; empty = any
     bool         exclude_icmp{false}; // when true and proto unset, hide ICMP
