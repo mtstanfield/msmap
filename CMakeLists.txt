@@ -187,6 +187,15 @@ if(MSMAP_ENABLE_TESTS)
 
     enable_testing()
 
+    find_program(NODE_EXECUTABLE NAMES node nodejs)
+    if(NODE_EXECUTABLE)
+        add_test(
+            NAME frontend_js_validators
+            COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_frontend_js.js")
+    else()
+        message(WARNING "Node.js not found; skipping frontend_js_validators test")
+    endif()
+
     add_executable(test_parser
         tests/test_parser.cpp
         src/parser.cpp)

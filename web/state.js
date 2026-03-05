@@ -297,4 +297,3 @@ const msmapDeps = {
 };
 
 window.msmapDeps = msmapDeps;
-Object.assign(window, msmapDeps);

@@ -1667,10 +1667,3 @@ Object.assign(window.msmapDeps, {
     pollNow,
     startMsmap,
 });
-
-Object.assign(window, {
-    clearActiveArcs,
-    refreshVisibleMarkerMotionState,
-    pollNow,
-    startMsmap,
-});

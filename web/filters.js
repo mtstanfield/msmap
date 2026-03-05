@@ -526,19 +526,3 @@ Object.assign(window.msmapDeps, {
     isMobileMapUi,
     initFilterUi,
 });
-
-Object.assign(window, {
-    currentFilterState,
-    saveFilters,
-    loadFilters,
-    motionEnabled,
-    currentWindowSecs,
-    setThreatValue,
-    setMotionValue,
-    validateIpValue,
-    validatePortValue,
-    validateAsnValue,
-    updateTextValidity,
-    isMobileMapUi,
-    initFilterUi,
-});
