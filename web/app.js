@@ -348,7 +348,7 @@ function setMotionValue(value, { save = true, repoll = true, force = false } = {
     }
     if (repoll && (changed || force)) {
         clearActiveArcs();
-        pollNow();
+        refreshVisibleMarkerMotionState();
     }
 }
 
@@ -1772,6 +1772,15 @@ function applySpikeMarkerState(marker, spiking) {
         marker.closeTooltip();
         marker.unbindTooltip();
     }
+}
+
+function refreshVisibleMarkerMotionState() {
+    cluster.eachLayer((layer) => {
+        if (!(layer instanceof L.CircleMarker)) {
+            return;
+        }
+        applySpikeMarkerState(layer, layer.options.spiking === true);
+    });
 }
 
 function renderMap(rows) {
