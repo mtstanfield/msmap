@@ -54,7 +54,7 @@ async function requestJson(path, timeoutMs) {
         }
         return { ok: true, data: body };
     } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') {
             return { ok: false, status: 0, retryAfterMs: 0, kind: 'timeout', message: 'Request timed out' };
         }
         return { ok: false, status: 0, retryAfterMs: 0, kind: 'network', message: 'Network request failed' };
