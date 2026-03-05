@@ -213,7 +213,7 @@ std::string make_lower_like_contains_pattern(std::string_view raw)
     pattern.reserve(raw.size() * 2 + 2);
     pattern.push_back('%');
     for (const char ch : raw) {
-        const unsigned char uch = static_cast<unsigned char>(ch);
+        const auto uch = static_cast<unsigned char>(ch);
         const char lower = static_cast<char>(std::tolower(uch));
         if (lower == '\\' || lower == '%' || lower == '_') {
             pattern.push_back('\\');

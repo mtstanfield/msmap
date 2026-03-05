@@ -33,7 +33,7 @@ inline std::optional<std::string> normalize_asn_filter(std::string_view raw)
         return std::nullopt;
     }
     for (const char ch : trimmed) {
-        const unsigned char uch = static_cast<unsigned char>(ch);
+        const auto uch = static_cast<unsigned char>(ch);
         if (uch < 0x20U || uch > 0x7EU) {
             return std::nullopt;
         }
