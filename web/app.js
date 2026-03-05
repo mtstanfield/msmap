@@ -800,18 +800,28 @@ function setOperatorStatus(status) {
     if (status.intel_enabled !== true) {
         statIntelValue.textContent = 'off';
         statIntelValue.classList.add('status-state-off');
+        statIntel.dataset.tooltip = 'Threat intel feeds are disabled.';
     } else {
         const now = Number.isFinite(status.now) ? status.now : Math.floor(Date.now() / 1000);
         const refreshTs = Number.isFinite(status.intel_last_refresh_ts) ? status.intel_last_refresh_ts : 0;
         if (refreshTs <= 0) {
-            statIntelValue.textContent = 'syncing';
-            statIntelValue.classList.add('status-state-syncing');
+            if (status.intel_refresh_attempted === true) {
+                statIntelValue.textContent = 'stale';
+                statIntelValue.classList.add('status-state-stale');
+                statIntel.dataset.tooltip = 'Threat intel feeds have not completed a successful refresh yet.';
+            } else {
+                statIntelValue.textContent = 'syncing';
+                statIntelValue.classList.add('status-state-syncing');
+                statIntel.dataset.tooltip = 'Threat intel feeds are still initializing.';
+            }
         } else if ((now - refreshTs) <= (12 * 3600)) {
             statIntelValue.textContent = 'ok';
             statIntelValue.classList.add('status-state-ok');
+            statIntel.dataset.tooltip = 'Threat intel feeds are current.';
         } else {
             statIntelValue.textContent = 'stale';
             statIntelValue.classList.add('status-state-stale');
+            statIntel.dataset.tooltip = 'Threat intel feeds are stale.';
         }
     }
 
@@ -824,9 +834,17 @@ function setOperatorStatus(status) {
 
     const abuseRemaining = Number.isFinite(status.abuse_rate_remaining) ? status.abuse_rate_remaining : null;
     if (abuseRemaining === null && status.abuse_quota_exhausted !== true) {
-        statAbuseValue.textContent = 'syncing';
-        statAbuseValue.classList.add('status-state-syncing');
-        statAbuse.dataset.tooltip = 'Waiting for the first live AbuseIPDB response to confirm current requests remaining.';
+        if (status.abuse_has_pending_work === true) {
+            statAbuseValue.textContent = 'syncing';
+            statAbuseValue.classList.add('status-state-syncing');
+            statAbuse.dataset.tooltip =
+                'Waiting for the first live AbuseIPDB response to confirm current requests remaining.';
+        } else {
+            statAbuseValue.textContent = 'ok';
+            statAbuseValue.classList.add('status-state-ok');
+            statAbuse.dataset.tooltip =
+                'AbuseIPDB can accept new lookups. Quota has not yet been confirmed by a live response.';
+        }
     } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
         statAbuseValue.classList.add('status-state-stale');

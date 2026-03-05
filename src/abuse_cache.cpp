@@ -426,6 +426,12 @@ std::optional<int> AbuseCache::confirmed_rate_remaining() const noexcept
     return confirmed_rate_remaining_;
 }
 
+bool AbuseCache::has_pending_work() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return !queue_.empty() || !soft_queue_.empty() || !in_flight_.empty();
+}
+
 std::optional<std::int64_t> AbuseCache::quota_retry_after_ts() const noexcept
 {
     const std::lock_guard<std::mutex> lock{queue_mutex_};

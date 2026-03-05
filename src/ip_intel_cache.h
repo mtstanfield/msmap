@@ -38,6 +38,7 @@ public:
 
     void submit(const std::string& ip) noexcept;
     [[nodiscard]] std::optional<std::int64_t> last_refresh_ts() const noexcept;
+    [[nodiscard]] bool refresh_attempted() const noexcept;
 
 private:
     struct SnapshotState {
@@ -64,6 +65,7 @@ private:
     mutable std::mutex snapshot_mutex_;
     SnapshotState      snapshot_;
     std::optional<std::int64_t> last_refresh_ts_;
+    bool               refresh_attempted_{false};
 
     std::mutex                     queue_mutex_;
     std::condition_variable        queue_cv_;

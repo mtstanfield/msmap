@@ -175,6 +175,8 @@ std::string status_to_json(const StatusPayload& snapshot)
     out += snapshot.abuse_quota_exhausted ? "true" : "false";
     out += ",\"abuse_quota_retry_after_ts\":";
     append_i64_or_null(out, snapshot.abuse_quota_retry_after_ts);
+    out += ",\"abuse_has_pending_work\":";
+    out += snapshot.abuse_has_pending_work ? "true" : "false";
     out += ",\"intel_enabled\":";
     out += snapshot.intel_enabled ? "true" : "false";
     out += ",\"home_configured\":";
@@ -183,6 +185,8 @@ std::string status_to_json(const StatusPayload& snapshot)
     out += snapshot.home_valid ? "true" : "false";
     out += ",\"intel_last_refresh_ts\":";
     append_i64_or_null(out, snapshot.intel_last_refresh_ts);
+    out += ",\"intel_refresh_attempted\":";
+    out += snapshot.intel_refresh_attempted ? "true" : "false";
     out += ",\"abuse_cache_rows\":";
     append_i64_or_null(out, snapshot.abuse_cache_rows);
     out += ",\"db_size_bytes\":";

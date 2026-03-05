@@ -24,10 +24,12 @@ struct StatusPayload {
     std::optional<int>            abuse_rate_remaining;
     bool                          abuse_quota_exhausted{false};
     std::optional<std::int64_t>   abuse_quota_retry_after_ts;
+    bool                          abuse_has_pending_work{false};
     bool                          intel_enabled{false};
     bool                          home_configured{false};
     bool                          home_valid{false};
     std::optional<std::int64_t>   intel_last_refresh_ts;
+    bool                          intel_refresh_attempted{false};
     std::optional<std::int64_t>   abuse_cache_rows;
     std::optional<std::uintmax_t> db_size_bytes;
     std::int64_t                  generated_at{};

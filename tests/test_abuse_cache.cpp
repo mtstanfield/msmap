@@ -177,6 +177,16 @@ TEST_CASE("AbuseCache: expired post-midnight retry releases one probe request")
     CHECK(cache.rate_remaining() == 1);
 }
 
+TEST_CASE("AbuseCache: has_pending_work tracks in-flight test marker")
+{
+    msmap::AbuseCache cache{":memory:", "dummy_key"};
+    REQUIRE(cache.valid());
+    CHECK_FALSE(cache.has_pending_work());
+
+    cache.mark_in_flight_for_test("1.2.3.4");
+    CHECK(cache.has_pending_work());
+}
+
 TEST_CASE("AbuseCache: lookup state distinguishes fresh soft-refresh and stale")
 {
     msmap::AbuseCache cache{":memory:", "dummy_key"};

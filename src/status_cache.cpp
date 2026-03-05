@@ -33,11 +33,15 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
         (abuse_enabled && abuse_cache != nullptr)
             ? abuse_cache->quota_retry_after_ts()
             : std::nullopt;
+    payload.abuse_has_pending_work =
+        abuse_enabled && abuse_cache != nullptr && abuse_cache->has_pending_work();
     payload.intel_enabled = intel_enabled;
     payload.home_configured = home_resolver != nullptr;
     payload.home_valid = payload.home_configured && home_resolver->get().valid;
     payload.intel_last_refresh_ts =
         intel_cache != nullptr ? intel_cache->last_refresh_ts() : std::nullopt;
+    payload.intel_refresh_attempted =
+        intel_cache != nullptr && intel_cache->refresh_attempted();
     payload.abuse_cache_rows =
         abuse_cache != nullptr ? abuse_cache->cache_row_count() : std::nullopt;
     payload.generated_at = payload.now;
@@ -134,11 +138,15 @@ void StatusCache::refresh_snapshot() noexcept
         (abuse_enabled_ && abuse_cache_ != nullptr)
             ? abuse_cache_->quota_retry_after_ts()
             : std::nullopt;
+    payload.abuse_has_pending_work =
+        abuse_enabled_ && abuse_cache_ != nullptr && abuse_cache_->has_pending_work();
     payload.intel_enabled = intel_enabled_;
     payload.home_configured = home_resolver_ != nullptr;
     payload.home_valid = payload.home_configured && home_resolver_->get().valid;
     payload.intel_last_refresh_ts =
         intel_cache_ != nullptr ? intel_cache_->last_refresh_ts() : std::nullopt;
+    payload.intel_refresh_attempted =
+        intel_cache_ != nullptr && intel_cache_->refresh_attempted();
     payload.abuse_cache_rows =
         abuse_cache_ != nullptr ? abuse_cache_->cache_row_count() : std::nullopt;
     payload.generated_at = static_cast<std::int64_t>(std::time(nullptr));

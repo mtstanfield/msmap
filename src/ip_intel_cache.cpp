@@ -237,6 +237,12 @@ std::optional<std::int64_t> IpIntelCache::last_refresh_ts() const noexcept
     return last_refresh_ts_;
 }
 
+bool IpIntelCache::refresh_attempted() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+    return refresh_attempted_;
+}
+
 void IpIntelCache::worker() noexcept
 {
     auto next_refresh = std::chrono::steady_clock::now();
@@ -268,6 +274,11 @@ void IpIntelCache::worker() noexcept
 
 void IpIntelCache::refresh_sources() noexcept
 {
+    {
+        const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+        refresh_attempted_ = true;
+    }
+
     bool refreshed = false;
     if (!tor_url_.empty()) {
         if (const auto body = fetch_body(tor_url_); body.has_value()) {

@@ -37,6 +37,8 @@ TEST_CASE("status cache: empty database snapshot is available", "[status]")
     REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
+    REQUIRE_FALSE(snapshot->intel_refresh_attempted);
     REQUIRE(snapshot->generated_at >= snapshot->now);
 }
 
@@ -77,6 +79,8 @@ TEST_CASE("status cache: populated database snapshot includes counts", "[status]
     REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
+    REQUIRE_FALSE(snapshot->intel_refresh_attempted);
 }
 
 TEST_CASE("status cache: invalid database publishes an unhealthy snapshot", "[status]")
@@ -97,6 +101,8 @@ TEST_CASE("status cache: invalid database publishes an unhealthy snapshot", "[st
     REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
+    REQUIRE_FALSE(snapshot->intel_refresh_attempted);
     REQUIRE(snapshot->generated_at == snapshot->now);
 }
 
@@ -117,6 +123,7 @@ TEST_CASE("status cache: abuse cache exposes remaining quota", "[status]")
     REQUIRE(*snapshot->abuse_rate_remaining == 742);
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
 }
 
 TEST_CASE("status cache: abuse cache remains unknown before first live confirmation", "[status]")
@@ -134,6 +141,7 @@ TEST_CASE("status cache: abuse cache remains unknown before first live confirmat
     REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
     REQUIRE_FALSE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
 }
 
 TEST_CASE("status cache: abuse cache exposes exhausted quota", "[status]")
@@ -153,6 +161,7 @@ TEST_CASE("status cache: abuse cache exposes exhausted quota", "[status]")
     REQUIRE(*snapshot->abuse_rate_remaining == 0);
     REQUIRE(snapshot->abuse_quota_exhausted);
     REQUIRE_FALSE(snapshot->abuse_quota_retry_after_ts.has_value());
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
 }
 
 TEST_CASE("status cache: exposes abuse quota retry ETA when armed", "[status]")
@@ -172,4 +181,22 @@ TEST_CASE("status cache: exposes abuse quota retry ETA when armed", "[status]")
     REQUIRE(snapshot->abuse_quota_exhausted);
     REQUIRE(snapshot->abuse_quota_retry_after_ts.has_value());
     REQUIRE(*snapshot->abuse_quota_retry_after_ts == 1700000000);
+    REQUIRE_FALSE(snapshot->abuse_has_pending_work);
+}
+
+TEST_CASE("status cache: abuse syncing reflects pending background work", "[status]")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    msmap::AbuseCache abuse{":memory:", "dummy_key"};
+    REQUIRE(abuse.valid());
+    abuse.mark_in_flight_for_test("1.2.3.4");
+
+    msmap::StatusCache status{db, nullptr, &abuse, nullptr, true, false, 60};
+    const auto snapshot = status.snapshot();
+    REQUIRE(snapshot.has_value());
+    REQUIRE(snapshot->abuse_enabled);
+    REQUIRE(snapshot->abuse_has_pending_work);
+    REQUIRE_FALSE(snapshot->abuse_rate_remaining.has_value());
 }
