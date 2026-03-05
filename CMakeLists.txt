@@ -123,6 +123,10 @@ add_custom_command(
     DEPENDS
         "${WEB_DIR}/bundle.py"
         "${WEB_DIR}/index.html"
+        "${WEB_DIR}/state.js"
+        "${WEB_DIR}/filters.js"
+        "${WEB_DIR}/api.js"
+        "${WEB_DIR}/ui-map.js"
         "${WEB_DIR}/app.js"
         "${WEB_DIR}/app.css"
         "${WEB_DIR}/vendor/leaflet.min.js"

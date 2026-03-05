@@ -12,5 +12,12 @@
     "lib": ["ES2022", "DOM"],
     "skipLibCheck": true
   },
-  "include": ["web/app.js", "web/global.d.ts"]
+  "include": [
+    "web/state.js",
+    "web/filters.js",
+    "web/api.js",
+    "web/ui-map.js",
+    "web/app.js",
+    "web/global.d.ts"
+  ]
 }

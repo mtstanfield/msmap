@@ -21,6 +21,10 @@ _PLACEHOLDERS = [
     ('{{APP_CSS}}',                 'app.css'),
     ('{{LEAFLET_JS}}',              'vendor/leaflet.min.js'),
     ('{{MARKERCLUSTER_JS}}',        'vendor/leaflet.markercluster.js'),
+    ('{{STATE_JS}}',                'state.js'),
+    ('{{FILTERS_JS}}',              'filters.js'),
+    ('{{API_JS}}',                  'api.js'),
+    ('{{UI_MAP_JS}}',               'ui-map.js'),
     ('{{APP_JS}}',                  'app.js'),
 ]
 
