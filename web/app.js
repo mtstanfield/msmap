@@ -178,6 +178,7 @@ lmap.on('popupclose', (event) => {
     if (activePopup && event.popup === activePopup) {
         activePopup = null;
         activePopupIp = '';
+        activePopupRow = null;
     }
 });
 
@@ -271,6 +272,7 @@ let pollInFlight  = false;
 let pollQueued    = false;
 let activePopupIp = '';
 let activePopup   = null;
+let activePopupRow = null;
 let lastMapSuccessAt = 0;
 let mapFeedState = 'unknown';
 let lastStatus = null;
@@ -1549,16 +1551,18 @@ function createPopupOptions() {
 
 function updatePopupContent(row, latlng = null) {
     if (!activePopup || activePopupIp !== row.src_ip) { return; }
+    activePopupRow = row;
     if (latlng) {
         activePopup.setLatLng(latlng);
     }
     activePopup.setContent(buildAggregatePopup(row));
     activePopup.update();
-    bindPopupControls(row);
+    bindPopupControls();
 }
 
 function openAggregatePopup(marker, row) {
     activePopupIp = row.src_ip;
+    activePopupRow = row;
     if (!activePopup) {
         activePopup = L.popup(createPopupOptions());
     } else {
@@ -1567,7 +1571,7 @@ function openAggregatePopup(marker, row) {
     activePopup.setLatLng(marker.getLatLng());
     activePopup.setContent(buildAggregatePopup(row));
     activePopup.openOn(lmap);
-    bindPopupControls(row);
+    bindPopupControls();
 
     if (isMobileMapUi()) {
         return;
@@ -1701,7 +1705,7 @@ function showNewerDetail(row) {
     updatePopupContent(row);
 }
 
-function bindPopupControls(row) {
+function bindPopupControls() {
     const popupEl = activePopup ? activePopup.getElement() : null;
     if (!popupEl) { return; }
 
@@ -1719,6 +1723,10 @@ function bindPopupControls(row) {
     });
 
     popupEl.addEventListener('click', (event) => {
+        const popupRow = activePopupRow;
+        if (!popupRow || popupRow.src_ip !== activePopupIp) {
+            return;
+        }
         const copyButton = event.target.closest('[data-copy-ip]');
         if (copyButton && popupEl.contains(copyButton)) {
             event.preventDefault();
@@ -1734,8 +1742,11 @@ function bindPopupControls(row) {
         event.stopPropagation();
 
         const action = button.getAttribute('data-action');
+        if (button.getAttribute('data-ip') !== popupRow.src_ip) {
+            return;
+        }
         if (action === 'retry') {
-            const state = ensureDetailState(row.src_ip);
+            const state = ensureDetailState(popupRow.src_ip);
             clearDetailRetryTimer(state);
             state.rows = [];
             state.selectedIndex = 0;
@@ -1745,15 +1756,15 @@ function bindPopupControls(row) {
             state.retryAfterMs = 0;
             state.anchorTs = 0;
             state.loaded = false;
-            void loadDetail(row, '');
+            void loadDetail(popupRow, '');
             return;
         }
         if (action === 'older') {
-            void showOlderDetail(row);
+            void showOlderDetail(popupRow);
             return;
         }
         if (action === 'newer') {
-            showNewerDetail(row);
+            showNewerDetail(popupRow);
         }
     });
 }
@@ -1873,6 +1884,7 @@ function renderMap(rows) {
     const reopenIp = activePopupIp;
     let reopenMarker = null;
     let reopenRow = null;
+    const mobileUi = isMobileMapUi();
 
     cluster.clearLayers();
     mappedCount = 0;
@@ -1888,7 +1900,6 @@ function renderMap(rows) {
 
         const threat = markerThreat(r);
         const spiking = isSpikeMarker(r);
-        const mobileUi = isMobileMapUi();
         const color = threat === 'high'
             ? '#f85149'
             : markerColor((r.threat_max !== undefined) ? r.threat_max : null);
