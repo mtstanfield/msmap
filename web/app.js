@@ -834,7 +834,12 @@ function setOperatorStatus(status) {
 
     const abuseRemaining = Number.isFinite(status.abuse_rate_remaining) ? status.abuse_rate_remaining : null;
     if (abuseRemaining === null && status.abuse_quota_exhausted !== true) {
-        if (status.abuse_has_pending_work === true) {
+        if (status.abuse_can_accept_new_lookups === false) {
+            statAbuseValue.textContent = 'quota';
+            statAbuseValue.classList.add('status-state-stale');
+            statAbuse.dataset.tooltip =
+                'AbuseIPDB request budget is currently exhausted. New lookups are paused until reset.';
+        } else if (status.abuse_has_pending_work === true) {
             statAbuseValue.textContent = 'syncing';
             statAbuseValue.classList.add('status-state-syncing');
             statAbuse.dataset.tooltip =

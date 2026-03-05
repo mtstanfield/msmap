@@ -182,9 +182,13 @@ TEST_CASE("AbuseCache: has_pending_work tracks in-flight test marker")
     msmap::AbuseCache cache{":memory:", "dummy_key"};
     REQUIRE(cache.valid());
     CHECK_FALSE(cache.has_pending_work());
+    CHECK(cache.can_accept_new_lookups());
 
     cache.mark_in_flight_for_test("1.2.3.4");
     CHECK(cache.has_pending_work());
+
+    cache.set_rate_remaining_for_test(0);
+    CHECK_FALSE(cache.can_accept_new_lookups());
 }
 
 TEST_CASE("AbuseCache: lookup state distinguishes fresh soft-refresh and stale")

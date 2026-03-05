@@ -22,6 +22,7 @@ struct StatusPayload {
     std::int64_t                  distinct_sources_24h{};
     bool                          abuse_enabled{false};
     std::optional<int>            abuse_rate_remaining;
+    bool                          abuse_can_accept_new_lookups{false};
     bool                          abuse_quota_exhausted{false};
     std::optional<std::int64_t>   abuse_quota_retry_after_ts;
     bool                          abuse_has_pending_work{false};

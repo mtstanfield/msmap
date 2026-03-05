@@ -171,6 +171,8 @@ std::string status_to_json(const StatusPayload& snapshot)
     append_i64_or_null(out, snapshot.abuse_rate_remaining.has_value()
                                 ? std::optional<std::int64_t>{*snapshot.abuse_rate_remaining}
                                 : std::nullopt);
+    out += ",\"abuse_can_accept_new_lookups\":";
+    out += snapshot.abuse_can_accept_new_lookups ? "true" : "false";
     out += ",\"abuse_quota_exhausted\":";
     out += snapshot.abuse_quota_exhausted ? "true" : "false";
     out += ",\"abuse_quota_retry_after_ts\":";

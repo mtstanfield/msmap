@@ -432,6 +432,12 @@ bool AbuseCache::has_pending_work() const noexcept
     return !queue_.empty() || !soft_queue_.empty() || !in_flight_.empty();
 }
 
+bool AbuseCache::can_accept_new_lookups() const noexcept
+{
+    const std::lock_guard<std::mutex> lock{queue_mutex_};
+    return rate_remaining_ > 0;
+}
+
 std::optional<std::int64_t> AbuseCache::quota_retry_after_ts() const noexcept
 {
     const std::lock_guard<std::mutex> lock{queue_mutex_};

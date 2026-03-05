@@ -26,6 +26,8 @@ StatusPayload build_failed_payload(const std::optional<StatusPayload>& previous,
         (abuse_enabled && abuse_cache != nullptr)
             ? abuse_cache->confirmed_rate_remaining()
             : std::nullopt;
+    payload.abuse_can_accept_new_lookups =
+        abuse_enabled && abuse_cache != nullptr && abuse_cache->can_accept_new_lookups();
     payload.abuse_quota_exhausted =
         abuse_enabled && payload.abuse_rate_remaining.has_value() &&
         *payload.abuse_rate_remaining <= 0;
@@ -131,6 +133,8 @@ void StatusCache::refresh_snapshot() noexcept
         (abuse_enabled_ && abuse_cache_ != nullptr)
             ? abuse_cache_->confirmed_rate_remaining()
             : std::nullopt;
+    payload.abuse_can_accept_new_lookups =
+        abuse_enabled_ && abuse_cache_ != nullptr && abuse_cache_->can_accept_new_lookups();
     payload.abuse_quota_exhausted =
         abuse_enabled_ && payload.abuse_rate_remaining.has_value() &&
         *payload.abuse_rate_remaining <= 0;
