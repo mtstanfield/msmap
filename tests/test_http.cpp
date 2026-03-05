@@ -1,4 +1,5 @@
 #include "db.h"
+#include "filter_utils.h"
 #include "geoip.h"
 #include "json.h"
 #include "parser.h"
@@ -6,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -267,4 +269,38 @@ TEST_CASE("query_connections: ICMP row has null ports", "[db][query]")
     REQUIRE(rows.size() == 1);
     REQUIRE_FALSE(rows.at(0).src_port.has_value());
     REQUIRE_FALSE(rows.at(0).dst_port.has_value());
+}
+
+TEST_CASE("normalize_asn_filter: trims and enforces printable 3-64 chars", "[http][asn]")
+{
+    SECTION("accepts and trims valid input")
+    {
+        const auto normalized = msmap::normalize_asn_filter("  google  ");
+        REQUIRE(normalized.has_value());
+        CHECK(*normalized == "google");
+    }
+
+    SECTION("rejects empty/whitespace input")
+    {
+        CHECK_FALSE(msmap::normalize_asn_filter("").has_value());
+        CHECK_FALSE(msmap::normalize_asn_filter("   ").has_value());
+    }
+
+    SECTION("rejects shorter than 3 chars after trim")
+    {
+        CHECK_FALSE(msmap::normalize_asn_filter("go").has_value());
+        CHECK_FALSE(msmap::normalize_asn_filter("  x ").has_value());
+    }
+
+    SECTION("rejects non-printable characters")
+    {
+        CHECK_FALSE(msmap::normalize_asn_filter(std::string{"good\tname"}).has_value());
+        CHECK_FALSE(msmap::normalize_asn_filter(std::string{"bad\nname"}).has_value());
+    }
+
+    SECTION("rejects values longer than 64 chars")
+    {
+        const std::string long_asn(65, 'a');
+        CHECK_FALSE(msmap::normalize_asn_filter(long_asn).has_value());
+    }
 }
