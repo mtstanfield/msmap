@@ -1,7 +1,75 @@
 /* msmap – Firewall Live Map
  * Polls /api/map for aggregate markers and lazily loads raw event drilldown.
  */
+// @ts-check
 'use strict';
+
+/**
+ * @typedef {{
+ *   src_ip: string,
+ *   lat: number|null|undefined,
+ *   lon: number|null|undefined,
+ *   count: number,
+ *   first_ts: number,
+ *   last_ts: number,
+ *   threat_max: number|null|undefined,
+ *   country?: string,
+ *   asn?: string,
+ *   usage_type?: string,
+ *   spamhaus_drop?: boolean,
+ *   tor_exit?: boolean
+ * }} MapRow
+ */
+
+/**
+ * @typedef {{
+ *   ts: number,
+ *   src_ip: string,
+ *   dst_ip: string,
+ *   src_port: number|null,
+ *   dst_port: number|null,
+ *   proto: string,
+ *   tcp_flags?: string,
+ *   rule: string
+ * }} DetailRow
+ */
+
+/**
+ * @typedef {{
+ *   rows: DetailRow[],
+ *   selectedIndex: number,
+ *   nextCursor: string,
+ *   loading: boolean,
+ *   error: string,
+ *   errorKind: string,
+ *   retryAfterMs: number,
+ *   retryTimerId: ReturnType<typeof setTimeout>|null,
+ *   loaded: boolean,
+ *   windowSecs: number,
+ *   anchorTs: number
+ * }} DetailEntryState
+ */
+
+/**
+ * @typedef {{
+ *   ok?: boolean,
+ *   now?: number,
+ *   rows_24h?: number,
+ *   distinct_sources_24h?: number,
+ *   intel_enabled?: boolean,
+ *   intel_refresh_attempted?: boolean,
+ *   intel_last_refresh_ts?: number,
+ *   abuse_enabled?: boolean,
+ *   abuse_rate_remaining?: number|null,
+ *   abuse_quota_exhausted?: boolean,
+ *   abuse_can_accept_new_lookups?: boolean,
+ *   abuse_has_pending_work?: boolean,
+ *   abuse_quota_retry_after_ts?: number|null,
+ *   home_configured?: boolean,
+ *   home_valid?: boolean,
+ *   home_updated_at?: number|null
+ * }} StatusPayload
+ */
 
 const NORMAL_REFRESH_MS = 30000;
 const HIDDEN_REFRESH_MS = 300000;
@@ -28,22 +96,115 @@ const DEFAULT_FILTERS = Object.freeze({
     threat: '',
 });
 
-const appliedTextFilters = {
-    ip: DEFAULT_FILTERS.ip,
-    port: DEFAULT_FILTERS.port,
-    asn: DEFAULT_FILTERS.asn,
+/**
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+function mustGetById(id) {
+    const el = document.getElementById(id);
+    if (!el) {
+        throw new Error('Missing required element #' + id);
+    }
+    return el;
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLInputElement}
+ */
+function mustGetInput(id) {
+    return /** @type {HTMLInputElement} */ (mustGetById(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLSelectElement}
+ */
+function mustGetSelect(id) {
+    return /** @type {HTMLSelectElement} */ (mustGetById(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLButtonElement}
+ */
+function mustGetButton(id) {
+    return /** @type {HTMLButtonElement} */ (mustGetById(id));
+}
+
+/**
+ * @param {string} selector
+ * @returns {HTMLElement[]}
+ */
+function queryAllHtml(selector) {
+    return /** @type {HTMLElement[]} */ (Array.from(document.querySelectorAll(selector)));
+}
+
+/**
+ * @param {string} selector
+ * @returns {HTMLButtonElement[]}
+ */
+function queryAllButtons(selector) {
+    return /** @type {HTMLButtonElement[]} */ (Array.from(document.querySelectorAll(selector)));
+}
+
+const filterState = {
+    appliedTextFilters: {
+        ip: DEFAULT_FILTERS.ip,
+        port: DEFAULT_FILTERS.port,
+        asn: DEFAULT_FILTERS.asn,
+    },
+    textApplyTimer: null,
+    activeFilterPanelTab: 'filters',
+    activeThreat: DEFAULT_FILTERS.threat,
+    activeMotion: 'on',
 };
 
-let textApplyTimer = null;
+const mapState = {
+    mappedCount: 0,
+    totalSeen: 0,
+    lastMapTs: 0,
+    lastMapGeneratedAt: 0,
+    isInitialLoad: true,
+    pollTimer: null,
+    pollInFlight: false,
+    pollQueued: false,
+    lastMapSuccessAt: 0,
+};
+
+const popupState = {
+    activePopupIp: '',
+    activePopup: null,
+    activePopupRow: null,
+    detailStateByIp: new Map(),
+};
+
+const statusState = {
+    statusPollTimer: null,
+    statusInFlight: false,
+};
+
+const homeState = {
+    homePt: null,
+    homeMarker: null,
+    homeFetchInFlight: false,
+    homeRetryAfterMs: 0,
+    homeStatusExpectedValid: false,
+    lastHomeUpdatedAt: null,
+};
+
+const arcState = {
+    activeArcs: new Set(),
+};
 
 function currentFilterState() {
     return {
         time:        fTime.value,
         proto:       fProto.value,
-        ip:          appliedTextFilters.ip,
-        port:        appliedTextFilters.port,
-        asn:         appliedTextFilters.asn,
-        threat:      activeThreat,
+        ip:          filterState.appliedTextFilters.ip,
+        port:        filterState.appliedTextFilters.port,
+        asn:         filterState.appliedTextFilters.asn,
+        threat:      filterState.activeThreat,
     };
 }
 
@@ -175,52 +336,49 @@ const cluster = L.markerClusterGroup({
 });
 lmap.addLayer(cluster);
 lmap.on('popupclose', (event) => {
-    if (activePopup && event.popup === activePopup) {
-        activePopup = null;
-        activePopupIp = '';
-        activePopupRow = null;
+    if (popupState.activePopup && event.popup === popupState.activePopup) {
+        popupState.activePopup = null;
+        popupState.activePopupIp = '';
+        popupState.activePopupRow = null;
     }
 });
 
-const statMapped    = document.getElementById('stat-mapped');
-const statTotal     = document.getElementById('stat-total');
-const statTime      = document.getElementById('stat-time');
-const statEvents    = document.getElementById('stat-events');
-const statSources   = document.getElementById('stat-sources');
-const statIntel     = document.getElementById('stat-intel');
-const statAbuse     = document.getElementById('stat-abuse');
-const statMappedValue = document.getElementById('stat-mapped-value');
-const statTotalValue  = document.getElementById('stat-total-value');
-const statTimeValue   = document.getElementById('stat-time-value');
-const statEventsValue = document.getElementById('stat-events-value');
-const statSourcesValue = document.getElementById('stat-sources-value');
-const statIntelValue = document.getElementById('stat-intel-value');
-const statAbuseValue = document.getElementById('stat-abuse-value');
-const statError     = document.getElementById('stat-error');
-const filterPanel   = document.getElementById('filter-panel');
-const filterToggle  = document.getElementById('filter-toggle');
-const filterTabButtons = Array.from(document.querySelectorAll('[data-panel-tab]'));
-const filterTabFilters = document.getElementById('filter-tab-filters');
-const filterTabLegend  = document.getElementById('filter-tab-legend');
-const fTime         = document.getElementById('f-time');
-const fProto        = document.getElementById('f-proto');
-const fIp           = document.getElementById('f-ip');
-const fPort         = document.getElementById('f-port');
-const fAsn          = document.getElementById('f-asn');
-const fThreatButtons = Array.from(document.querySelectorAll('[data-threat]'));
-const fThreatText = document.getElementById('f-threat-text');
-const fMotionOn     = document.getElementById('f-motion-on');
-const fMotionOff    = document.getElementById('f-motion-off');
-const legendHome    = document.getElementById('legend-home');
-const statDot       = statTime.querySelector('.status-dot');
-const statusOpSeparators = Array.from(document.querySelectorAll('.status-sep-ops'));
-let activeFilterPanelTab = 'filters';
-let activeThreat = DEFAULT_FILTERS.threat;
-let activeMotion = 'on';
+const statMapped    = mustGetById('stat-mapped');
+const statTotal     = mustGetById('stat-total');
+const statTime      = mustGetById('stat-time');
+const statEvents    = mustGetById('stat-events');
+const statSources   = mustGetById('stat-sources');
+const statIntel     = mustGetById('stat-intel');
+const statAbuse     = mustGetById('stat-abuse');
+const statMappedValue = mustGetById('stat-mapped-value');
+const statTotalValue  = mustGetById('stat-total-value');
+const statTimeValue   = mustGetById('stat-time-value');
+const statEventsValue = mustGetById('stat-events-value');
+const statSourcesValue = mustGetById('stat-sources-value');
+const statIntelValue = mustGetById('stat-intel-value');
+const statAbuseValue = mustGetById('stat-abuse-value');
+const statError     = mustGetById('stat-error');
+const filterPanel   = mustGetById('filter-panel');
+const filterToggle  = mustGetButton('filter-toggle');
+const filterTabButtons = queryAllButtons('[data-panel-tab]');
+const filterTabFilters = mustGetById('filter-tab-filters');
+const filterTabLegend  = mustGetById('filter-tab-legend');
+const fTime         = mustGetSelect('f-time');
+const fProto        = mustGetSelect('f-proto');
+const fIp           = mustGetInput('f-ip');
+const fPort         = mustGetInput('f-port');
+const fAsn          = mustGetInput('f-asn');
+const fThreatButtons = queryAllButtons('[data-threat]');
+const fThreatText = mustGetById('f-threat-text');
+const fMotionOn     = mustGetButton('f-motion-on');
+const fMotionOff    = mustGetButton('f-motion-off');
+const legendHome    = mustGetById('legend-home');
+const statDot = /** @type {HTMLElement} */ (mustGetById('stat-time').querySelector('.status-dot'));
+const statusOpSeparators = queryAllHtml('.status-sep-ops');
 
 function setFilterPanelTab(tabName) {
     const nextTab = tabName === 'legend' ? 'legend' : 'filters';
-    activeFilterPanelTab = nextTab;
+    filterState.activeFilterPanelTab = nextTab;
     filterTabButtons.forEach((button) => {
         const selected = button.dataset.panelTab === nextTab;
         button.classList.toggle('is-active', selected);
@@ -249,11 +407,12 @@ filterTabButtons.forEach((button) => {
         setFilterPanelTab(button.dataset.panelTab);
     });
     button.addEventListener('keydown', (event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        const keyEvent = /** @type {KeyboardEvent} */ (event);
+        if (keyEvent.key !== 'ArrowLeft' && keyEvent.key !== 'ArrowRight') {
             return;
         }
-        event.preventDefault();
-        const nextTab = activeFilterPanelTab === 'filters' ? 'legend' : 'filters';
+        keyEvent.preventDefault();
+        const nextTab = filterState.activeFilterPanelTab === 'filters' ? 'legend' : 'filters';
         setFilterPanelTab(nextTab);
         const nextButton = filterTabButtons.find((candidate) => candidate.dataset.panelTab === nextTab);
         if (nextButton) {
@@ -262,36 +421,12 @@ filterTabButtons.forEach((button) => {
     });
 });
 
-let mappedCount   = 0;
-let totalSeen     = 0;
-let lastMapTs     = 0;
-let lastMapGeneratedAt = 0;
-let isInitialLoad = true;
-let pollTimer     = null;
-let pollInFlight  = false;
-let pollQueued    = false;
-let activePopupIp = '';
-let activePopup   = null;
-let activePopupRow = null;
-let lastMapSuccessAt = 0;
-let statusPollTimer = null;
-let statusInFlight = false;
-
-let homePt     = null;
-let homeMarker = null;
-let homeFetchInFlight = false;
-let homeRetryAfterMs = 0;
-let homeStatusExpectedValid = false;
-let lastHomeUpdatedAt = null;
-const detailStateByIp = new Map();
-const activeArcs = new Set();
-
 function isMobileMapUi() {
     return window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 }
 
 function motionEnabled() {
-    return activeMotion === 'on';
+    return filterState.activeMotion === 'on';
 }
 
 function currentWindowSecs() {
@@ -332,8 +467,8 @@ function isValidThreat(value) {
 
 function setMotionValue(value, { save = true, repoll = true, force = false } = {}) {
     const next = value === 'off' ? 'off' : 'on';
-    const changed = next !== activeMotion;
-    activeMotion = next;
+    const changed = next !== filterState.activeMotion;
+    filterState.activeMotion = next;
     const onSelected = next === 'on';
     fMotionOn.classList.toggle('is-active', onSelected);
     fMotionOff.classList.toggle('is-active', !onSelected);
@@ -358,8 +493,8 @@ function setMotionValue(value, { save = true, repoll = true, force = false } = {
 
 function setThreatValue(value, { save = true, repoll = true, force = false } = {}) {
     const next = isValidThreat(value) ? value : DEFAULT_FILTERS.threat;
-    const changed = next !== activeThreat;
-    activeThreat = next;
+    const changed = next !== filterState.activeThreat;
+    filterState.activeThreat = next;
     fThreatButtons.forEach((button) => {
         const selected = button.dataset.threat === next;
         button.classList.toggle('is-active', selected);
@@ -432,7 +567,7 @@ function validateIpValue(value) {
         return { valid: true, normalized: '' };
     }
     const valid = isValidIpv4(trimmed) || isValidIpv6(trimmed);
-    return { valid, normalized: valid ? trimmed : appliedTextFilters.ip };
+    return { valid, normalized: valid ? trimmed : filterState.appliedTextFilters.ip };
 }
 
 function validatePortValue(value) {
@@ -441,11 +576,11 @@ function validatePortValue(value) {
         return { valid: true, normalized: '' };
     }
     if (!/^\d+$/.test(trimmed)) {
-        return { valid: false, normalized: appliedTextFilters.port };
+        return { valid: false, normalized: filterState.appliedTextFilters.port };
     }
     const port = Number(trimmed);
     if (port < 1 || port > 65535) {
-        return { valid: false, normalized: appliedTextFilters.port };
+        return { valid: false, normalized: filterState.appliedTextFilters.port };
     }
     return { valid: true, normalized: String(port) };
 }
@@ -459,7 +594,7 @@ function validateAsnValue(value) {
     const valid = trimmed.length >= 3 &&
         trimmed.length <= 64 &&
         asnPattern.test(trimmed);
-    return { valid, normalized: valid ? trimmed : appliedTextFilters.asn };
+    return { valid, normalized: valid ? trimmed : filterState.appliedTextFilters.asn };
 }
 
 function updateTextValidity() {
@@ -476,16 +611,16 @@ function applyTextFilters() {
     const validation = updateTextValidity();
     let changed = false;
 
-    if (validation.ip.valid && appliedTextFilters.ip !== validation.ip.normalized) {
-        appliedTextFilters.ip = validation.ip.normalized;
+    if (validation.ip.valid && filterState.appliedTextFilters.ip !== validation.ip.normalized) {
+        filterState.appliedTextFilters.ip = validation.ip.normalized;
         changed = true;
     }
-    if (validation.port.valid && appliedTextFilters.port !== validation.port.normalized) {
-        appliedTextFilters.port = validation.port.normalized;
+    if (validation.port.valid && filterState.appliedTextFilters.port !== validation.port.normalized) {
+        filterState.appliedTextFilters.port = validation.port.normalized;
         changed = true;
     }
-    if (validation.asn.valid && appliedTextFilters.asn !== validation.asn.normalized) {
-        appliedTextFilters.asn = validation.asn.normalized;
+    if (validation.asn.valid && filterState.appliedTextFilters.asn !== validation.asn.normalized) {
+        filterState.appliedTextFilters.asn = validation.asn.normalized;
         changed = true;
     }
 
@@ -506,19 +641,19 @@ function applyTextFilters() {
 }
 
 function scheduleTextApply() {
-    if (textApplyTimer !== null) {
-        clearTimeout(textApplyTimer);
+    if (filterState.textApplyTimer !== null) {
+        clearTimeout(filterState.textApplyTimer);
     }
-    textApplyTimer = setTimeout(() => {
-        textApplyTimer = null;
+    filterState.textApplyTimer = setTimeout(() => {
+        filterState.textApplyTimer = null;
         applyTextFilters();
     }, TEXT_FILTER_DEBOUNCE_MS);
 }
 
 function resetToDefaults() {
-    if (textApplyTimer !== null) {
-        clearTimeout(textApplyTimer);
-        textApplyTimer = null;
+    if (filterState.textApplyTimer !== null) {
+        clearTimeout(filterState.textApplyTimer);
+        filterState.textApplyTimer = null;
     }
     fTime.value         = DEFAULT_FILTERS.time;
     fProto.value        = DEFAULT_FILTERS.proto;
@@ -528,9 +663,9 @@ function resetToDefaults() {
     setThreatValue(DEFAULT_FILTERS.threat, { save: false, repoll: false, force: true });
     setMotionValue('on', { save: true, repoll: false, force: true });
 
-    appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
-    appliedTextFilters.port    = DEFAULT_FILTERS.port;
-    appliedTextFilters.asn = DEFAULT_FILTERS.asn;
+    filterState.appliedTextFilters.ip      = DEFAULT_FILTERS.ip;
+    filterState.appliedTextFilters.port    = DEFAULT_FILTERS.port;
+    filterState.appliedTextFilters.asn = DEFAULT_FILTERS.asn;
     updateTextValidity();
     clearActiveArcs();
     saveFilters();
@@ -543,7 +678,7 @@ function applyNonTextFilters() {
     pollNow();
 }
 
-document.getElementById('f-defaults').addEventListener('click', resetToDefaults);
+mustGetButton('f-defaults').addEventListener('click', resetToDefaults);
 fTime.addEventListener('change', applyNonTextFilters);
 fProto.addEventListener('change', applyNonTextFilters);
 fMotionOn.addEventListener('click', () => {
@@ -557,11 +692,12 @@ fThreatButtons.forEach((button, index) => {
         setThreatValue(button.dataset.threat || '');
     });
     button.addEventListener('keydown', (event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        const keyEvent = /** @type {KeyboardEvent} */ (event);
+        if (keyEvent.key !== 'ArrowLeft' && keyEvent.key !== 'ArrowRight') {
             return;
         }
-        event.preventDefault();
-        const step = event.key === 'ArrowRight' ? 1 : -1;
+        keyEvent.preventDefault();
+        const step = keyEvent.key === 'ArrowRight' ? 1 : -1;
         const nextIndex = (index + step + fThreatButtons.length) % fThreatButtons.length;
         const nextButton = fThreatButtons[nextIndex];
         nextButton.focus();
@@ -575,18 +711,18 @@ fThreatButtons.forEach((button, index) => {
         scheduleTextApply();
     });
     el.addEventListener('blur', () => {
-        if (textApplyTimer !== null) {
-            clearTimeout(textApplyTimer);
-            textApplyTimer = null;
+        if (filterState.textApplyTimer !== null) {
+            clearTimeout(filterState.textApplyTimer);
+            filterState.textApplyTimer = null;
         }
         applyTextFilters();
     });
     el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (textApplyTimer !== null) {
-                clearTimeout(textApplyTimer);
-                textApplyTimer = null;
+            if (filterState.textApplyTimer !== null) {
+                clearTimeout(filterState.textApplyTimer);
+                filterState.textApplyTimer = null;
             }
             applyTextFilters();
         }
@@ -899,10 +1035,10 @@ function setHomeLegendVisible(visible) {
 
 function clearHomeState() {
     clearActiveArcs();
-    homePt = null;
-    if (homeMarker) {
-        homeMarker.remove();
-        homeMarker = null;
+    homeState.homePt = null;
+    if (homeState.homeMarker) {
+        homeState.homeMarker.remove();
+        homeState.homeMarker = null;
     }
     setHomeLegendVisible(false);
 }
@@ -914,15 +1050,15 @@ function readHomeUpdatedAt(status) {
 }
 
 function syncHomeStateFromStatus(status) {
-    const wasExpectedValid = homeStatusExpectedValid;
+    const wasExpectedValid = homeState.homeStatusExpectedValid;
     const homeConfigured = status?.home_configured === true;
     const homeValid = status?.home_valid === true;
     const nextUpdatedAt = readHomeUpdatedAt(status);
 
-    homeStatusExpectedValid = homeConfigured && homeValid;
-    if (!homeStatusExpectedValid) {
-        homeRetryAfterMs = 0;
-        lastHomeUpdatedAt = nextUpdatedAt;
+    homeState.homeStatusExpectedValid = homeConfigured && homeValid;
+    if (!homeState.homeStatusExpectedValid) {
+        homeState.homeRetryAfterMs = 0;
+        homeState.lastHomeUpdatedAt = nextUpdatedAt;
         clearHomeState();
         return;
     }
@@ -931,26 +1067,26 @@ function syncHomeStateFromStatus(status) {
     if (!wasExpectedValid) {
         shouldFetch = true;
     }
-    if (!homePt) {
+    if (!homeState.homePt) {
         shouldFetch = true;
     }
-    if (lastHomeUpdatedAt !== nextUpdatedAt) {
+    if (homeState.lastHomeUpdatedAt !== nextUpdatedAt) {
         shouldFetch = true;
     }
-    if (homeRetryAfterMs > 0 && Date.now() >= homeRetryAfterMs) {
+    if (homeState.homeRetryAfterMs > 0 && Date.now() >= homeState.homeRetryAfterMs) {
         shouldFetch = true;
     }
-    lastHomeUpdatedAt = nextUpdatedAt;
+    homeState.lastHomeUpdatedAt = nextUpdatedAt;
     if (shouldFetch) {
         void fetchHome({ ignoreRetryGate: true });
     }
 }
 
 async function fetchStatus() {
-    if (statusInFlight) {
+    if (statusState.statusInFlight) {
         return;
     }
-    statusInFlight = true;
+    statusState.statusInFlight = true;
     try {
         const resp = await fetch('/api/status', { cache: 'no-store' });
         if (!resp.ok) {
@@ -963,23 +1099,23 @@ async function fetchStatus() {
     } catch (_) {
         setOperatorStatus(null);
     } finally {
-        statusInFlight = false;
+        statusState.statusInFlight = false;
     }
 }
 
 function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
     if (document.visibilityState === 'hidden') {
-        if (statusPollTimer !== null) {
-            clearTimeout(statusPollTimer);
-            statusPollTimer = null;
+        if (statusState.statusPollTimer !== null) {
+            clearTimeout(statusState.statusPollTimer);
+            statusState.statusPollTimer = null;
         }
         return;
     }
-    if (statusPollTimer !== null) {
-        clearTimeout(statusPollTimer);
+    if (statusState.statusPollTimer !== null) {
+        clearTimeout(statusState.statusPollTimer);
     }
-    statusPollTimer = setTimeout(() => {
-        statusPollTimer = null;
+    statusState.statusPollTimer = setTimeout(() => {
+        statusState.statusPollTimer = null;
         void fetchStatus().then(() => {
             if (document.visibilityState === 'visible') {
                 scheduleStatusPoll(STATUS_REFRESH_MS);
@@ -989,17 +1125,17 @@ function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
 }
 
 function updateMapFeedIndicator(now = Date.now()) {
-    if (lastMapSuccessAt === 0) {
+    if (mapState.lastMapSuccessAt === 0) {
         setMapFeedState('unknown');
         return;
     }
     const staleAfterMs = NORMAL_REFRESH_MS * 2;
-    setMapFeedState((now - lastMapSuccessAt) <= staleAfterMs ? 'healthy' : 'stale');
+    setMapFeedState((now - mapState.lastMapSuccessAt) <= staleAfterMs ? 'healthy' : 'stale');
 }
 
 function ensureDetailState(srcIp) {
     const windowSecs = currentWindowSecs();
-    const existing = detailStateByIp.get(srcIp);
+    const existing = popupState.detailStateByIp.get(srcIp);
     if (existing && existing.windowSecs === windowSecs) {
         touchDetailState(srcIp, existing);
         return existing;
@@ -1026,28 +1162,28 @@ function ensureDetailState(srcIp) {
 }
 
 function touchDetailState(srcIp, state) {
-    if (detailStateByIp.has(srcIp)) {
-        detailStateByIp.delete(srcIp);
+    if (popupState.detailStateByIp.has(srcIp)) {
+        popupState.detailStateByIp.delete(srcIp);
     }
-    detailStateByIp.set(srcIp, state);
+    popupState.detailStateByIp.set(srcIp, state);
     trimDetailStateCache();
 }
 
 function trimDetailStateCache() {
-    while (detailStateByIp.size > DETAIL_STATE_CACHE_MAX) {
-        const oldest = detailStateByIp.entries().next().value;
+    while (popupState.detailStateByIp.size > DETAIL_STATE_CACHE_MAX) {
+        const oldest = popupState.detailStateByIp.entries().next().value;
         if (!oldest) {
             return;
         }
         const [oldestIp, oldestState] = oldest;
         clearDetailRetryTimer(oldestState);
-        detailStateByIp.delete(oldestIp);
+        popupState.detailStateByIp.delete(oldestIp);
     }
 }
 
 function currentDetailAnchorTs() {
-    if (Number.isFinite(lastMapGeneratedAt) && lastMapGeneratedAt > 0) {
-        return lastMapGeneratedAt;
+    if (Number.isFinite(mapState.lastMapGeneratedAt) && mapState.lastMapGeneratedAt > 0) {
+        return mapState.lastMapGeneratedAt;
     }
     return Math.floor(Date.now() / 1000);
 }
@@ -1063,10 +1199,10 @@ function buildMapQueryString() {
     const params = new URLSearchParams();
     params.set('window', String(currentWindowSecs()));
     if (fProto.value)               { params.set('proto', fProto.value); }
-    if (appliedTextFilters.ip)      { params.set('ip', appliedTextFilters.ip); }
-    if (appliedTextFilters.port)    { params.set('port', appliedTextFilters.port); }
-    if (appliedTextFilters.asn)     { params.set('asn', appliedTextFilters.asn); }
-    if (activeThreat)               { params.set('threat', activeThreat); }
+    if (filterState.appliedTextFilters.ip)      { params.set('ip', filterState.appliedTextFilters.ip); }
+    if (filterState.appliedTextFilters.port)    { params.set('port', filterState.appliedTextFilters.port); }
+    if (filterState.appliedTextFilters.asn)     { params.set('asn', filterState.appliedTextFilters.asn); }
+    if (filterState.activeThreat)               { params.set('threat', filterState.activeThreat); }
     return '?' + params.toString();
 }
 
@@ -1277,53 +1413,53 @@ function setError(msg) {
 }
 
 async function fetchHome({ ignoreRetryGate = false } = {}) {
-    if (homeFetchInFlight) {
+    if (homeState.homeFetchInFlight) {
         return;
     }
-    if (!ignoreRetryGate && homeRetryAfterMs > 0 && Date.now() < homeRetryAfterMs) {
+    if (!ignoreRetryGate && homeState.homeRetryAfterMs > 0 && Date.now() < homeState.homeRetryAfterMs) {
         return;
     }
-    homeFetchInFlight = true;
+    homeState.homeFetchInFlight = true;
     try {
         const resp = await fetch('/api/home', { cache: 'no-store' });
         if (!resp.ok) {
             if (resp.status === 404) {
                 clearHomeState();
             }
-            if (homeStatusExpectedValid) {
-                homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
+            if (homeState.homeStatusExpectedValid) {
+                homeState.homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
             }
             return;
         }
         const fresh = await resp.json();
         if (!fresh || !Number.isFinite(fresh.lat) || !Number.isFinite(fresh.lon)) {
-            if (homeStatusExpectedValid) {
-                homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
+            if (homeState.homeStatusExpectedValid) {
+                homeState.homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
             }
             return;
         }
-        homeRetryAfterMs = 0;
+        homeState.homeRetryAfterMs = 0;
 
-        const changed = !homePt || homePt.lat !== fresh.lat || homePt.lon !== fresh.lon;
+        const changed = !homeState.homePt || homeState.homePt.lat !== fresh.lat || homeState.homePt.lon !== fresh.lon;
         if (changed) {
             clearActiveArcs();
-            homePt = fresh;
-            if (homeMarker) { homeMarker.remove(); homeMarker = null; }
+            homeState.homePt = fresh;
+            if (homeState.homeMarker) { homeState.homeMarker.remove(); homeState.homeMarker = null; }
             addHomeMarker();
         }
     } catch (_) {
-        if (homeStatusExpectedValid) {
-            homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
+        if (homeState.homeStatusExpectedValid) {
+            homeState.homeRetryAfterMs = Date.now() + HOME_FETCH_RETRY_MS;
         }
     } finally {
-        homeFetchInFlight = false;
+        homeState.homeFetchInFlight = false;
     }
 }
 
 function addHomeMarker() {
-    if (!homePt || homeMarker) { return; }
+    if (!homeState.homePt || homeState.homeMarker) { return; }
     setHomeLegendVisible(true);
-    homeMarker = L.circleMarker([homePt.lat, homePt.lon], {
+    homeState.homeMarker = L.circleMarker([homeState.homePt.lat, homeState.homePt.lon], {
         radius:      8,
         color:       '#58a6ff',
         fillColor:   '#58a6ff',
@@ -1331,8 +1467,8 @@ function addHomeMarker() {
         weight:      2.5,
         interactive: true,
     });
-    homeMarker.bindTooltip('Home', { direction: 'top', offset: [0, -8] });
-    homeMarker.addTo(lmap);
+    homeState.homeMarker.bindTooltip('Home', { direction: 'top', offset: [0, -8] });
+    homeState.homeMarker.addTo(lmap);
 }
 
 function shortestWrappedLon(srcLon, dstLon) {
@@ -1349,24 +1485,24 @@ function shortestWrappedLon(srcLon, dstLon) {
 }
 
 function clearActiveArcs() {
-    for (const arcState of activeArcs) {
-        if (arcState.rafId !== null) {
-            cancelAnimationFrame(arcState.rafId);
+    for (const activeArc of arcState.activeArcs) {
+        if (activeArc.rafId !== null) {
+            cancelAnimationFrame(activeArc.rafId);
         }
-        if (arcState.removeTimeoutId !== null) {
-            clearTimeout(arcState.removeTimeoutId);
+        if (activeArc.removeTimeoutId !== null) {
+            clearTimeout(activeArc.removeTimeoutId);
         }
-        arcState.svg.remove();
+        activeArc.svg.remove();
     }
-    activeArcs.clear();
+    arcState.activeArcs.clear();
 }
 
 function fireArc(srcLat, srcLon, color) {
-    if (!homePt) { return; }
+    if (!homeState.homePt) { return; }
 
-    const wrappedSrcLon = shortestWrappedLon(srcLon, homePt.lon);
+    const wrappedSrcLon = shortestWrappedLon(srcLon, homeState.homePt.lon);
     const src = lmap.latLngToLayerPoint([srcLat, wrappedSrcLon]);
-    const dst = lmap.latLngToLayerPoint([homePt.lat, homePt.lon]);
+    const dst = lmap.latLngToLayerPoint([homeState.homePt.lat, homeState.homePt.lon]);
 
     const dx = dst.x - src.x;
     const dy = dst.y - src.y;
@@ -1418,12 +1554,12 @@ function fireArc(srcLat, srcLon, color) {
     svg.appendChild(dot);
     lmap.getPanes().overlayPane.appendChild(svg);
 
-    const arcState = {
+    const activeArc = {
         svg: svg,
         rafId: null,
         removeTimeoutId: null,
     };
-    activeArcs.add(arcState);
+    arcState.activeArcs.add(activeArc);
 
     const totalLen = path.getTotalLength();
     path.style.strokeDasharray = String(totalLen);
@@ -1434,17 +1570,17 @@ function fireArc(srcLat, srcLon, color) {
 
     const t0 = performance.now();
     function step(now) {
-        if (!activeArcs.has(arcState)) { return; }
+        if (!arcState.activeArcs.has(activeArc)) { return; }
 
         const frac = Math.min((now - t0) / ARC_DRAW_MS, 1.0);
         const pt = path.getPointAtLength(frac * totalLen);
         dot.setAttribute('cx', String(pt.x));
         dot.setAttribute('cy', String(pt.y));
         if (frac < 1.0) {
-            arcState.rafId = requestAnimationFrame(step);
+            activeArc.rafId = requestAnimationFrame(step);
             return;
         }
-        arcState.rafId = null;
+        activeArc.rafId = null;
         const ring = document.createElementNS(NS, 'circle');
         ring.setAttribute('cx', String(dst.x));
         ring.setAttribute('cy', String(dst.y));
@@ -1456,23 +1592,23 @@ function fireArc(srcLat, srcLon, color) {
         svg.appendChild(ring);
         svg.style.transition = 'opacity ' + ARC_FADE_MS + 'ms ease-out';
         svg.style.opacity = '0';
-        arcState.removeTimeoutId = setTimeout(() => {
+        activeArc.removeTimeoutId = setTimeout(() => {
             svg.remove();
-            activeArcs.delete(arcState);
-            arcState.removeTimeoutId = null;
+            arcState.activeArcs.delete(activeArc);
+            activeArc.removeTimeoutId = null;
         }, ARC_FADE_MS + 50);
     }
-    arcState.rafId = requestAnimationFrame(step);
+    activeArc.rafId = requestAnimationFrame(step);
 }
 
 lmap.on('zoomstart', clearActiveArcs);
 
 function shouldCandidateArc(row) {
-    return !isInitialLoad &&
-        homePt &&
+    return !mapState.isInitialLoad &&
+        homeState.homePt &&
         motionEnabled() &&
         typeof row.last_ts === 'number' &&
-        row.last_ts > lastMapTs &&
+        row.last_ts > mapState.lastMapTs &&
         Number.isFinite(row.lat) &&
         Number.isFinite(row.lon);
 }
@@ -1542,27 +1678,27 @@ function createPopupOptions() {
 }
 
 function updatePopupContent(row, latlng = null) {
-    if (!activePopup || activePopupIp !== row.src_ip) { return; }
-    activePopupRow = row;
+    if (!popupState.activePopup || popupState.activePopupIp !== row.src_ip) { return; }
+    popupState.activePopupRow = row;
     if (latlng) {
-        activePopup.setLatLng(latlng);
+        popupState.activePopup.setLatLng(latlng);
     }
-    activePopup.setContent(buildAggregatePopup(row));
-    activePopup.update();
+    popupState.activePopup.setContent(buildAggregatePopup(row));
+    popupState.activePopup.update();
     bindPopupControls();
 }
 
 function openAggregatePopup(marker, row) {
-    activePopupIp = row.src_ip;
-    activePopupRow = row;
-    if (!activePopup) {
-        activePopup = L.popup(createPopupOptions());
+    popupState.activePopupIp = row.src_ip;
+    popupState.activePopupRow = row;
+    if (!popupState.activePopup) {
+        popupState.activePopup = L.popup(createPopupOptions());
     } else {
-        Object.assign(activePopup.options, createPopupOptions());
+        Object.assign(popupState.activePopup.options, createPopupOptions());
     }
-    activePopup.setLatLng(marker.getLatLng());
-    activePopup.setContent(buildAggregatePopup(row));
-    activePopup.openOn(lmap);
+    popupState.activePopup.setLatLng(marker.getLatLng());
+    popupState.activePopup.setContent(buildAggregatePopup(row));
+    popupState.activePopup.openOn(lmap);
     bindPopupControls();
 
     if (isMobileMapUi()) {
@@ -1698,7 +1834,7 @@ function showNewerDetail(row) {
 }
 
 function bindPopupControls() {
-    const popupEl = activePopup ? activePopup.getElement() : null;
+    const popupEl = popupState.activePopup ? popupState.activePopup.getElement() : null;
     if (!popupEl) { return; }
 
     if (popupEl.dataset.mmPopupControlsBound === '1') { return; }
@@ -1715,8 +1851,8 @@ function bindPopupControls() {
     });
 
     popupEl.addEventListener('click', (event) => {
-        const popupRow = activePopupRow;
-        if (!popupRow || popupRow.src_ip !== activePopupIp) {
+        const popupRow = popupState.activePopupRow;
+        if (!popupRow || popupRow.src_ip !== popupState.activePopupIp) {
             return;
         }
         const copyButton = event.target.closest('[data-copy-ip]');
@@ -1822,8 +1958,8 @@ function isSpikeMarker(row) {
         return false;
     }
 
-    const now = Number.isFinite(lastMapGeneratedAt) && lastMapGeneratedAt > 0
-        ? lastMapGeneratedAt
+    const now = Number.isFinite(mapState.lastMapGeneratedAt) && mapState.lastMapGeneratedAt > 0
+        ? mapState.lastMapGeneratedAt
         : Math.floor(Date.now() / 1000);
     const count = row.count;
     const span = Math.max(0, row.last_ts - row.first_ts);
@@ -1873,21 +2009,21 @@ function refreshVisibleMarkerMotionState() {
 }
 
 function renderMap(rows) {
-    const reopenIp = activePopupIp;
+    const reopenIp = popupState.activePopupIp;
     let reopenMarker = null;
     let reopenRow = null;
     const mobileUi = isMobileMapUi();
 
     cluster.clearLayers();
-    mappedCount = 0;
-    totalSeen = 0;
+    mapState.mappedCount = 0;
+    mapState.totalSeen = 0;
     const arcCandidates = [];
 
     for (const r of rows) {
         if (r.lat === null || r.lon === null || r.lat === undefined || r.lon === undefined) {
             continue;
         }
-        totalSeen += Number.isFinite(r.count) ? r.count : 0;
+        mapState.totalSeen += Number.isFinite(r.count) ? r.count : 0;
 
         const threat = markerThreat(r);
         const spiking = isSpikeMarker(r);
@@ -1913,7 +2049,7 @@ function renderMap(rows) {
             openAggregatePopup(marker, r);
         });
         cluster.addLayer(marker);
-        mappedCount++;
+        mapState.mappedCount++;
         if (reopenIp && r.src_ip === reopenIp) {
             reopenMarker = marker;
             reopenRow = r;
@@ -1925,46 +2061,46 @@ function renderMap(rows) {
     }
 
     if (!reopenMarker && reopenIp) {
-        activePopupIp = '';
+        popupState.activePopupIp = '';
     }
 
     renderArcBatch(arcCandidates);
     if (reopenMarker && reopenRow) {
         updatePopupContent(reopenRow, reopenMarker.getLatLng());
-    } else if (activePopup) {
-        lmap.closePopup(activePopup);
+    } else if (popupState.activePopup) {
+        lmap.closePopup(popupState.activePopup);
     }
 }
 
 function scheduleNextPoll(delayMs) {
-    if (pollTimer !== null) {
-        clearTimeout(pollTimer);
+    if (mapState.pollTimer !== null) {
+        clearTimeout(mapState.pollTimer);
     }
-    pollTimer = setTimeout(() => {
-        pollTimer = null;
+    mapState.pollTimer = setTimeout(() => {
+        mapState.pollTimer = null;
         void poll();
     }, delayMs);
 }
 
 function requestPollNow() {
-    if (pollTimer !== null) {
-        clearTimeout(pollTimer);
-        pollTimer = null;
+    if (mapState.pollTimer !== null) {
+        clearTimeout(mapState.pollTimer);
+        mapState.pollTimer = null;
     }
     // Keep one queued refresh rather than overlapping fetch/render cycles.
-    if (pollInFlight) {
-        pollQueued = true;
+    if (mapState.pollInFlight) {
+        mapState.pollQueued = true;
         return;
     }
     void poll();
 }
 
 async function poll() {
-    if (pollInFlight) {
-        pollQueued = true;
+    if (mapState.pollInFlight) {
+        mapState.pollQueued = true;
         return;
     }
-    pollInFlight = true;
+    mapState.pollInFlight = true;
     updateMapFeedIndicator();
     try {
         const resp = await fetch('/api/map' + buildMapQueryString(), { cache: 'no-store' });
@@ -1977,7 +2113,7 @@ async function poll() {
 
         const body = await resp.json();
         const rows = Array.isArray(body.rows) ? body.rows : [];
-        lastMapGeneratedAt = Number.isFinite(body.generated_at)
+        mapState.lastMapGeneratedAt = Number.isFinite(body.generated_at)
             ? body.generated_at
             : Math.floor(Date.now() / 1000);
         setError('');
@@ -1989,12 +2125,12 @@ async function poll() {
                 newestTs = r.last_ts;
             }
         }
-        lastMapTs = newestTs;
-        lastMapSuccessAt = Date.now();
-        updateMapFeedIndicator(lastMapSuccessAt);
-        setStatusCounts(mappedCount, totalSeen);
-        setStatusFreshness(formatMapFreshness(body.generated_at, lastMapSuccessAt));
-        isInitialLoad = false;
+        mapState.lastMapTs = newestTs;
+        mapState.lastMapSuccessAt = Date.now();
+        updateMapFeedIndicator(mapState.lastMapSuccessAt);
+        setStatusCounts(mapState.mappedCount, mapState.totalSeen);
+        setStatusFreshness(formatMapFreshness(body.generated_at, mapState.lastMapSuccessAt));
+        mapState.isInitialLoad = false;
 
         scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
     } catch (err) {
@@ -2002,9 +2138,9 @@ async function poll() {
         updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
         scheduleNextPoll(ERROR_REFRESH_MS);
     } finally {
-        pollInFlight = false;
-        if (pollQueued) {
-            pollQueued = false;
+        mapState.pollInFlight = false;
+        if (mapState.pollQueued) {
+            mapState.pollQueued = false;
             requestPollNow();
         }
     }
@@ -2012,9 +2148,9 @@ async function poll() {
 
 function pollNow() {
     clearActiveArcs();
-    isInitialLoad = true;
-    lastMapTs = 0;
-    lastMapGeneratedAt = 0;
+    mapState.isInitialLoad = true;
+    mapState.lastMapTs = 0;
+    mapState.lastMapGeneratedAt = 0;
     setStatusCounts(0, 0);
     setStatusFreshness('Refreshing...');
     requestPollNow();
@@ -2025,25 +2161,25 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         void fetchStatus();
         scheduleStatusPoll();
-        if (!pollInFlight) {
+        if (!mapState.pollInFlight) {
             requestPollNow();
         }
         return;
     }
-    if (statusPollTimer !== null) {
-        clearTimeout(statusPollTimer);
-        statusPollTimer = null;
+    if (statusState.statusPollTimer !== null) {
+        clearTimeout(statusState.statusPollTimer);
+        statusState.statusPollTimer = null;
     }
     scheduleNextPoll(HIDDEN_REFRESH_MS);
 });
 
 loadFilters();
-appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
-appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
-appliedTextFilters.asn = validateAsnValue(fAsn.value).normalized;
-fIp.value = appliedTextFilters.ip;
-fPort.value = appliedTextFilters.port;
-fAsn.value = appliedTextFilters.asn;
+filterState.appliedTextFilters.ip      = validateIpValue(fIp.value).normalized;
+filterState.appliedTextFilters.port    = validatePortValue(fPort.value).normalized;
+filterState.appliedTextFilters.asn = validateAsnValue(fAsn.value).normalized;
+fIp.value = filterState.appliedTextFilters.ip;
+fPort.value = filterState.appliedTextFilters.port;
+fAsn.value = filterState.appliedTextFilters.asn;
 updateTextValidity();
 saveFilters();
 setOperatorStatus(null);

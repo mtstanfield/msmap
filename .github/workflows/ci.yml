@@ -142,6 +142,11 @@ jobs:
               -DMSMAP_CPU_TARGET=x86-64-v3 \
             && ninja -C build-lint web_bundle"
 
+      - name: checkJs
+        run: |
+          /usr/bin/time -f 'checkJs: %E real' docker run --rm -v "$PWD:/workspace" msmap-dev:ci \
+            tsc --project tsconfig.checkjs.json --noEmit
+
       # Analyse src/ only; the '/workspace/src/.*' regex excludes Catch2 in
       # _deps/ from analysis.  run-clang-tidy-18 (not run-clang-tidy) is
       # required because the unversioned alias is not installed in the image.

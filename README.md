@@ -659,6 +659,9 @@ docker run --rm -v "$PWD:/workspace" msmap-dev \
 
 docker run --rm -v "$PWD:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
+
+docker run --rm -v "$PWD:/workspace" msmap-dev \
+  tsc --project tsconfig.checkjs.json --noEmit
 ```
 
 CI keeps the same full-strength gate on both pull requests and `master`:

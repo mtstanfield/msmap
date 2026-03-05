@@ -55,6 +55,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ninja-build \
         pkg-config \
         git \
+        # frontend checks
+        nodejs \
+        npm \
+        node-typescript \
         # LLVM toolchain
         clang-${LLVM_VER} \
         clang-tidy-${LLVM_VER} \
