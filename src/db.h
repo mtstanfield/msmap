@@ -2,12 +2,14 @@
 
 #include "parser.h"
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // Forward-declare the opaque SQLite types so callers of db.h don't
@@ -33,7 +35,7 @@ struct StmtFinalizer  { void operator()(sqlite3_stmt* p) const noexcept; };
 
 // ── Query result type ─────────────────────────────────────────────────────────
 
-/// One row returned by Database::query_connections().
+/// One row returned by Database::query_detail_page().
 /// Nullable DB columns map to std::optional / empty std::string.
 struct ConnectionRow {
     std::int64_t       ts{};
@@ -56,7 +58,7 @@ struct ConnectionRow {
 
 // ── Query filter type ─────────────────────────────────────────────────────────
 
-/// Filters for Database::query_connections().  Unset fields mean "no constraint".
+/// Filters for row-level queries. Unset fields mean "no constraint".
 struct QueryFilters {
     std::int64_t since{0};      // ts >= since;  0 = no lower bound
     std::int64_t until{0};      // ts <= until;  0 = no upper bound
@@ -66,8 +68,7 @@ struct QueryFilters {
     bool         exclude_icmp{false}; // when true and proto unset, hide ICMP
     int          dst_port{0};   // exact match;  0 = any
     std::string  cursor;        // opaque keyset cursor for detail paging
-    int          offset{0};     // pagination offset; query_connections only
-    int          limit{25000};  // row cap (enforced max: 25 000)
+    int          limit{500};    // row cap (enforced max: 500)
 };
 
 struct MapFilters {
@@ -131,7 +132,7 @@ public:
     Database& operator=(Database&&)      = delete;
 
     /// True if the database was opened and initialised successfully.
-    [[nodiscard]] bool valid() const noexcept { return db_ != nullptr; }
+    [[nodiscard]] bool valid() const noexcept { return write_db_ != nullptr; }
 
     /// Insert a parsed log entry with its GeoIP enrichment.
     /// Only renderable GeoIpResult values are accepted; non-renderable rows
@@ -146,12 +147,6 @@ public:
 
     /// Distinct source IPs currently present in the retained window.
     [[nodiscard]] std::vector<std::string> distinct_source_ips() const noexcept;
-
-    /// Return up to filters.limit rows matching the given filters.
-    /// Rows are ordered newest-first (ORDER BY ts DESC).
-    /// Thread-safe: acquires an internal mutex before touching SQLite.
-    [[nodiscard]] std::vector<ConnectionRow>
-        query_connections(const QueryFilters& filters) const noexcept;
 
     /// Return a complete per-source aggregate set for the requested window and filters.
     /// Used by the public map endpoint so the browser can render the full 24h view
@@ -177,21 +172,40 @@ public:
     int prune_expired() noexcept;
 
 private:
-    bool exec(const char* sql) noexcept;
-    /// Shared DELETE implementation — caller must already hold mutex_.
+    bool bootstrap_status_counters() noexcept;
+    bool rebuild_status_counters_unlocked() noexcept;
+    void on_insert_success_unlocked(const LogEntry& entry) noexcept;
+    std::vector<std::pair<std::string, std::int64_t>>
+        collect_prune_src_counts_unlocked(std::int64_t cutoff_ts) noexcept;
+    std::optional<std::size_t> acquire_read_slot() const noexcept;
+    void release_read_slot(std::size_t slot) const noexcept;
+    [[nodiscard]] sqlite3* read_db_for_slot(std::size_t slot) const noexcept;
+    /// Shared DELETE implementation — caller must already hold write_mutex_.
     int  prune_unlocked(std::int64_t cutoff_ts) noexcept;
-    /// Called from insert() (already under mutex_) with the production 24h cutoff.
+    /// Called from insert() (already under write_mutex_) with the production 24h cutoff.
     void prune_old() noexcept;
 
-    // mutex_ serialises all SQLite calls from the listener thread (insert)
-    // and the HTTP thread (query_connections).  Declared mutable so that
-    // const methods (query_connections) can lock it.
-    mutable std::mutex                           mutex_;
-    std::unique_ptr<sqlite3,      SqliteCloser>  db_;
+    std::string db_open_path_;
+    int         db_open_flags_{0};
+
+    std::mutex                                  write_mutex_;
+    std::unique_ptr<sqlite3,      SqliteCloser> write_db_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> insert_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> prune_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> upsert_ip_intel_stmt_;
     std::unique_ptr<sqlite3_stmt, StmtFinalizer> distinct_source_ips_stmt_;
+
+    mutable std::mutex                           read_pool_mutex_;
+    mutable std::condition_variable              read_pool_cv_;
+    std::vector<std::unique_ptr<sqlite3, SqliteCloser>> read_dbs_;
+    mutable std::vector<bool>                    read_in_use_;
+
+    mutable std::mutex                           status_mutex_;
+    std::optional<std::int64_t>                  status_latest_event_ts_;
+    std::int64_t                                 status_rows_24h_{0};
+    std::int64_t                                 status_distinct_sources_24h_{0};
+    std::unordered_map<std::string, std::int64_t> status_source_refcounts_;
+
     std::size_t                                  insert_count_{0};
 };
 

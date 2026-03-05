@@ -57,9 +57,6 @@ public:
     /// True if the City database was opened successfully.
     [[nodiscard]] bool city_ready() const noexcept { return city_open_; }
 
-    /// Backward-compatible alias for city_ready().
-    [[nodiscard]] bool valid() const noexcept { return city_ready(); }
-
     /// True if the ASN database is currently loaded.
     [[nodiscard]] bool asn_ready() const noexcept { return asn_db_ != nullptr; }
 

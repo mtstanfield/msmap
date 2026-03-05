@@ -9,6 +9,7 @@
 #include <ctime>
 #include <optional>
 #include <string>
+#include <vector>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,22 @@ msmap::GeoIpResult make_renderable_geo()
     geo.lon = -97.822;
     geo.has_coords = true;
     return geo;
+}
+
+std::vector<msmap::ConnectionRow> collect_rows(msmap::Database& db)
+{
+    msmap::QueryFilters f;
+    f.limit = 500;
+    std::vector<msmap::ConnectionRow> rows;
+    for (;;) {
+        const auto page = db.query_detail_page(f);
+        rows.insert(rows.end(), page.rows.begin(), page.rows.end());
+        if (!page.next_cursor.has_value()) {
+            break;
+        }
+        f.cursor = *page.next_cursor;
+    }
+    return rows;
 }
 
 } // anonymous namespace
@@ -382,7 +399,7 @@ TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")
         REQUIRE(db.valid());
         REQUIRE(db.insert(make_entry("5.5.5.5"), make_renderable_geo()));
 
-        const auto rows = db.query_connections(msmap::QueryFilters{});
+        const auto rows = collect_rows(db);
         REQUIRE(rows.size() == 1);
         REQUIRE_FALSE(rows.at(0).threat.has_value());
     }
@@ -400,7 +417,7 @@ TEST_CASE("AbuseCache: update_connections_abuse sets threat and usage_type")
     {
         msmap::Database db{db_path};
         REQUIRE(db.valid());
-        const auto rows = db.query_connections(msmap::QueryFilters{});
+        const auto rows = collect_rows(db);
         REQUIRE(rows.size() == 1);
         REQUIRE(rows.at(0).threat == 75);
         REQUIRE(rows.at(0).usage_type == "Data Center/Web Hosting/Transit");
@@ -442,7 +459,7 @@ TEST_CASE("AbuseCache: update_connections_abuse skips already-enriched rows")
     {
         msmap::Database db{db_path};
         REQUIRE(db.valid());
-        const auto rows = db.query_connections(msmap::QueryFilters{});
+        const auto rows = collect_rows(db);
         REQUIRE(rows.size() == 1);
         REQUIRE(rows.at(0).threat == 50);
         REQUIRE(rows.at(0).usage_type == "ISP/Residential");

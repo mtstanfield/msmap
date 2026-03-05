@@ -35,7 +35,7 @@ TEST_CASE("GeoIp with empty city path is not valid")
 {
     const msmap::GeoIp geoip{"", ""};
     REQUIRE_FALSE(geoip.city_ready());
-    REQUIRE_FALSE(geoip.valid());
+    REQUIRE_FALSE(geoip.city_ready());
     REQUIRE_FALSE(geoip.asn_ready());
 }
 
@@ -43,7 +43,7 @@ TEST_CASE("GeoIp with nonexistent city path is not valid")
 {
     const msmap::GeoIp geoip{"/nonexistent/GeoLite2-City.mmdb", ""};
     REQUIRE_FALSE(geoip.city_ready());
-    REQUIRE_FALSE(geoip.valid());
+    REQUIRE_FALSE(geoip.city_ready());
     REQUIRE_FALSE(geoip.asn_ready());
 }
 

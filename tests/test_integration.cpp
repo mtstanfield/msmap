@@ -29,6 +29,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,22 @@ constexpr std::string_view kTcpSynPlusTwoHours =
 // Not a Mikrotik log line — parser should skip and log a WARN.
 constexpr std::string_view kInvalid = "not a valid Mikrotik firewall log line";
 
+std::vector<msmap::ConnectionRow> collect_rows(msmap::Database& db)
+{
+    msmap::QueryFilters f;
+    f.limit = 500;
+    std::vector<msmap::ConnectionRow> rows;
+    for (;;) {
+        const auto page = db.query_detail_page(f);
+        rows.insert(rows.end(), page.rows.begin(), page.rows.end());
+        if (!page.next_cursor.has_value()) {
+            break;
+        }
+        f.cursor = *page.next_cursor;
+    }
+    return rows;
+}
+
 } // anonymous namespace
 
 // ── Test cases ────────────────────────────────────────────────────────────────
@@ -137,7 +154,7 @@ TEST_CASE("Integration: valid TCP line is dropped when source GeoIP is unavailab
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -146,7 +163,7 @@ TEST_CASE("Integration: valid UDP line is dropped when source GeoIP is unavailab
     ListenerFixture fix{kPort};
     send_lines(kPort, {kUdp});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -155,7 +172,7 @@ TEST_CASE("Integration: valid ICMP line is dropped when source GeoIP is unavaila
     ListenerFixture fix{kPort};
     send_lines(kPort, {kIcmp});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -164,7 +181,7 @@ TEST_CASE("Integration: timezone-normalised valid rows still drop without source
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn, kTcpSynPlusTwoHours});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -173,7 +190,7 @@ TEST_CASE("Integration: multiple valid datagrams are all dropped without source 
     ListenerFixture fix{kPort};
     send_lines(kPort, {kTcpSyn, kUdp, kIcmp});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -184,7 +201,7 @@ TEST_CASE("Integration: unparseable line skipped, valid line still drops without
 
     // The invalid line is logged as a WARN and the valid line is dropped later
     // because no City GeoIP is available in this fixture.
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }
 
@@ -194,6 +211,6 @@ TEST_CASE("Integration: repeated valid datagrams remain dropped without source G
     send_lines(kPort, {kTcpSyn});
     send_lines(kPort, {kUdp});
 
-    const auto rows = fix.db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(fix.db);
     CHECK(rows.empty());
 }

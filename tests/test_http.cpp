@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -20,6 +21,15 @@ msmap::GeoIpResult make_renderable_geo()
     geo.has_coords = true;
     geo.asn = "AS64500 Example ISP";
     return geo;
+}
+
+std::vector<msmap::ConnectionRow> query_rows(msmap::Database& db,
+                                             msmap::QueryFilters filters = {})
+{
+    if (filters.limit <= 0 || filters.limit > 500) {
+        filters.limit = 500;
+    }
+    return db.query_detail_page(filters).rows;
 }
 
 } // namespace
@@ -116,18 +126,18 @@ TEST_CASE("append_double_or_null: negative coordinate", "[json]")
     REQUIRE(out == "-97.822000");
 }
 
-// ── Database::query_connections ───────────────────────────────────────────────
+// ── Database::query_detail_page filter behavior ───────────────────────────────
 
-TEST_CASE("query_connections: empty database returns empty vector", "[db][query]")
+TEST_CASE("query_detail_page: empty database returns empty vector", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
 
-    const auto rows = db.query_connections({});
+    const auto rows = query_rows(db, {});
     REQUIRE(rows.empty());
 }
 
-TEST_CASE("query_connections: returns all rows when no filters set", "[db][query]")
+TEST_CASE("query_detail_page: returns all rows when no filters set", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -145,14 +155,14 @@ TEST_CASE("query_connections: returns all rows when no filters set", "[db][query
     db.insert(e1, geo);
     db.insert(e2, geo);
 
-    const auto rows = db.query_connections({});
+    const auto rows = query_rows(db, {});
     REQUIRE(rows.size() == 2);
     // Results ordered newest-first.
     REQUIRE(rows.at(0).ts == 2000);
     REQUIRE(rows.at(1).ts == 1000);
 }
 
-TEST_CASE("query_connections: filter by src_ip", "[db][query]")
+TEST_CASE("query_detail_page: filter by src_ip", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -172,12 +182,12 @@ TEST_CASE("query_connections: filter by src_ip", "[db][query]")
 
     msmap::QueryFilters f;
     f.src_ip = "1.2.3.4";
-    const auto rows = db.query_connections(f);
+    const auto rows = query_rows(db, f);
     REQUIRE(rows.size() == 1);
     REQUIRE(rows.at(0).src_ip == "1.2.3.4");
 }
 
-TEST_CASE("query_connections: filter by dst_port", "[db][query]")
+TEST_CASE("query_detail_page: filter by dst_port", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -197,12 +207,12 @@ TEST_CASE("query_connections: filter by dst_port", "[db][query]")
 
     msmap::QueryFilters f;
     f.dst_port = 443;
-    const auto rows = db.query_connections(f);
+    const auto rows = query_rows(db, f);
     REQUIRE(rows.size() == 1);
     REQUIRE(rows.at(0).dst_port.value_or(0) == 443);
 }
 
-TEST_CASE("query_connections: limit is respected", "[db][query]")
+TEST_CASE("query_detail_page: limit is respected", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -221,11 +231,11 @@ TEST_CASE("query_connections: limit is respected", "[db][query]")
 
     msmap::QueryFilters f;
     f.limit = 3;
-    const auto rows = db.query_connections(f);
+    const auto rows = query_rows(db, f);
     REQUIRE(rows.size() == 3);
 }
 
-TEST_CASE("query_connections: GeoIP columns round-trip correctly", "[db][query]")
+TEST_CASE("query_detail_page: GeoIP columns round-trip correctly", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -244,7 +254,7 @@ TEST_CASE("query_connections: GeoIP columns round-trip correctly", "[db][query]"
     geo.asn     = "AS1234 Example ISP";
     db.insert(e, geo);
 
-    const auto rows = db.query_connections({});
+    const auto rows = query_rows(db, {});
     REQUIRE(rows.size() == 1);
     REQUIRE(rows.at(0).country        == "DE");
     REQUIRE(rows.at(0).lat.has_value());
@@ -252,7 +262,7 @@ TEST_CASE("query_connections: GeoIP columns round-trip correctly", "[db][query]"
     REQUIRE(rows.at(0).asn            == "AS1234 Example ISP");
 }
 
-TEST_CASE("query_connections: ICMP row has null ports", "[db][query]")
+TEST_CASE("query_detail_page: ICMP row has null ports", "[db][query]")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -265,7 +275,7 @@ TEST_CASE("query_connections: ICMP row has null ports", "[db][query]")
 
     db.insert(e, make_renderable_geo());
 
-    const auto rows = db.query_connections({});
+    const auto rows = query_rows(db, {});
     REQUIRE(rows.size() == 1);
     REQUIRE_FALSE(rows.at(0).src_port.has_value());
     REQUIRE_FALSE(rows.at(0).dst_port.has_value());

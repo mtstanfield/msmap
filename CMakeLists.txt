@@ -231,7 +231,7 @@ if(MSMAP_ENABLE_TESTS)
 
     catch_discover_tests(test_geoip)
 
-    # test_http: tests the JSON serialiser (json.h) and Database::query_connections.
+    # test_http: tests JSON helpers and DB filter utility paths used by HTTP handlers.
     # Does not link MICROHTTPD — HttpServer is not instantiated in these tests.
     add_executable(test_http
         tests/test_http.cpp

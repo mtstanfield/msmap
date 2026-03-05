@@ -5,7 +5,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <atomic>
 #include <ctime>
+#include <thread>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,6 +72,25 @@ msmap::GeoIpResult make_renderable_geo()
     return geo;
 }
 
+std::vector<msmap::ConnectionRow> collect_rows(msmap::Database& db,
+                                               msmap::QueryFilters filters = {})
+{
+    if (filters.limit <= 0 || filters.limit > 500) {
+        filters.limit = 500;
+    }
+
+    std::vector<msmap::ConnectionRow> out;
+    for (;;) {
+        const auto page = db.query_detail_page(filters);
+        out.insert(out.end(), page.rows.begin(), page.rows.end());
+        if (!page.next_cursor.has_value()) {
+            break;
+        }
+        filters.cursor = *page.next_cursor;
+    }
+    return out;
+}
+
 } // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -114,7 +135,7 @@ TEST_CASE("Entry with non-renderable GeoIpResult is rejected")
     geo.asn = "AS14618 Amazon.com Inc.";
 
     REQUIRE_FALSE(db.insert(make_tcp_entry(), geo));
-    CHECK(db.query_connections(msmap::QueryFilters{}).empty());
+    CHECK(collect_rows(db, msmap::QueryFilters{}).empty());
 }
 
 TEST_CASE("Multiple entries insert without error")
@@ -146,7 +167,7 @@ TEST_CASE("prune_older_than: removes rows strictly below cutoff")
     CHECK(db.prune_older_than(4000) == 3);
 
     // Only the two new rows should survive, newest-first.
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     REQUIRE(rows.size() == 2);
     CHECK(rows.at(0).ts == 6000);
     CHECK(rows.at(1).ts == 5000);
@@ -164,7 +185,7 @@ TEST_CASE("prune_older_than: cutoff below all rows removes nothing")
 
     CHECK(db.prune_older_than(1000) == 0);
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     CHECK(rows.size() == 2);
 }
 
@@ -180,7 +201,7 @@ TEST_CASE("prune_older_than: cutoff above all rows clears table")
 
     CHECK(db.prune_older_than(9'999'999) == 2);
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     CHECK(rows.empty());
 }
 
@@ -191,14 +212,14 @@ TEST_CASE("prune_older_than: returns 0 safely on invalid database")
     CHECK(db.prune_older_than(999'999) == 0);
 }
 
-TEST_CASE("threat score round-trips through insert and query_connections")
+TEST_CASE("threat score round-trips through insert and query_detail_page")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
 
     REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo(), std::optional<int>{75}));
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
     REQUIRE(rows.at(0).threat == 75);
 }
@@ -210,7 +231,7 @@ TEST_CASE("threat score nullopt stores and reads as NULL")
 
     REQUIRE(db.insert(make_tcp_entry(), make_renderable_geo())); // default threat = nullopt
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
     CHECK_FALSE(rows.at(0).threat.has_value());
 }
@@ -243,7 +264,7 @@ TEST_CASE("Duplicate suppression: identical entries produce exactly one row")
     REQUIRE(db.insert(entry, make_renderable_geo()));
     REQUIRE(db.insert(entry, make_renderable_geo()));
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     CHECK(rows.size() == 1);
 }
 
@@ -257,7 +278,7 @@ TEST_CASE("Duplicate suppression: ICMP entries (NULL ports) deduplicate correctl
     REQUIRE(db.insert(entry, make_renderable_geo()));
     REQUIRE(db.insert(entry, make_renderable_geo()));
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     CHECK(rows.size() == 1);
 }
 
@@ -272,7 +293,7 @@ TEST_CASE("Duplicate suppression: different timestamps are distinct rows")
     entry.ts = 2000;
     REQUIRE(db.insert(entry, make_renderable_geo()));
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     CHECK(rows.size() == 2);
 }
 
@@ -315,6 +336,32 @@ TEST_CASE("status_snapshot: reports latest event and distinct sources")
     CHECK(snapshot->distinct_sources_24h == 2);
 }
 
+TEST_CASE("status_snapshot: prune_older_than updates retained counts correctly")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.src_ip = "198.51.100.10";
+    entry.ts = 1000;
+    REQUIRE(db.insert(entry, make_renderable_geo()));
+    entry.ts = 2000;
+    REQUIRE(db.insert(entry, make_renderable_geo()));
+
+    entry.src_ip = "203.0.113.99";
+    entry.ts = 3000;
+    REQUIRE(db.insert(entry, make_renderable_geo()));
+
+    REQUIRE(db.prune_older_than(2500) == 2);
+
+    const auto snapshot = db.status_snapshot();
+    REQUIRE(snapshot.has_value());
+    CHECK(snapshot->rows_24h == 1);
+    CHECK(snapshot->distinct_sources_24h == 1);
+    REQUIRE(snapshot->latest_event_ts.has_value());
+    CHECK(*snapshot->latest_event_ts == 3000);
+}
+
 TEST_CASE("prune_expired: removes rows older than 24h relative to now")
 {
     msmap::Database db{":memory:"};
@@ -328,7 +375,7 @@ TEST_CASE("prune_expired: removes rows older than 24h relative to now")
 
     CHECK(db.prune_expired() == 1);
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
     CHECK(rows.at(0).ts == entry.ts);
 }
@@ -570,7 +617,7 @@ TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
     }
 }
 
-TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
+TEST_CASE("query_detail_page: exclude_icmp hides ICMP unless proto is explicit")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -585,14 +632,14 @@ TEST_CASE("query_connections: exclude_icmp hides ICMP unless proto is explicit")
 
     msmap::QueryFilters filtered;
     filtered.exclude_icmp = true;
-    const auto rows = db.query_connections(filtered);
+    const auto rows = collect_rows(db, filtered);
     REQUIRE(rows.size() == 1);
     CHECK(rows.front().proto == "TCP");
 
     msmap::QueryFilters icmp_only;
     icmp_only.exclude_icmp = true;
     icmp_only.proto = "ICMP";
-    const auto icmp_rows = db.query_connections(icmp_only);
+    const auto icmp_rows = collect_rows(db, icmp_only);
     REQUIRE(icmp_rows.size() == 1);
     CHECK(icmp_rows.front().proto == "ICMP");
 }
@@ -631,7 +678,7 @@ TEST_CASE("query_detail_page: keyset cursor paginates and tolerates malformed cu
     CHECK(fallback.rows.at(1).ts == 1001);
 }
 
-TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
+TEST_CASE("query_detail_page: IP intel flags are surfaced from ip_intel_cache")
 {
     msmap::Database db{":memory:"};
     REQUIRE(db.valid());
@@ -646,10 +693,55 @@ TEST_CASE("query_connections: IP intel flags are surfaced from ip_intel_cache")
         .spamhaus_drop = false,
     }));
 
-    const auto rows = db.query_connections(msmap::QueryFilters{});
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
     REQUIRE(rows.size() == 1);
     REQUIRE(rows.front().tor_exit.has_value());
     REQUIRE(*rows.front().tor_exit);
     REQUIRE(rows.front().spamhaus_drop.has_value());
     REQUIRE_FALSE(*rows.front().spamhaus_drop);
+}
+
+TEST_CASE("concurrency: inserts and detail/map reads run concurrently without corruption")
+{
+    msmap::Database db{":memory:"};
+    REQUIRE(db.valid());
+
+    auto entry = make_tcp_entry();
+    entry.src_ip = "198.51.100.10";
+    const auto geo = make_renderable_geo();
+
+    std::atomic<bool> stop{false};
+    std::thread writer([&]() {
+        for (int i = 0; i < 250; ++i) {
+            entry.ts = 10'000 + i;
+            (void)db.insert(entry, geo, i % 100);
+        }
+        stop.store(true);
+    });
+
+    std::thread reader_detail([&]() {
+        while (!stop.load()) {
+            msmap::QueryFilters f;
+            f.limit = 50;
+            f.src_ip = entry.src_ip;
+            (void)db.query_detail_page(f);
+        }
+    });
+
+    std::thread reader_map([&]() {
+        while (!stop.load()) {
+            msmap::MapFilters f;
+            f.since = 1;
+            f.until = static_cast<std::int64_t>(std::time(nullptr)) + 20'000;
+            (void)db.query_map_rows(f);
+        }
+    });
+
+    writer.join();
+    reader_detail.join();
+    reader_map.join();
+
+    const auto snapshot = db.status_snapshot();
+    REQUIRE(snapshot.has_value());
+    CHECK(snapshot->rows_24h >= 1);
 }

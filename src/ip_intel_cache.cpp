@@ -262,8 +262,10 @@ void IpIntelCache::worker() noexcept
 
         const auto now = std::chrono::steady_clock::now();
         if (now >= next_refresh) {
-            refresh_sources();
-            refresh_known_ips();
+            const bool snapshot_changed = refresh_sources();
+            if (snapshot_changed) {
+                refresh_known_ips();
+            }
             next_refresh = now + std::chrono::seconds(refresh_secs_);
         }
         if (!pending.empty()) {
@@ -272,7 +274,7 @@ void IpIntelCache::worker() noexcept
     }
 }
 
-void IpIntelCache::refresh_sources() noexcept
+bool IpIntelCache::refresh_sources() noexcept
 {
     {
         const std::lock_guard<std::mutex> lock{snapshot_mutex_};
@@ -280,12 +282,14 @@ void IpIntelCache::refresh_sources() noexcept
     }
 
     bool refreshed = false;
+    bool snapshot_changed = false;
     if (!tor_url_.empty()) {
         if (const auto body = fetch_body(tor_url_); body.has_value()) {
             auto nets = parse_line_oriented_nets(*body);
             // A successful empty fetch is still authoritative: replace any old
             // snapshot so stale Tor intel does not linger indefinitely.
             const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+            snapshot_changed = snapshot_changed || snapshot_.tor_nets != nets || !snapshot_.tor_loaded;
             snapshot_.tor_nets = std::move(nets);
             snapshot_.tor_loaded = true;
             refreshed = true;
@@ -297,6 +301,7 @@ void IpIntelCache::refresh_sources() noexcept
             auto nets = parse_drop_json(*body);
             // Same rule as Tor: successful empty snapshots clear prior state.
             const std::lock_guard<std::mutex> lock{snapshot_mutex_};
+            snapshot_changed = snapshot_changed || snapshot_.drop_nets != nets || !snapshot_.drop_loaded;
             snapshot_.drop_nets = std::move(nets);
             snapshot_.drop_loaded = true;
             refreshed = true;
@@ -307,6 +312,7 @@ void IpIntelCache::refresh_sources() noexcept
         const std::lock_guard<std::mutex> lock{snapshot_mutex_};
         last_refresh_ts_ = static_cast<std::int64_t>(std::time(nullptr));
     }
+    return snapshot_changed;
 }
 
 void IpIntelCache::refresh_known_ips() noexcept

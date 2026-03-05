@@ -21,6 +21,8 @@ struct IpNet {
     int                          family{};
     std::array<std::uint8_t, 16> bytes{};
     std::uint8_t                 prefix_len{0};
+
+    bool operator==(const IpNet&) const noexcept = default;
 };
 
 class IpIntelCache {
@@ -49,7 +51,7 @@ private:
     };
 
     void worker() noexcept;
-    void refresh_sources() noexcept;
+    [[nodiscard]] bool refresh_sources() noexcept;
     void refresh_known_ips() noexcept;
     void process_pending(const std::unordered_set<std::string>& pending) noexcept;
     [[nodiscard]] IpIntel classify_ip(const std::string& ip) const noexcept;
