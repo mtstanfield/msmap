@@ -7,6 +7,14 @@
 
 namespace msmap {
 
+inline bool is_allowed_asn_filter_char(unsigned char ch) noexcept
+{
+    return std::isalnum(ch) != 0 ||
+           ch == ' ' || ch == '.' || ch == ',' || ch == '\'' ||
+           ch == '(' || ch == ')' || ch == '&' || ch == '/' ||
+           ch == '_' || ch == '-' || ch == '+' || ch == ':';
+}
+
 inline std::optional<std::string> normalize_asn_filter(std::string_view raw)
 {
     if (raw.empty() || raw.size() > 64) {
@@ -34,7 +42,7 @@ inline std::optional<std::string> normalize_asn_filter(std::string_view raw)
     }
     for (const char ch : trimmed) {
         const auto uch = static_cast<unsigned char>(ch);
-        if (uch < 0x20U || uch > 0x7EU) {
+        if (!is_allowed_asn_filter_char(uch)) {
             return std::nullopt;
         }
     }

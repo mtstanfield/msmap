@@ -271,13 +271,21 @@ TEST_CASE("query_connections: ICMP row has null ports", "[db][query]")
     REQUIRE_FALSE(rows.at(0).dst_port.has_value());
 }
 
-TEST_CASE("normalize_asn_filter: trims and enforces printable 3-64 chars", "[http][asn]")
+TEST_CASE("normalize_asn_filter: trims and enforces practical ASN charset", "[http][asn]")
 {
     SECTION("accepts and trims valid input")
     {
         const auto normalized = msmap::normalize_asn_filter("  google  ");
         REQUIRE(normalized.has_value());
         CHECK(*normalized == "google");
+    }
+
+    SECTION("accepts common ASN punctuation including colon")
+    {
+        const auto normalized =
+            msmap::normalize_asn_filter("AS15169 Google LLC:Global (US-East)");
+        REQUIRE(normalized.has_value());
+        CHECK(*normalized == "AS15169 Google LLC:Global (US-East)");
     }
 
     SECTION("rejects empty/whitespace input")
@@ -292,10 +300,12 @@ TEST_CASE("normalize_asn_filter: trims and enforces printable 3-64 chars", "[htt
         CHECK_FALSE(msmap::normalize_asn_filter("  x ").has_value());
     }
 
-    SECTION("rejects non-printable characters")
+    SECTION("rejects disallowed characters")
     {
         CHECK_FALSE(msmap::normalize_asn_filter(std::string{"good\tname"}).has_value());
         CHECK_FALSE(msmap::normalize_asn_filter(std::string{"bad\nname"}).has_value());
+        CHECK_FALSE(msmap::normalize_asn_filter("100%_literal").has_value());
+        CHECK_FALSE(msmap::normalize_asn_filter("evil;drop").has_value());
     }
 
     SECTION("rejects values longer than 64 chars")

@@ -264,7 +264,7 @@ QueryFilters parse_connection_filters(MHD_Connection* conn)
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "ip");
     f.src_ip = safe_param(v, 45);
 
-    // ASN fuzzy search: trimmed printable ASCII, 3-64 chars.
+    // ASN fuzzy search: trimmed practical charset, 3-64 chars.
     v = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "asn");
     if (v != nullptr) {
         if (const auto normalized = normalize_asn_filter(safe_param(v, 64)); normalized.has_value()) {

@@ -498,7 +498,7 @@ Supported query parameters:
 | `proto` | optional exact protocol filter: `TCP`, `UDP`, or `ICMP` |
 | `ip` | optional exact source IP filter |
 | `port` | optional exact destination port filter |
-| `asn` | optional case-insensitive ASN substring filter (3-64 chars) |
+| `asn` | optional case-insensitive ASN substring filter (3-64 chars; letters/numbers/spaces plus `.,'()&/_:+-`) |
 | `threat` | optional exact threat bucket: `unknown`, `clean`, `low`, `medium`, or `high` |
 
 Notes:
@@ -517,7 +517,7 @@ Supported query parameters:
 | Parameter | Description |
 |---|---|
 | `ip` | exact source IP filter |
-| `asn` | optional case-insensitive ASN substring filter (3-64 chars) |
+| `asn` | optional case-insensitive ASN substring filter (3-64 chars; letters/numbers/spaces plus `.,'()&/_:+-`) |
 | `since` | lower timestamp bound |
 | `until` | optional upper timestamp bound |
 | `proto` | optional exact protocol filter |

@@ -451,9 +451,10 @@ function validateAsnValue(value) {
     if (!trimmed) {
         return { valid: true, normalized: '' };
     }
+    const asnPattern = /^[A-Za-z0-9 .,'()&/_:+-]+$/;
     const valid = trimmed.length >= 3 &&
         trimmed.length <= 64 &&
-        /^[\x20-\x7E]+$/.test(trimmed);
+        asnPattern.test(trimmed);
     return { valid, normalized: valid ? trimmed : appliedTextFilters.asn };
 }
 
