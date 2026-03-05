@@ -4,6 +4,7 @@
 #include "parser.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
 #include <ctime>
 
 // ---------------------------------------------------------------------------
@@ -405,6 +406,14 @@ TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
     unknown.src_ip = "198.51.100.11";
     unknown.ts = 1300;
     REQUIRE(db.insert(unknown, geo));
+    auto unknown_drop = entry;
+    unknown_drop.src_ip = "198.51.100.15";
+    unknown_drop.ts = 1350;
+    REQUIRE(db.insert(unknown_drop, geo));
+    REQUIRE(db.upsert_ip_intel(unknown_drop.src_ip, msmap::IpIntel{
+        .tor_exit = std::nullopt,
+        .spamhaus_drop = true,
+    }));
 
     auto low = entry;
     low.src_ip = "198.51.100.12";
@@ -445,6 +454,7 @@ TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
         REQUIRE(rows.size() == 1);
         CHECK(rows.front().src_ip == "198.51.100.11");
         CHECK_FALSE(rows.front().threat_max.has_value());
+        CHECK_FALSE(rows.front().spamhaus_drop.value_or(false));
     }
 
     SECTION("low")
@@ -471,12 +481,28 @@ TEST_CASE("query_map_rows: threat filters exact threat buckets", "[db][query]")
     {
         filters.threat = "high";
         const auto rows = db.query_map_rows(filters);
-        REQUIRE(rows.size() == 2);
-        CHECK(rows.at(0).src_ip == "198.51.100.14");
-        CHECK(rows.at(1).src_ip == "198.51.100.10");
-        REQUIRE(rows.at(1).threat_max.has_value());
-        CHECK(*rows.at(1).threat_max == 80);
-        CHECK(rows.at(1).count == 1);
+        REQUIRE(rows.size() == 3);
+        const auto drop_only = std::find_if(rows.begin(), rows.end(), [](const msmap::MapRow& row) {
+            return row.src_ip == "198.51.100.15";
+        });
+        REQUIRE(drop_only != rows.end());
+        CHECK(drop_only->spamhaus_drop.value_or(false));
+        CHECK_FALSE(drop_only->threat_max.has_value());
+
+        const auto explicit_high = std::find_if(rows.begin(), rows.end(), [](const msmap::MapRow& row) {
+            return row.src_ip == "198.51.100.14";
+        });
+        REQUIRE(explicit_high != rows.end());
+        REQUIRE(explicit_high->threat_max.has_value());
+        CHECK(*explicit_high->threat_max == 90);
+
+        const auto mixed = std::find_if(rows.begin(), rows.end(), [](const msmap::MapRow& row) {
+            return row.src_ip == "198.51.100.10";
+        });
+        REQUIRE(mixed != rows.end());
+        REQUIRE(mixed->threat_max.has_value());
+        CHECK(*mixed->threat_max == 80);
+        CHECK(mixed->count == 1);
     }
 }
 

@@ -231,14 +231,18 @@ BoundFilterState build_where_clause(std::string& sql, const WhereInputs& inputs)
     if (state.has_threat) {
         if (inputs.threat == "unknown") {
             add_cond("threat IS NULL");
+            add_cond("COALESCE(intel.spamhaus_drop, 0) = 0");
         } else if (inputs.threat == "clean") {
             add_cond("threat = 0");
+            add_cond("COALESCE(intel.spamhaus_drop, 0) = 0");
         } else if (inputs.threat == "low") {
             add_cond("threat BETWEEN 1 AND 33");
+            add_cond("COALESCE(intel.spamhaus_drop, 0) = 0");
         } else if (inputs.threat == "medium") {
             add_cond("threat BETWEEN 34 AND 66");
+            add_cond("COALESCE(intel.spamhaus_drop, 0) = 0");
         } else if (inputs.threat == "high") {
-            add_cond("threat BETWEEN 67 AND 100");
+            add_cond("(threat BETWEEN 67 AND 100 OR COALESCE(intel.spamhaus_drop, 0) = 1)");
         }
     }
     if (state.exclude_icmp) { add_cond("proto != 'ICMP'"); }
