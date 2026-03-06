@@ -255,6 +255,8 @@ function formatUtcMidnightCountdown(nowSec) {
 /** @type {HTMLElement|null} */
 let activeStatusTooltipTarget = null;
 
+const statusTooltipEl = /** @type {HTMLElement} */ (window.msmapDeps.statusTooltip);
+
 let statusTooltipRaf = 0;
 
 /**
@@ -268,14 +270,14 @@ function showStatusTooltip(target) {
     }
 
     activeStatusTooltipTarget = target;
-    statusTooltip.textContent = text;
-    statusTooltip.dataset.size = target.classList.contains('status-tooltip-compact') ? 'compact' : 'normal';
+    statusTooltipEl.textContent = text;
+    statusTooltipEl.dataset.size = target.classList.contains('status-tooltip-compact') ? 'compact' : 'normal';
     if (target.classList.contains('status-tooltip-nowrap')) {
-        statusTooltip.dataset.nowrap = 'true';
+        statusTooltipEl.dataset.nowrap = 'true';
     } else {
-        delete statusTooltip.dataset.nowrap;
+        delete statusTooltipEl.dataset.nowrap;
     }
-    statusTooltip.classList.add('is-visible');
+    statusTooltipEl.classList.add('is-visible');
     scheduleStatusTooltipReposition();
 }
 
@@ -285,17 +287,17 @@ function hideStatusTooltip() {
         cancelAnimationFrame(statusTooltipRaf);
         statusTooltipRaf = 0;
     }
-    statusTooltip.classList.remove('is-visible');
+    statusTooltipEl.classList.remove('is-visible');
 }
 
 function repositionStatusTooltip() {
     statusTooltipRaf = 0;
-    if (!activeStatusTooltipTarget || !statusTooltip.classList.contains('is-visible')) {
+    if (!activeStatusTooltipTarget || !statusTooltipEl.classList.contains('is-visible')) {
         return;
     }
 
     const targetRect = activeStatusTooltipTarget.getBoundingClientRect();
-    const tooltipRect = statusTooltip.getBoundingClientRect();
+    const tooltipRect = statusTooltipEl.getBoundingClientRect();
     if (!tooltipRect.width || !tooltipRect.height) {
         return;
     }
@@ -315,8 +317,8 @@ function repositionStatusTooltip() {
         top = Math.min(window.innerHeight - tooltipRect.height - viewportPad, targetRect.bottom + offset);
     }
 
-    statusTooltip.style.left = Math.round(left) + 'px';
-    statusTooltip.style.top = Math.round(top) + 'px';
+    statusTooltipEl.style.left = Math.round(left) + 'px';
+    statusTooltipEl.style.top = Math.round(top) + 'px';
 }
 
 function scheduleStatusTooltipReposition() {

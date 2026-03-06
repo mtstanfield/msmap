@@ -220,6 +220,7 @@ const statSourcesValue = mustGetById('stat-sources-value');
 const statIntelValue = mustGetById('stat-intel-value');
 const statAbuseValue = mustGetById('stat-abuse-value');
 const statError     = mustGetById('stat-error');
+const statusTooltip = mustGetById('status-tooltip');
 const filterPanel   = mustGetById('filter-panel');
 const filterToggle  = mustGetButton('filter-toggle');
 const filterTabButtons = queryAllButtons('[data-panel-tab]');
@@ -277,6 +278,7 @@ const msmapDeps = {
     statIntelValue,
     statAbuseValue,
     statError,
+    statusTooltip,
     filterPanel,
     filterToggle,
     filterTabButtons,
