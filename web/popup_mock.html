@@ -329,6 +329,11 @@
             max-width: min(22ch, calc(100vw - 16px));
         }
 
+        .mobile-preview .status-tooltip-target.status-tooltip-nowrap::after {
+            white-space: nowrap;
+            max-width: none;
+        }
+
         .mobile-preview .status-tooltip-target.status-tooltip-align-left::after {
             left: 0;
             transform: translateY(4px);
@@ -530,7 +535,7 @@
                             </span>
                         </span>
                         <span class="status-group status-item-ops">
-                            <span class="status-item status-tooltip-target" data-tooltip="Threat intel feeds&#10;are current.">
+                            <span class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Threat intel feeds: ok.">
                                 <span class="status-label">Feeds</span>
                                 <span class="status-value status-value-ops status-state-ok">ok</span>
                             </span>
@@ -542,7 +547,7 @@
                         </span>
                     </div>
                     <div class="mobile-status-right">
-                        <span id="mp-stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-compact status-tooltip-align-right" data-tooltip="Age of current&#10;map snapshot.">
+                        <span id="mp-stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-nowrap status-tooltip-align-right" data-tooltip="Age of current map snapshot.">
                             <span class="status-dot is-healthy" aria-hidden="true"></span>
                             <span class="status-value status-value-ops">updated 22s ago</span>
                         </span>
@@ -673,17 +678,17 @@
                 </span>
             </div>
             <div class="status-group status-item-ops">
-                <span id="stat-events" class="status-item status-tooltip-target" data-tooltip="Retained logs&#10;(last 24h)"><span class="status-label">Logs</span><span class="status-value">36.3k</span></span>
+                <span id="stat-events" class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Retained logs (last 24h)"><span class="status-label">Logs</span><span class="status-value">36.3k</span></span>
                 <span class="status-sep status-sep-ops">&middot;</span>
-                <span id="stat-sources" class="status-item status-tooltip-target" data-tooltip="Distinct source IPs&#10;(last 24h)"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
+                <span id="stat-sources" class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Distinct source IPs (last 24h)"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
                 <span class="status-sep status-sep-ops">&middot;</span>
-                <span class="status-item status-tooltip-target" data-tooltip="Threat intel feeds&#10;are current."><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
+                <span class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Threat intel feeds: ok."><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
                 <span class="status-sep status-sep-ops">&middot;</span>
                 <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m."><span class="status-label">Abuse</span><span class="status-value status-value-ops status-state-syncing">syncing</span></span>
             </div>
         </div>
         <div id="status-right">
-            <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-compact status-tooltip-align-right" data-tooltip="Age of current&#10;map snapshot."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
+            <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-nowrap status-tooltip-align-right" data-tooltip="Age of current map snapshot."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
             <span class="status-sep">&middot;</span>
             <span id="stat-brand"><span class="brand-mark">@</span><span class="brand-name">msmap</span></span>
             <span class="status-sep">&middot;</span>

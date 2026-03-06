@@ -270,6 +270,11 @@ function showStatusTooltip(target) {
     activeStatusTooltipTarget = target;
     statusTooltip.textContent = text;
     statusTooltip.dataset.size = target.classList.contains('status-tooltip-compact') ? 'compact' : 'normal';
+    if (target.classList.contains('status-tooltip-nowrap')) {
+        statusTooltip.dataset.nowrap = 'true';
+    } else {
+        delete statusTooltip.dataset.nowrap;
+    }
     statusTooltip.classList.add('is-visible');
     scheduleStatusTooltipReposition();
 }
@@ -385,7 +390,7 @@ function setOperatorStatus(status) {
     if (status.intel_enabled !== true) {
         statIntelValue.textContent = 'off';
         statIntelValue.classList.add('status-state-off');
-        statIntel.dataset.tooltip = 'Threat intel feeds\nare disabled.';
+        statIntel.dataset.tooltip = 'Threat intel feeds: off.';
     } else {
         const now = typeof status.now === 'number' ? status.now : Math.floor(Date.now() / 1000);
         const refreshTs = typeof status.intel_last_refresh_ts === 'number' ? status.intel_last_refresh_ts : 0;
@@ -393,20 +398,20 @@ function setOperatorStatus(status) {
             if (status.intel_refresh_attempted === true) {
                 statIntelValue.textContent = 'stale';
                 statIntelValue.classList.add('status-state-stale');
-                statIntel.dataset.tooltip = 'Threat intel feeds\nhave not refreshed yet.';
+                statIntel.dataset.tooltip = 'Threat intel feeds: stale.';
             } else {
                 statIntelValue.textContent = 'syncing';
                 statIntelValue.classList.add('status-state-syncing');
-                statIntel.dataset.tooltip = 'Threat intel feeds\nare initializing.';
+                statIntel.dataset.tooltip = 'Threat intel feeds: syncing.';
             }
         } else if ((now - refreshTs) <= (12 * 3600)) {
             statIntelValue.textContent = 'ok';
             statIntelValue.classList.add('status-state-ok');
-            statIntel.dataset.tooltip = 'Threat intel feeds\nare current.';
+            statIntel.dataset.tooltip = 'Threat intel feeds: ok.';
         } else {
             statIntelValue.textContent = 'stale';
             statIntelValue.classList.add('status-state-stale');
-            statIntel.dataset.tooltip = 'Threat intel feeds\nare stale.';
+            statIntel.dataset.tooltip = 'Threat intel feeds: stale.';
         }
     }
 
