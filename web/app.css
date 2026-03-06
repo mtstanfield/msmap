@@ -23,7 +23,7 @@
     --status-item-gap: 6px;
     --status-group-gap: 10px;
     --status-freshness-gap: 8px;
-    --status-tooltip-min-w: 180px;
+    --status-tooltip-min-w: 0px;
     --status-tooltip-max-w: 260px;
     --status-tooltip-pad-y: 6px;
     --status-tooltip-pad-x: 8px;
@@ -178,8 +178,9 @@ html, body {
     left: 50%;
     bottom: calc(100% + var(--status-tooltip-offset));
     transform: translateX(-50%) translateY(var(--status-tooltip-enter-y));
+    width: max-content;
     min-width: var(--status-tooltip-min-w);
-    max-width: var(--status-tooltip-max-w);
+    max-width: min(var(--status-tooltip-max-w), calc(100vw - 16px));
     padding: var(--status-tooltip-pad-y) var(--status-tooltip-pad-x);
     border: 1px solid #30363d;
     border-radius: var(--status-tooltip-radius);
