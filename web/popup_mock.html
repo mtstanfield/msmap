@@ -86,34 +86,6 @@
             overflow: hidden;
         }
 
-        .mock-coarse-hotspot {
-            position: absolute;
-            width: 54px;
-            height: 54px;
-            border-radius: 999px;
-            border: 1px dashed rgba(139, 148, 158, 0.85);
-            background: rgba(139, 148, 158, 0.14);
-            display: grid;
-            place-items: center;
-            color: #c9d1d9;
-            font-size: 12px;
-            font-weight: 700;
-            box-shadow: 0 0 0 10px rgba(139, 148, 158, 0.10);
-            z-index: 700;
-        }
-
-        .mock-coarse-hotspot::after {
-            content: "coarse";
-            position: absolute;
-            top: -18px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #8b949e;
-            font-size: 10px;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
         #status-bar {
             z-index: 1002;
         }
@@ -208,12 +180,9 @@
         }
 
         .mobile-preview .popup-summary-top {
-            display: flex;
-            position: static;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 5px;
-            padding-right: 0;
+            display: block;
+            position: relative;
+            padding-right: 52px;
         }
 
         .mobile-preview .popup-meta-grid {
@@ -250,6 +219,13 @@
 
         .mobile-preview .popup-detail-wrap {
             display: none;
+        }
+
+        .mobile-preview .popup-linkouts {
+            position: absolute;
+            top: 0;
+            right: 0;
+            gap: 4px;
         }
 
         .mobile-status {
@@ -380,8 +356,6 @@
             <span class="cluster-spike-badge">!</span>
         </div>
         <div class="mock-cluster low" style="left: 66%; top: 26%;">42</div>
-        <div class="mock-coarse-hotspot" style="left: 48%; top: 43%;">844</div>
-
         <div class="mock-marker high" style="left: 31%; top: 51%;"></div>
         <div class="mock-marker medium" style="left: 35%; top: 54%;"></div>
         <div class="mock-marker low" style="left: 37%; top: 48%;"></div>
@@ -553,110 +527,152 @@
                         </span>
                         <span class="status-sep">&middot;</span>
                         <span id="stat-brand">
-                            <span class="brand-mark">@</span>
+                            <span class="brand-mark" aria-hidden="true">🌐</span>
                             <span class="brand-name">msmap</span>
                         </span>
                         <span class="status-sep">&middot;</span>
-                        <a href="#" aria-label="GitHub repository">github</a>
+                        <a href="#" aria-label="GitHub repository">GitHub</a>
+                        <span class="status-sep">&middot;</span>
+                        <span id="mp-stat-built">built 2026-03-06</span>
                     </div>
                 </footer>
             </div>
         </section>
     </div>
 
-    <button id="filter-toggle" class="active" aria-label="Toggle filters">&equiv;</button>
+    <button id="filter-toggle" title="Toggle controls" aria-label="Toggle controls">&#9881;</button>
     <div id="filter-panel">
         <div class="filter-header">
             <div class="filter-header-actions">
-                <div class="filter-header-toggle-group">
-                    <span class="filter-header-toggle-label">Arcs</span>
+                <div class="filter-header-toggle-group" role="group" aria-label="Motion">
+                    <span class="filter-header-toggle-label">Motion</span>
                     <div class="filter-header-toggle">
-                        <button type="button" class="filter-header-toggle-button is-active" data-arcs="on">On</button>
-                        <button type="button" class="filter-header-toggle-button" data-arcs="off">Off</button>
+                        <button id="f-motion-on" class="filter-header-toggle-button is-active"
+                                type="button" data-motion="on" aria-pressed="true">On</button>
+                        <button id="f-motion-off" class="filter-header-toggle-button"
+                                type="button" data-motion="off" aria-pressed="false">Off</button>
                     </div>
                 </div>
                 <button id="f-defaults" type="button">Defaults</button>
             </div>
         </div>
-
-        <div class="filter-tabs" role="tablist" aria-label="Panel tabs">
-            <button type="button" class="filter-tab-button is-active" data-tab="filters">Filters</button>
-            <button type="button" class="filter-tab-button" data-tab="legend">Legend</button>
+        <div class="filter-tabs" role="tablist" aria-label="Panel sections">
+            <button id="filter-tab-button-filters" class="filter-tab-button is-active" type="button"
+                    role="tab" aria-selected="true" aria-controls="filter-tab-filters"
+                    data-panel-tab="filters">Filters</button>
+            <button id="filter-tab-button-legend" class="filter-tab-button" type="button"
+                    role="tab" aria-selected="false" aria-controls="filter-tab-legend"
+                    data-panel-tab="legend">Legend</button>
         </div>
-
         <div class="filter-tab-body">
-            <div id="filter-tab-filters" class="filter-tab-panel">
-                <label class="filter-label" for="f-window">Window</label>
-                <select id="f-window">
-                    <option>15m</option>
-                    <option selected>1h</option>
-                    <option>6h</option>
-                    <option>24h</option>
+            <div id="filter-tab-filters" class="filter-tab-panel" role="tabpanel"
+                 aria-labelledby="filter-tab-button-filters">
+                <label class="filter-label" for="f-time">Time range</label>
+                <select id="f-time">
+                    <option value="900" selected>Last 15 minutes</option>
+                    <option value="3600">Last hour</option>
+                    <option value="21600">Last 6 hours</option>
+                    <option value="86400">Last 24 hours</option>
                 </select>
-
-                <label class="filter-label" for="f-asn">ASN Search</label>
-                <input id="f-asn" type="text" value="amazon">
 
                 <label class="filter-label" for="f-proto">Protocol</label>
                 <select id="f-proto">
-                    <option selected>All</option>
-                    <option>TCP</option>
-                    <option>UDP</option>
-                    <option>ICMP</option>
+                    <option value="">All</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
                 </select>
 
-                <label class="filter-label">Coarse Geo</label>
-                <div class="filter-header-toggle">
-                    <button type="button" class="filter-header-toggle-button is-active" data-coarse-mode="bucket">Bucketed</button>
-                    <button type="button" class="filter-header-toggle-button" data-coarse-mode="raw">Raw</button>
-                </div>
+                <label class="filter-label" for="f-ip">Source IP</label>
+                <input id="f-ip" type="text" placeholder="1.2.3.4" maxlength="45"
+                       autocomplete="off" spellcheck="false">
 
-                <label class="filter-label">Threats</label>
-                <div class="filter-threat">
-                    <button type="button" class="filter-threat-button filter-threat-button-all is-active" data-threat="all">All</button>
-                    <button type="button" class="filter-threat-button" data-threat="unknown"><span class="filter-threat-dot threat-unknown"></span></button>
-                    <button type="button" class="filter-threat-button" data-threat="clean"><span class="filter-threat-dot threat-clean"></span></button>
-                    <button type="button" class="filter-threat-button" data-threat="low"><span class="filter-threat-dot threat-low"></span></button>
-                    <button type="button" class="filter-threat-button" data-threat="medium"><span class="filter-threat-dot threat-medium"></span></button>
-                    <button type="button" class="filter-threat-button" data-threat="high"><span class="filter-threat-dot threat-high"></span></button>
+                <label class="filter-label" for="f-port">Destination Port</label>
+                <input id="f-port" type="text" placeholder="any" maxlength="5" inputmode="numeric"
+                       autocomplete="off" spellcheck="false">
+
+                <label class="filter-label" for="f-asn">ASN</label>
+                <input id="f-asn" type="text" placeholder="AS14618 / amazon" maxlength="64"
+                       autocomplete="off" spellcheck="false">
+
+                <div id="f-threat" class="filter-threat" role="radiogroup" aria-label="Threat">
+                    <button type="button" class="filter-threat-button filter-threat-button-all is-active"
+                            data-threat="" role="radio" aria-checked="true"
+                            aria-label="All threat levels">All</button>
+                    <button type="button" class="filter-threat-button"
+                            data-threat="unknown" role="radio" aria-checked="false"
+                            aria-label="Threat unknown">
+                        <span class="filter-threat-dot threat-unknown" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-threat-button"
+                            data-threat="clean" role="radio" aria-checked="false"
+                            aria-label="Threat clean">
+                        <span class="filter-threat-dot threat-clean" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-threat-button"
+                            data-threat="low" role="radio" aria-checked="false"
+                            aria-label="Threat low">
+                        <span class="filter-threat-dot threat-low" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-threat-button"
+                            data-threat="medium" role="radio" aria-checked="false"
+                            aria-label="Threat medium">
+                        <span class="filter-threat-dot threat-medium" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="filter-threat-button"
+                            data-threat="high" role="radio" aria-checked="false"
+                            aria-label="Threat high">
+                        <span class="filter-threat-dot threat-high" aria-hidden="true"></span>
+                    </button>
                 </div>
-                <div class="filter-threat-text">Threats: all</div>
+                <div id="f-threat-text" class="filter-threat-text">Threats: All</div>
             </div>
-
-            <div id="filter-tab-legend" class="filter-tab-panel" hidden>
+            <div id="filter-tab-legend" class="filter-tab-panel" role="tabpanel"
+                 aria-labelledby="filter-tab-button-legend" hidden>
                 <div id="filter-legend">
+                    <div id="legend-home" style="display:none">
+                        <div class="legend-title">Home</div>
+                        <div class="legend-list">
+                            <div class="legend-entry">
+                                <span class="legend-symbol-wrap" aria-hidden="true">
+                                    <span class="legend-home-swatch"></span>
+                                </span>
+                                <span class="legend-label">Home location</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="legend-title">Threat</div>
+                    <div class="legend-list">
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-unknown"></span></span><span class="legend-label">Unknown</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-clean"></span></span><span class="legend-label">Clean</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-low"></span></span><span class="legend-label">Low</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-medium"></span></span><span class="legend-label">Medium</span></div>
+                        <div class="legend-entry"><span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-swatch threat-high"></span></span><span class="legend-label">High</span></div>
+                    </div>
                     <div class="legend-title">Spikes</div>
                     <div class="legend-list">
                         <div class="legend-entry">
-                            <span class="legend-symbol-wrap">
+                            <span class="legend-symbol-wrap" aria-hidden="true">
                                 <span class="legend-symbol legend-symbol-cluster">
-                                    <span class="legend-symbol-cluster-core"></span>
-                                    <span class="cluster-spike-badge">!</span>
+                                <span class="legend-symbol-cluster-core"></span>
+                                <i class="cluster-spike-badge">!</i>
                                 </span>
                             </span>
-                            <span class="legend-label">Spike cluster</span>
+                            <span class="legend-label">Cluster spike</span>
                         </div>
                         <div class="legend-entry">
-                            <span class="legend-symbol-wrap">
-                                <span class="legend-symbol legend-symbol-node">!</span>
-                            </span>
-                            <span class="legend-label">Spike node</span>
+                            <span class="legend-symbol-wrap" aria-hidden="true"><span class="legend-symbol legend-symbol-node">!</span></span>
+                            <span class="legend-label">Node spike</span>
                         </div>
                     </div>
-
                     <div class="legend-title">Intel</div>
                     <div class="legend-list">
                         <div class="legend-entry">
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">Tor</span></span>
-                            <span class="legend-label">Tor exit indicator</span>
+                            <span class="legend-label">Tor exit</span>
                         </div>
                         <div class="legend-entry">
                             <span class="legend-symbol-wrap"><span class="popup-chip popup-chip-intel">DROP</span></span>
-                            <span class="legend-label">Spamhaus DROP indicator</span>
-                        </div>
-                        <div class="legend-entry">
-                            <span class="legend-symbol-wrap"><span class="legend-home-swatch"></span></span>
-                            <span class="legend-label">Configured home location</span>
+                            <span class="legend-label">Spamhaus DROP</span>
                         </div>
                     </div>
                 </div>
@@ -665,36 +681,52 @@
     </div>
 
     <div id="status-bar">
-        <div id="status-left">
-            <div class="status-group">
-                <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" data-tooltip="Visible markers">
-                    <span class="status-label">Mapped</span>
-                    <span class="status-value status-value-ops">932</span>
-                </span>
-                <span class="status-sep" aria-hidden="true">&middot;</span>
-                <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" data-tooltip="Events in current window">
-                    <span class="status-label">Events</span>
-                    <span class="status-value status-value-ops">36.3k</span>
-                </span>
-            </div>
-            <div class="status-group status-item-ops">
-                <span id="stat-events" class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Retained logs (last 24h)"><span class="status-label">Logs</span><span class="status-value">36.3k</span></span>
-                <span class="status-sep status-sep-ops">&middot;</span>
-                <span id="stat-sources" class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Distinct source IPs (last 24h)"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
-                <span class="status-sep status-sep-ops">&middot;</span>
-                <span class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Threat intel feeds: ok."><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
-                <span class="status-sep status-sep-ops">&middot;</span>
-                <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m."><span class="status-label">Abuse</span><span class="status-value status-value-ops status-state-syncing">syncing</span></span>
-            </div>
+        <div id="status-left" class="status-group">
+            <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" tabindex="0" data-tooltip="Visible markers">
+                <span class="status-label">Mapped</span>
+                <span id="stat-mapped-value" class="status-value status-value-ops">932</span>
+            </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" tabindex="0" data-tooltip="Events in current window">
+                <span class="status-label">Events</span>
+                <span id="stat-total-value" class="status-value status-value-ops">36.3k</span>
+            </span>
+            <span id="status-sep-events" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+            <span id="stat-events" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" tabindex="0" data-tooltip="Retained logs (last 24h)">
+                <span class="status-label">Logs</span>
+                <span id="stat-events-value" class="status-value status-value-ops">36.3k</span>
+            </span>
+            <span id="status-sep-sources" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+            <span id="stat-sources" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" tabindex="0" data-tooltip="Distinct source IPs (last 24h)">
+                <span class="status-label">Sources</span>
+                <span id="stat-sources-value" class="status-value status-value-ops">4.4k</span>
+            </span>
+            <span id="status-sep-intel" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+            <span id="stat-intel" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" tabindex="0" data-tooltip="Threat intel feeds: ok.">
+                <span class="status-label">Feeds</span>
+                <span id="stat-intel-value" class="status-value status-value-ops status-state-ok">ok</span>
+            </span>
+            <span id="status-sep-abuse" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+            <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" tabindex="0" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m.">
+                <span class="status-label">Abuse</span>
+                <span id="stat-abuse-value" class="status-value status-value-ops status-state-syncing">syncing</span>
+            </span>
+            <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">
-            <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-nowrap status-tooltip-align-right" data-tooltip="Age of current map snapshot."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
-            <span class="status-sep">&middot;</span>
-            <span id="stat-brand"><span class="brand-mark">@</span><span class="brand-name">msmap</span></span>
-            <span class="status-sep">&middot;</span>
-            <a href="#" aria-label="GitHub repository">github</a>
-            <span class="status-sep">&middot;</span>
-            <span id="stat-built">build abc1234</span>
+            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-nowrap status-tooltip-align-right" tabindex="0" data-tooltip="Age of current map snapshot.">
+                <span class="status-dot is-healthy" aria-hidden="true"></span>
+                <span id="stat-time-value">updated 19s ago</span>
+            </div>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <span id="stat-brand">
+                <span class="brand-mark" aria-hidden="true">🌐</span>
+                <span class="brand-name">msmap</span>
+            </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <a href="https://github.com/mtstanfield/msmap" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <span id="stat-built">built 2026-03-06</span>
         </div>
     </div>
     <div id="status-tooltip" class="status-tooltip-floating" aria-hidden="true"></div>
@@ -708,11 +740,8 @@
             const tabLegend = document.getElementById('filter-tab-legend');
             const threatButtons = document.querySelectorAll('.filter-threat-button');
             const threatText = document.querySelector('.filter-threat-text');
-            const arcButtons = document.querySelectorAll('[data-arcs]');
+            const motionButtons = document.querySelectorAll('[data-motion]');
             const popupCopy = document.querySelector('.popup-ip-copy');
-            const coarseButtons = document.querySelectorAll('[data-coarse-mode]');
-            const coarseBucket = document.querySelector('.mock-coarse-bucket');
-            const coarseHotspot = document.querySelector('.mock-coarse-hotspot');
             const mockStatusTooltip = document.getElementById('status-tooltip');
 
             toggle.addEventListener('click', () => {
@@ -723,8 +752,12 @@
 
             tabButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    const tab = button.getAttribute('data-tab');
-                    tabButtons.forEach((b) => b.classList.toggle('is-active', b === button));
+                    const tab = button.getAttribute('data-panel-tab');
+                    tabButtons.forEach((b) => {
+                        const isActive = b === button;
+                        b.classList.toggle('is-active', isActive);
+                        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
                     const showFilters = tab === 'filters';
                     tabFilters.hidden = !showFilters;
                     tabLegend.hidden = showFilters;
@@ -733,31 +766,24 @@
 
             threatButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    threatButtons.forEach((b) => b.classList.remove('is-active'));
-                    button.classList.add('is-active');
-                    const value = button.getAttribute('data-threat') || 'all';
+                    threatButtons.forEach((b) => {
+                        const isActive = b === button;
+                        b.classList.toggle('is-active', isActive);
+                        b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                    });
+                    const raw = button.getAttribute('data-threat') || '';
+                    const value = raw === '' ? 'All' : (raw.charAt(0).toUpperCase() + raw.slice(1));
                     threatText.textContent = 'Threats: ' + value;
                 });
             });
 
-            arcButtons.forEach((button) => {
+            motionButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    arcButtons.forEach((b) => b.classList.remove('is-active'));
-                    button.classList.add('is-active');
-                });
-            });
-
-            coarseButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    coarseButtons.forEach((b) => b.classList.remove('is-active'));
-                    button.classList.add('is-active');
-                    const isBucketed = button.getAttribute('data-coarse-mode') === 'bucket';
-                    if (coarseBucket) {
-                        coarseBucket.style.display = isBucketed ? '' : 'none';
-                    }
-                    if (coarseHotspot) {
-                        coarseHotspot.style.display = isBucketed ? '' : 'none';
-                    }
+                    motionButtons.forEach((b) => {
+                        const isActive = b === button;
+                        b.classList.toggle('is-active', isActive);
+                        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                    });
                 });
             });
 

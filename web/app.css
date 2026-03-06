@@ -103,7 +103,7 @@ html, body {
 
 #status-left {
     flex: 1;
-    gap: var(--status-left-gap);
+    gap: var(--status-group-gap);
 }
 
 #status-right {
@@ -168,6 +168,10 @@ html, body {
     align-items: baseline;
     gap: var(--status-group-gap);
     min-width: 0;
+}
+
+#status-left .status-item {
+    align-items: center;
 }
 
 .status-tooltip-target {
@@ -1181,12 +1185,9 @@ html, body {
     }
 
     .popup-summary-top {
-        display: flex;
-        position: static;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 5px;
-        padding-right: 0;
+        display: block;
+        position: relative;
+        padding-right: 52px;
     }
 
     .popup-meta-grid {
@@ -1244,8 +1245,10 @@ html, body {
     }
 
     .popup-linkouts {
+        position: absolute;
+        top: 0;
+        right: 0;
         gap: 4px;
-        position: static;
     }
 
     .popup-linkout {
@@ -1423,10 +1426,10 @@ html, body {
         font-size: 11px;
     }
 
+    #status-sep-events,
     #stat-events,
-    #stat-events + .status-sep-ops,
-    #stat-sources,
-    #stat-sources + .status-sep-ops {
+    #status-sep-sources,
+    #stat-sources {
         display: none;
     }
 }

@@ -159,39 +159,36 @@
 
     <!-- Status bar -->
     <div id="status-bar">
-        <div id="status-left">
-            <div class="status-group">
-                <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" tabindex="0" data-tooltip="Visible markers">
-                    <span class="status-label">Mapped</span>
-                    <span id="stat-mapped-value" class="status-value status-value-ops">0</span>
-                </span>
-                <span class="status-sep" aria-hidden="true">&middot;</span>
-                <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" tabindex="0" data-tooltip="Events in current window">
-                    <span class="status-label">Events</span>
-                    <span id="stat-total-value" class="status-value status-value-ops">0</span>
-                </span>
-            </div>
-            <div id="status-ops" class="status-group">
-                <span id="stat-events" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Retained logs (last 24h)">
-                    <span class="status-label">Logs</span>
-                    <span id="stat-events-value" class="status-value status-value-ops">--</span>
-                </span>
-                <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-sources" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Distinct source IPs (last 24h)">
-                    <span class="status-label">Sources</span>
-                    <span id="stat-sources-value" class="status-value status-value-ops">--</span>
-                </span>
-                <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-intel" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Threat intel feeds: syncing.">
-                    <span class="status-label">Feeds</span>
-                    <span id="stat-intel-value" class="status-value status-value-ops">--</span>
-                </span>
-                <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="AbuseIPDB lookup status&#10;and daily quota.">
-                    <span class="status-label">Abuse</span>
-                    <span id="stat-abuse-value" class="status-value status-value-ops">--</span>
-                </span>
-            </div>
+        <div id="status-left" class="status-group">
+            <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" tabindex="0" data-tooltip="Visible markers">
+                <span class="status-label">Mapped</span>
+                <span id="stat-mapped-value" class="status-value status-value-ops">0</span>
+            </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
+            <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" tabindex="0" data-tooltip="Events in current window">
+                <span class="status-label">Events</span>
+                <span id="stat-total-value" class="status-value status-value-ops">0</span>
+            </span>
+            <span id="status-sep-events" class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-events" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Retained logs (last 24h)">
+                <span class="status-label">Logs</span>
+                <span id="stat-events-value" class="status-value status-value-ops">--</span>
+            </span>
+            <span id="status-sep-sources" class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-sources" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Distinct source IPs (last 24h)">
+                <span class="status-label">Sources</span>
+                <span id="stat-sources-value" class="status-value status-value-ops">--</span>
+            </span>
+            <span id="status-sep-intel" class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-intel" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" style="display:none" tabindex="0" data-tooltip="Threat intel feeds: syncing.">
+                <span class="status-label">Feeds</span>
+                <span id="stat-intel-value" class="status-value status-value-ops">--</span>
+            </span>
+            <span id="status-sep-abuse" class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
+            <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="AbuseIPDB lookup status&#10;and daily quota.">
+                <span class="status-label">Abuse</span>
+                <span id="stat-abuse-value" class="status-value status-value-ops">--</span>
+            </span>
             <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">
@@ -199,11 +196,14 @@
                 <span class="status-dot is-unknown" aria-hidden="true"></span>
                 <span id="stat-time-value">Waiting for data</span>
             </div>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
             <span id="stat-brand">
                 <span class="brand-mark" aria-hidden="true">🌐</span>
                 <span class="brand-name">msmap</span>
             </span>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
             <a href="https://github.com/mtstanfield/msmap" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span class="status-sep" aria-hidden="true">&middot;</span>
             <span id="stat-built">built {{BUILD_DATE}}</span>
         </div>
     </div>
