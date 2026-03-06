@@ -411,7 +411,7 @@ In the `15m` and `1h` views, sources with a dense short-window burst of hits
 also get a stronger marker pulse plus a centred `!` marker overlay so obvious
 spikes stand out without waiting for a popup drilldown. Clusters containing at
 least one such source get a small light `!` badge so they stand out before
-opening before spiderfying.
+spiderfying.
 
 If the hostname fails to resolve, or GeoIP has no record for the resolved IP, a
 `[WARN]` is logged at startup and only the home-directed arcs are disabled. The
@@ -465,11 +465,11 @@ The bottom status bar shows the current state of the visible map and the
 backend caches:
 
 - `Mapped`: aggregate markers currently rendered
-- `Hits`: total matching event volume represented by the visible aggregate rows
+- `Events`: total matching event volume represented by the visible aggregate rows
 - `Updated`: age of the current `/api/map` dataset on screen, with a dot that
   reflects live poll health (`unknown` on startup, green when current, red when
   stale or failing)
-- `Events`: total retained connection rows in the current 24-hour window
+- `Logs`: total retained connection rows in the current 24-hour window
 - `Sources`: distinct retained source IPs in that window
 - `Feeds`: compact Tor/DROP refresh state (`ok`, `stale`, `syncing`, or `off`)
 - `Abuse`: AbuseIPDB availability/quota state for new lookups (`syncing`, `ok`, `quota`, or `off`), where `quota` also covers locally exhausted budget before a live header confirms remaining requests
@@ -683,9 +683,10 @@ python3 -m http.server 8081
 ```
 
 Then visit `http://localhost:8081/popup_mock.html`.
-The mock page includes the current desktop/mobile popup states, the live
-footer/control-panel variants, long-string stress coverage, and spiderfy layout
-demos for small through very large clusters.
+The mock page includes the current desktop popup states, a full
+live-matching controls/legend/footer section, an inline mobile preview,
+long-string stress coverage, and spiderfy layout demos for small through very
+large clusters.
 
 ### Fuzzer (libFuzzer on the syslog parser)
 
