@@ -176,33 +176,6 @@ function setStatusFreshness(text) {
 }
 
 /**
- * @param {number} generatedAt
- * @param {number} [nowMs]
- * @returns {string}
- */
-function formatMapFreshness(generatedAt, nowMs = Date.now()) {
-    if (!Number.isFinite(generatedAt) || generatedAt <= 0) {
-        return 'Updated';
-    }
-
-    const ageSecs = Math.max(0, Math.floor((nowMs / 1000) - generatedAt));
-    if (ageSecs < 5) {
-        return 'Updated just now';
-    }
-    if (ageSecs < 60) {
-        return 'Updated ' + ageSecs + 's ago';
-    }
-
-    const ageMins = Math.floor(ageSecs / 60);
-    if (ageMins < 60) {
-        return 'Updated ' + ageMins + 'm ago';
-    }
-
-    const ageHours = Math.floor(ageMins / 60);
-    return 'Updated ' + ageHours + 'h ago';
-}
-
-/**
  * @param {number} value
  * @returns {string}
  */
@@ -258,8 +231,6 @@ let activeStatusTooltipTarget = null;
 const statusTooltipEl = /** @type {HTMLElement} */ (window.msmapDeps.statusTooltip);
 
 let statusTooltipRaf = 0;
-/** @type {number|null} */
-let mapFreshnessTickTimer = null;
 
 /**
  * @param {HTMLElement} target
@@ -518,7 +489,7 @@ function syncMapFreshnessUi(nowMs = Date.now(), forceStale = false) {
     if (!Number.isFinite(generatedAt) || generatedAt <= 0) {
         setMapFeedState('unknown');
         if (forceStale) {
-            setStatusFreshness('Update failed');
+            setStatusFreshness('Stale');
         } else if (!mapState.pollInFlight && mapState.lastMapSuccessAt === 0) {
             setStatusFreshness('Waiting for data');
         }
@@ -540,37 +511,9 @@ function syncMapFreshnessUi(nowMs = Date.now(), forceStale = false) {
                 ? 'warning'
                 : 'stale';
     setMapFeedState(nextState);
-    setStatusFreshness(formatMapFreshness(generatedAt, nowMs));
-
-    const lastFetchAge = mapState.lastMapSuccessAt > 0
-        ? formatElapsedAge(Math.max(0, Math.floor((nowMs - mapState.lastMapSuccessAt) / 1000)))
-        : 'unknown';
-    statTime.dataset.tooltip =
-        'Map snapshot age: ' + formatElapsedAge(snapshotAgeSecs) + '.\n' +
-        'Last successful fetch: ' + lastFetchAge + '.';
-    if (forceStale) {
-        statTime.dataset.tooltip += '\nLatest map fetch failed.';
-    }
+    setStatusFreshness(nextState === 'healthy' ? 'Fresh' : nextState === 'warning' ? 'Delayed' : 'Stale');
+    statTime.dataset.tooltip = 'Map data age: ' + formatElapsedAge(snapshotAgeSecs) + '.';
     syncActiveStatusTooltip(statTime);
-}
-
-function stopMapFreshnessTick() {
-    if (mapFreshnessTickTimer !== null) {
-        clearTimeout(mapFreshnessTickTimer);
-        mapFreshnessTickTimer = null;
-    }
-}
-
-function scheduleMapFreshnessTick() {
-    stopMapFreshnessTick();
-    if (document.visibilityState !== 'visible') {
-        return;
-    }
-    mapFreshnessTickTimer = setTimeout(() => {
-        mapFreshnessTickTimer = null;
-        syncMapFreshnessUi();
-        scheduleMapFreshnessTick();
-    }, 1000);
 }
 
 /**
@@ -1796,7 +1739,7 @@ function pollNow() {
     mapState.lastMapTs = 0;
     mapState.lastMapGeneratedAt = 0;
     setStatusCounts(0, 0);
-    setStatusFreshness('Refreshing...');
+    setStatusFreshness('Waiting for data');
     statTime.dataset.tooltip = 'Fetching latest map snapshot...';
     syncActiveStatusTooltip(statTime);
     requestPollNow();
@@ -1830,7 +1773,6 @@ function startMsmap() {
     setOperatorStatus(null);
     setHomeLegendVisible(false);
     updateMapFeedIndicator();
-    scheduleMapFreshnessTick();
     void fetchStatus();
     scheduleStatusPoll();
     pollNow();
@@ -1838,7 +1780,6 @@ function startMsmap() {
     document.addEventListener('visibilitychange', () => {
         updateMapFeedIndicator();
         if (document.visibilityState === 'visible') {
-            scheduleMapFreshnessTick();
             void fetchStatus();
             scheduleStatusPoll();
             if (!mapState.pollInFlight) {
@@ -1850,7 +1791,6 @@ function startMsmap() {
             clearTimeout(statusState.statusPollTimer);
             statusState.statusPollTimer = null;
         }
-        stopMapFreshnessTick();
         scheduleNextPoll(HIDDEN_REFRESH_MS);
     });
 }
