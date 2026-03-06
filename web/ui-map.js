@@ -258,6 +258,8 @@ let activeStatusTooltipTarget = null;
 const statusTooltipEl = /** @type {HTMLElement} */ (window.msmapDeps.statusTooltip);
 
 let statusTooltipRaf = 0;
+/** @type {number|null} */
+let mapFreshnessTickTimer = null;
 
 /**
  * @param {HTMLElement} target
@@ -473,15 +475,102 @@ function setOperatorStatus(status) {
 }
 
 /**
- * @param {'healthy'|'stale'|'unknown'} nextState
+ * @param {'healthy'|'warning'|'stale'|'unknown'} nextState
  */
 function setMapFeedState(nextState) {
-    statDot.classList.remove('is-unknown', 'is-healthy', 'is-stale');
+    statDot.classList.remove('is-unknown', 'is-healthy', 'is-warning', 'is-stale');
     statDot.classList.add(
         nextState === 'healthy' ? 'is-healthy' :
+        nextState === 'warning' ? 'is-warning' :
         nextState === 'stale' ? 'is-stale' :
         'is-unknown'
     );
+}
+
+/**
+ * @param {number} elapsedSecs
+ * @returns {string}
+ */
+function formatElapsedAge(elapsedSecs) {
+    if (!Number.isFinite(elapsedSecs) || elapsedSecs < 0) {
+        return 'unknown';
+    }
+    if (elapsedSecs < 5) {
+        return 'just now';
+    }
+    if (elapsedSecs < 60) {
+        return Math.floor(elapsedSecs) + 's ago';
+    }
+    const mins = Math.floor(elapsedSecs / 60);
+    if (mins < 60) {
+        return mins + 'm ago';
+    }
+    const hours = Math.floor(mins / 60);
+    return hours + 'h ago';
+}
+
+/**
+ * @param {number} [nowMs]
+ * @param {boolean} [forceStale]
+ */
+function syncMapFreshnessUi(nowMs = Date.now(), forceStale = false) {
+    const generatedAt = mapState.lastMapGeneratedAt;
+    if (!Number.isFinite(generatedAt) || generatedAt <= 0) {
+        setMapFeedState('unknown');
+        if (forceStale) {
+            setStatusFreshness('Update failed');
+        } else if (!mapState.pollInFlight && mapState.lastMapSuccessAt === 0) {
+            setStatusFreshness('Waiting for data');
+        }
+        statTime.dataset.tooltip = forceStale
+            ? 'No map snapshot available.\nLatest map fetch failed.'
+            : 'Waiting for first map snapshot.';
+        syncActiveStatusTooltip(statTime);
+        return;
+    }
+
+    const snapshotAgeSecs = Math.max(0, Math.floor((nowMs / 1000) - generatedAt));
+    const healthyAfterSecs = Math.floor((NORMAL_REFRESH_MS * 2) / 1000);
+    const warningAfterSecs = healthyAfterSecs * 3;
+    const nextState = forceStale
+        ? 'stale'
+        : snapshotAgeSecs <= healthyAfterSecs
+            ? 'healthy'
+            : snapshotAgeSecs <= warningAfterSecs
+                ? 'warning'
+                : 'stale';
+    setMapFeedState(nextState);
+    setStatusFreshness(formatMapFreshness(generatedAt, nowMs));
+
+    const lastFetchAge = mapState.lastMapSuccessAt > 0
+        ? formatElapsedAge(Math.max(0, Math.floor((nowMs - mapState.lastMapSuccessAt) / 1000)))
+        : 'unknown';
+    statTime.dataset.tooltip =
+        'Map snapshot age: ' + formatElapsedAge(snapshotAgeSecs) + '.\n' +
+        'Last successful fetch: ' + lastFetchAge + '.';
+    if (forceStale) {
+        statTime.dataset.tooltip += '\nLatest map fetch failed.';
+    }
+    syncActiveStatusTooltip(statTime);
+}
+
+function stopMapFreshnessTick() {
+    if (mapFreshnessTickTimer !== null) {
+        clearTimeout(mapFreshnessTickTimer);
+        mapFreshnessTickTimer = null;
+    }
+}
+
+function scheduleMapFreshnessTick() {
+    stopMapFreshnessTick();
+    if (document.visibilityState !== 'visible') {
+        return;
+    }
+    mapFreshnessTickTimer = setTimeout(() => {
+        mapFreshnessTickTimer = null;
+        syncMapFreshnessUi();
+        scheduleMapFreshnessTick();
+    }, 1000);
 }
 
 /**
@@ -594,12 +683,7 @@ function scheduleStatusPoll(delayMs = STATUS_REFRESH_MS) {
  * @param {number} [now]
  */
 function updateMapFeedIndicator(now = Date.now()) {
-    if (mapState.lastMapSuccessAt === 0) {
-        setMapFeedState('unknown');
-        return;
-    }
-    const staleAfterMs = NORMAL_REFRESH_MS * 2;
-    setMapFeedState((now - mapState.lastMapSuccessAt) <= staleAfterMs ? 'healthy' : 'stale');
+    syncMapFreshnessUi(now);
 }
 
 /**
@@ -1664,12 +1748,12 @@ async function poll() {
         return;
     }
     mapState.pollInFlight = true;
-    updateMapFeedIndicator();
+    syncMapFreshnessUi();
     try {
         const result = await window.msmapApi.fetchMapApi(buildMapQueryString());
         if (!result.ok) {
             setError('API ' + result.status);
-            updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
+            syncMapFreshnessUi(Date.now(), true);
             scheduleNextPoll(ERROR_REFRESH_MS);
             return;
         }
@@ -1688,15 +1772,14 @@ async function poll() {
         }
         mapState.lastMapTs = newestTs;
         mapState.lastMapSuccessAt = Date.now();
-        updateMapFeedIndicator(mapState.lastMapSuccessAt);
+        syncMapFreshnessUi(mapState.lastMapSuccessAt);
         setStatusCounts(mapState.mappedCount, mapState.totalSeen);
-        setStatusFreshness(formatMapFreshness(body.generated_at, mapState.lastMapSuccessAt));
         mapState.isInitialLoad = false;
 
         scheduleNextPoll(document.visibilityState === 'hidden' ? HIDDEN_REFRESH_MS : NORMAL_REFRESH_MS);
     } catch (err) {
         setError(err && err.message ? err.message : 'Map poll failed');
-        updateMapFeedIndicator(Date.now() + (NORMAL_REFRESH_MS * 3));
+        syncMapFreshnessUi(Date.now(), true);
         scheduleNextPoll(ERROR_REFRESH_MS);
     } finally {
         mapState.pollInFlight = false;
@@ -1714,6 +1797,8 @@ function pollNow() {
     mapState.lastMapGeneratedAt = 0;
     setStatusCounts(0, 0);
     setStatusFreshness('Refreshing...');
+    statTime.dataset.tooltip = 'Fetching latest map snapshot...';
+    syncActiveStatusTooltip(statTime);
     requestPollNow();
 }
 
@@ -1745,6 +1830,7 @@ function startMsmap() {
     setOperatorStatus(null);
     setHomeLegendVisible(false);
     updateMapFeedIndicator();
+    scheduleMapFreshnessTick();
     void fetchStatus();
     scheduleStatusPoll();
     pollNow();
@@ -1752,6 +1838,7 @@ function startMsmap() {
     document.addEventListener('visibilitychange', () => {
         updateMapFeedIndicator();
         if (document.visibilityState === 'visible') {
+            scheduleMapFreshnessTick();
             void fetchStatus();
             scheduleStatusPoll();
             if (!mapState.pollInFlight) {
@@ -1763,6 +1850,7 @@ function startMsmap() {
             clearTimeout(statusState.statusPollTimer);
             statusState.statusPollTimer = null;
         }
+        stopMapFreshnessTick();
         scheduleNextPoll(HIDDEN_REFRESH_MS);
     });
 }

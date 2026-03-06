@@ -251,6 +251,7 @@ html, body {
 
 .status-dot.is-unknown { background: #6e7681; }
 .status-dot.is-healthy { background: #3fb950; }
+.status-dot.is-warning { background: #d29922; }
 .status-dot.is-stale { background: #f85149; }
 
 #stat-time-value {
