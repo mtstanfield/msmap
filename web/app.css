@@ -88,6 +88,7 @@ html, body {
     justify-content: space-between;
     padding: var(--status-bar-pad-y) var(--status-bar-pad-x);
     font-size: var(--ui-font-sm);
+    line-height: 1;
     gap: var(--status-bar-gap);
     z-index: 1000;
 }
@@ -164,7 +165,7 @@ html, body {
 
 .status-group {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--status-group-gap);
     min-width: 0;
 }
@@ -241,6 +242,7 @@ html, body {
     height: 8px;
     border-radius: 999px;
     flex-shrink: 0;
+    align-self: center;
 }
 
 .status-dot.is-unknown { background: #6e7681; }
@@ -278,7 +280,7 @@ html, body {
 
 #stat-brand {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: 6px;
     color: #e6edf3;
 }
@@ -286,13 +288,29 @@ html, body {
 .brand-mark {
     font-size: 14px;
     line-height: 1;
+    align-self: center;
+}
+
+#stat-time,
+#status-right a,
+#stat-built {
+    display: inline-flex;
+    align-items: baseline;
+    line-height: 1;
 }
 
 .brand-name {
     font-size: var(--ui-font-sm);
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
     text-transform: lowercase;
+}
+
+#status-right a,
+#stat-built {
+    font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 #stat-built {
