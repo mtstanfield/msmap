@@ -114,75 +114,254 @@
             text-transform: uppercase;
         }
 
-        .mock-coarse-bucket {
-            position: absolute;
-            left: 14px;
-            bottom: 52px;
-            width: min(280px, calc(100vw - 28px));
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 25%),
-                rgba(22, 27, 34, 0.94);
-            color: #e6edf3;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-            overflow: hidden;
-            z-index: 1001;
-        }
-
-        .mock-coarse-bucket-head {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 8px 10px 7px;
-            border-bottom: 1px solid rgba(48, 54, 61, 0.9);
-        }
-
-        .mock-coarse-title {
-            color: #8b949e;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .mock-coarse-count {
-            color: #c9d1d9;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .mock-coarse-list {
-            margin: 0;
-            padding: 8px 10px 10px;
-            list-style: none;
-            display: grid;
-            gap: 5px;
-        }
-
-        .mock-coarse-item {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 8px;
-            font-size: 11px;
-            color: #c9d1d9;
-        }
-
-        .mock-coarse-item-label {
-            color: #8b949e;
-        }
-
         #status-bar {
             z-index: 1002;
         }
 
+        .mobile-preview-shell {
+            position: absolute;
+            bottom: 72px;
+            right: 10px;
+            width: 236px;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            background: rgba(13, 17, 23, 0.9);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+            z-index: 1003;
+            overflow: hidden;
+        }
+
+        .mobile-preview-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 6px 8px;
+            border-bottom: 1px solid #30363d;
+            background: rgba(22, 27, 34, 0.95);
+            color: #8b949e;
+            font-size: 10px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .mobile-preview-label strong {
+            color: #c9d1d9;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .mobile-preview {
+            position: relative;
+            width: 412px;
+            height: 915px;
+            transform: scale(0.56);
+            transform-origin: top right;
+            margin-left: -176px;
+            margin-bottom: -402px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 22% 28%, rgba(88, 166, 255, 0.14), transparent 28%),
+                radial-gradient(circle at 64% 22%, rgba(248, 81, 73, 0.1), transparent 30%),
+                linear-gradient(180deg, #0d1117, #10161e 48%, #0d1117);
+        }
+
+        .mobile-preview .mock-grid {
+            inset: 0 0 58px 0;
+            mask-image: radial-gradient(circle at center, #000 30%, transparent 100%);
+        }
+
+        .mobile-preview .leaflet-popup {
+            left: 50%;
+            top: 44%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            z-index: 40;
+        }
+
+        .mobile-preview .popup-row {
+            --popup-summary-pad-top: 7px;
+            --popup-summary-pad-x: 7px;
+            --popup-summary-pad-bottom: 6px;
+            --popup-summary-gap: 4px;
+            --popup-signal-gap: 6px;
+            --popup-meta-label-col: 46px;
+            --popup-meta-col-gap: 6px;
+            --popup-meta-row-pad-y: 4px;
+            --popup-meta-last-pad-bottom: 2px;
+            --popup-detail-rail-x: 8px;
+            min-width: min(224px, calc(100vw - 88px));
+            max-width: min(284px, calc(100vw - 88px));
+            max-height: calc(100dvh - 136px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .mobile-preview .popup-summary {
+            padding: var(--popup-summary-pad-top) var(--popup-summary-pad-x) var(--popup-summary-pad-bottom);
+            gap: var(--popup-summary-gap);
+        }
+
+        .mobile-preview .popup-row .ip {
+            font-size: 13px;
+        }
+
+        .mobile-preview .popup-summary-top {
+            display: flex;
+            position: static;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 5px;
+            padding-right: 0;
+        }
+
+        .mobile-preview .popup-meta-grid {
+            display: block;
+        }
+
+        .mobile-preview .popup-meta-item {
+            grid-template-columns: var(--popup-meta-label-col) minmax(0, 1fr);
+            gap: var(--popup-meta-col-gap);
+            padding: var(--popup-meta-row-pad-y) 0;
+        }
+
+        .mobile-preview .popup-signal-strip {
+            gap: var(--popup-signal-gap);
+        }
+
+        .mobile-preview .popup-usage {
+            font-size: 10px;
+            line-height: 1.2;
+        }
+
+        .mobile-preview .popup-meta-value,
+        .mobile-preview .popup-detail-value {
+            font-size: 13px;
+        }
+
+        .mobile-preview .popup-time-full {
+            display: none;
+        }
+
+        .mobile-preview .popup-time-compact {
+            display: inline;
+        }
+
+        .mobile-preview .popup-detail-wrap {
+            display: none;
+        }
+
+        .mobile-status {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            min-height: 58px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 10px;
+            border-top: 1px solid #30363d;
+            background: rgba(13, 17, 23, 0.96);
+            box-sizing: border-box;
+            z-index: 50;
+            font-size: 11px;
+        }
+
+        .mobile-status-left,
+        .mobile-status-right {
+            width: 100%;
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .mobile-status-right {
+            font-size: 11px;
+        }
+
+        .mobile-status-right #mp-stat-time::after {
+            left: 0;
+            right: auto;
+            transform: translateY(4px);
+        }
+
+        .mobile-status-right #mp-stat-time:hover::after,
+        .mobile-status-right #mp-stat-time:focus-visible::after {
+            transform: translateY(0);
+        }
+
+        .mobile-preview .status-tooltip-target {
+            position: relative;
+        }
+
+        .mobile-preview .status-tooltip-target::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 10px);
+            transform: translateX(-50%) translateY(4px);
+            width: max-content;
+            max-width: min(26ch, calc(100vw - 16px));
+            padding: 6px 6px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            background: rgba(22, 27, 34, 0.96);
+            color: #c9d1d9;
+            font-size: 11px;
+            line-height: 1.35;
+            white-space: pre-line;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 1002;
+            transition: opacity 120ms ease-out, transform 120ms ease-out, visibility 0ms linear 120ms;
+        }
+
+        .mobile-preview .status-tooltip-target.status-tooltip-compact::after {
+            max-width: min(22ch, calc(100vw - 16px));
+        }
+
+        .mobile-preview .status-tooltip-target.status-tooltip-align-left::after {
+            left: 0;
+            transform: translateY(4px);
+        }
+
+        .mobile-preview .status-tooltip-target.status-tooltip-align-right::after {
+            left: auto;
+            right: 0;
+            transform: translateY(4px);
+        }
+
+        .mobile-preview .status-tooltip-target:hover::after,
+        .mobile-preview .status-tooltip-target:focus-visible::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+            transition-delay: 0ms;
+        }
+
+        .mobile-preview .status-tooltip-target.status-tooltip-align-left:hover::after,
+        .mobile-preview .status-tooltip-target.status-tooltip-align-left:focus-visible::after,
+        .mobile-preview .status-tooltip-target.status-tooltip-align-right:hover::after,
+        .mobile-preview .status-tooltip-target.status-tooltip-align-right:focus-visible::after {
+            transform: translateY(0);
+        }
+
+        .mobile-status .brand-mark {
+            font-size: 11px;
+        }
+
         @media (max-width: 900px) {
-            .mock-coarse-bucket {
-                left: 10px;
-                right: 10px;
-                width: auto;
-                bottom: 84px;
+            .mobile-preview-shell {
+                display: none;
             }
         }
     </style>
@@ -203,19 +382,6 @@
         <div class="mock-marker low" style="left: 37%; top: 48%;"></div>
         <div class="mock-marker unknown" style="left: 44%; top: 63%;"></div>
         <div class="mock-marker clean" style="left: 58%; top: 58%;"></div>
-
-        <aside class="mock-coarse-bucket" aria-label="Coarse geolocation bucket">
-            <div class="mock-coarse-bucket-head">
-                <span class="mock-coarse-title">Coarse Geolocation Bucket</span>
-                <span class="mock-coarse-count">844 sources</span>
-            </div>
-            <ul class="mock-coarse-list">
-                <li class="mock-coarse-item"><span class="mock-coarse-item-label">US (centroid-heavy)</span><span>521</span></li>
-                <li class="mock-coarse-item"><span class="mock-coarse-item-label">DE</span><span>112</span></li>
-                <li class="mock-coarse-item"><span class="mock-coarse-item-label">NL</span><span>84</span></li>
-                <li class="mock-coarse-item"><span class="mock-coarse-item-label">Other</span><span>127</span></li>
-            </ul>
-        </aside>
 
         <div class="leaflet-popup leaflet-zoom-animated">
             <div class="leaflet-popup-content-wrapper">
@@ -294,6 +460,103 @@
                 </div>
             </div>
         </div>
+
+        <section class="mobile-preview-shell" aria-label="Pixel 8 mobile UI preview">
+            <div class="mobile-preview-label">
+                <strong>Pixel 8</strong>
+                <span>Footer + Popup</span>
+            </div>
+            <div class="mobile-preview">
+                <div class="mock-grid"></div>
+                <div class="mock-cluster high" style="left: 23%; top: 41%;">58<span class="cluster-spike-badge">!</span></div>
+                <div class="mock-marker medium" style="left: 48%; top: 55%;"></div>
+                <div class="mock-marker low" style="left: 62%; top: 62%;"></div>
+                <div class="mock-marker unknown" style="left: 72%; top: 35%;"></div>
+
+                <div class="leaflet-popup leaflet-zoom-animated">
+                    <div class="leaflet-popup-content-wrapper">
+                        <div class="leaflet-popup-content">
+                            <div class="popup-row">
+                                <div class="popup-summary">
+                                    <div class="popup-summary-top">
+                                        <div class="popup-header">
+                                            <div class="popup-kicker">Source</div>
+                                            <button type="button" class="popup-ip-copy" aria-label="Copy source IP" title="Copy source IP">
+                                                <span class="ip">185.242.226.8</span>
+                                            </button>
+                                        </div>
+                                        <div class="popup-linkouts">
+                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                        </div>
+                                    </div>
+                                    <div class="popup-signal-strip">
+                                        <div class="popup-chip-row">
+                                            <span class="popup-chip threat-medium">Threat 44</span>
+                                            <span class="popup-chip popup-chip-intel">Tor</span>
+                                        </div>
+                                        <div class="popup-usage">
+                                            <span class="popup-usage-label">type</span>
+                                            <span class="popup-usage-value">Data Center</span>
+                                        </div>
+                                    </div>
+                                    <div class="popup-meta-grid">
+                                        <div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">9</span></div>
+                                        <div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">US</span></div>
+                                        <div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value"><span class="popup-time-full">3/6/2026, 1:21:03 AM</span><span class="popup-time-compact">3/6, 1:21 AM</span></span></div>
+                                        <div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value"><span class="popup-time-full">3/6/2026, 1:24:44 AM</span><span class="popup-time-compact">3/6, 1:24 AM</span></span></div>
+                                        <div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div>
+                                    </div>
+                                </div>
+                                <div class="popup-detail-wrap" aria-hidden="true"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <footer class="mobile-status">
+                    <div class="mobile-status-left">
+                        <span class="status-group">
+                            <span class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" data-tooltip="Visible markers">
+                                <span class="status-label">Mapped</span>
+                                <span class="status-value status-value-ops">52</span>
+                            </span>
+                            <span class="status-sep" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-tooltip-target status-tooltip-compact" data-tooltip="Events in current window">
+                                <span class="status-label">Events</span>
+                                <span class="status-value status-value-ops">184</span>
+                            </span>
+                        </span>
+                        <span class="status-group status-item-ops">
+                            <span class="status-item status-tooltip-target" data-tooltip="Threat intel feeds&#10;are current.">
+                                <span class="status-label">Feeds</span>
+                                <span class="status-value status-value-ops status-state-ok">ok</span>
+                            </span>
+                            <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
+                            <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m.">
+                                <span class="status-label">Abuse</span>
+                                <span class="status-value status-value-ops status-state-syncing">syncing</span>
+                            </span>
+                        </span>
+                    </div>
+                    <div class="mobile-status-right">
+                        <span id="mp-stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-compact status-tooltip-align-right" data-tooltip="Age of current&#10;map snapshot.">
+                            <span class="status-dot is-healthy" aria-hidden="true"></span>
+                            <span class="status-value status-value-ops">updated 22s ago</span>
+                        </span>
+                        <span class="status-sep">&middot;</span>
+                        <span id="stat-brand">
+                            <span class="brand-mark">@</span>
+                            <span class="brand-name">msmap</span>
+                        </span>
+                        <span class="status-sep">&middot;</span>
+                        <a href="#" aria-label="GitHub repository">github</a>
+                    </div>
+                </footer>
+            </div>
+        </section>
     </div>
 
     <button id="filter-toggle" class="active" aria-label="Toggle filters">&equiv;</button>
@@ -398,22 +661,30 @@
 
     <div id="status-bar">
         <div id="status-left">
-            <div class="status-group status-item-ops">
-                <span class="status-item"><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
-                <span class="status-sep status-sep-ops">&middot;</span>
-                <span class="status-item status-tooltip-target status-tooltip-align-left" data-tooltip="AbuseIPDB quota refresh in 12h 14m."><span class="status-label">Abuse</span><span class="status-value status-value-ops status-state-syncing">syncing</span></span>
-            </div>
             <div class="status-group">
-                <span id="stat-events" class="status-item"><span class="status-label">Events</span><span class="status-value">36.3k</span></span>
-                <span class="status-sep">&middot;</span>
-                <span id="stat-sources" class="status-item"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
-                <span class="status-sep">&middot;</span>
-                <span id="stat-total" class="status-item"><span class="status-label">Nodes</span><span class="status-value">932</span></span>
-                <span class="status-sep">&middot;</span>
-                <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-align-left" data-tooltip="Using cached /api/map response while upstream refreshes."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
+                <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" data-tooltip="Visible markers">
+                    <span class="status-label">Mapped</span>
+                    <span class="status-value status-value-ops">932</span>
+                </span>
+                <span class="status-sep" aria-hidden="true">&middot;</span>
+                <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" data-tooltip="Events in current window">
+                    <span class="status-label">Events</span>
+                    <span class="status-value status-value-ops">36.3k</span>
+                </span>
+            </div>
+            <div class="status-group status-item-ops">
+                <span id="stat-events" class="status-item status-tooltip-target" data-tooltip="Retained logs&#10;(last 24h)"><span class="status-label">Logs</span><span class="status-value">36.3k</span></span>
+                <span class="status-sep status-sep-ops">&middot;</span>
+                <span id="stat-sources" class="status-item status-tooltip-target" data-tooltip="Distinct source IPs&#10;(last 24h)"><span class="status-label">Sources</span><span class="status-value">4.4k</span></span>
+                <span class="status-sep status-sep-ops">&middot;</span>
+                <span class="status-item status-tooltip-target" data-tooltip="Threat intel feeds&#10;are current."><span class="status-label">Feeds</span><span class="status-value status-value-ops status-state-ok">ok</span></span>
+                <span class="status-sep status-sep-ops">&middot;</span>
+                <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m."><span class="status-label">Abuse</span><span class="status-value status-value-ops status-state-syncing">syncing</span></span>
             </div>
         </div>
         <div id="status-right">
+            <span id="stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-compact status-tooltip-align-right" data-tooltip="Age of current&#10;map snapshot."><span class="status-dot is-healthy"></span><span id="stat-time-value" class="status-value status-value-ops">updated 19s ago</span></span>
+            <span class="status-sep">&middot;</span>
             <span id="stat-brand"><span class="brand-mark">@</span><span class="brand-name">msmap</span></span>
             <span class="status-sep">&middot;</span>
             <a href="#" aria-label="GitHub repository">github</a>
@@ -421,6 +692,7 @@
             <span id="stat-built">build abc1234</span>
         </div>
     </div>
+    <div id="status-tooltip" class="status-tooltip-floating" aria-hidden="true"></div>
 
     <script>
         (() => {
@@ -436,6 +708,7 @@
             const coarseButtons = document.querySelectorAll('[data-coarse-mode]');
             const coarseBucket = document.querySelector('.mock-coarse-bucket');
             const coarseHotspot = document.querySelector('.mock-coarse-hotspot');
+            const mockStatusTooltip = document.getElementById('status-tooltip');
 
             toggle.addEventListener('click', () => {
                 const isHidden = panel.style.display === 'none';
@@ -474,8 +747,12 @@
                     coarseButtons.forEach((b) => b.classList.remove('is-active'));
                     button.classList.add('is-active');
                     const isBucketed = button.getAttribute('data-coarse-mode') === 'bucket';
-                    coarseBucket.style.display = isBucketed ? '' : 'none';
-                    coarseHotspot.style.display = isBucketed ? '' : 'none';
+                    if (coarseBucket) {
+                        coarseBucket.style.display = isBucketed ? '' : 'none';
+                    }
+                    if (coarseHotspot) {
+                        coarseHotspot.style.display = isBucketed ? '' : 'none';
+                    }
                 });
             });
 
@@ -483,6 +760,71 @@
                 popupCopy.classList.add('is-copied');
                 window.setTimeout(() => popupCopy.classList.remove('is-copied'), 650);
             });
+
+            if (mockStatusTooltip) {
+                let activeTooltipTarget = null;
+                const repositionTooltip = () => {
+                    if (!activeTooltipTarget || !mockStatusTooltip.classList.contains('is-visible')) {
+                        return;
+                    }
+                    const targetRect = activeTooltipTarget.getBoundingClientRect();
+                    const tooltipRect = mockStatusTooltip.getBoundingClientRect();
+                    if (!tooltipRect.width || !tooltipRect.height) {
+                        return;
+                    }
+
+                    const viewportPad = 8;
+                    const offset = 10;
+                    let left = targetRect.left + ((targetRect.width - tooltipRect.width) / 2);
+                    if (activeTooltipTarget.classList.contains('status-tooltip-align-left')) {
+                        left = targetRect.left;
+                    } else if (activeTooltipTarget.classList.contains('status-tooltip-align-right')) {
+                        left = targetRect.right - tooltipRect.width;
+                    }
+                    left = Math.max(viewportPad, Math.min(left, window.innerWidth - tooltipRect.width - viewportPad));
+
+                    let top = targetRect.top - tooltipRect.height - offset;
+                    if (top < viewportPad) {
+                        top = Math.min(window.innerHeight - tooltipRect.height - viewportPad, targetRect.bottom + offset);
+                    }
+                    mockStatusTooltip.style.left = Math.round(left) + 'px';
+                    mockStatusTooltip.style.top = Math.round(top) + 'px';
+                };
+
+                const showTooltip = (target) => {
+                    const text = target.dataset.tooltip || '';
+                    if (!text) {
+                        activeTooltipTarget = null;
+                        mockStatusTooltip.classList.remove('is-visible');
+                        return;
+                    }
+                    activeTooltipTarget = target;
+                    mockStatusTooltip.textContent = text;
+                    mockStatusTooltip.dataset.size = target.classList.contains('status-tooltip-compact') ? 'compact' : 'normal';
+                    mockStatusTooltip.classList.add('is-visible');
+                    repositionTooltip();
+                };
+
+                const hideTooltip = (target) => {
+                    if (activeTooltipTarget === target) {
+                        activeTooltipTarget = null;
+                        mockStatusTooltip.classList.remove('is-visible');
+                    }
+                };
+
+                document.querySelectorAll('.status-tooltip-target').forEach((target) => {
+                    if (target.closest('.mobile-preview')) {
+                        return;
+                    }
+                    target.addEventListener('mouseenter', () => showTooltip(target));
+                    target.addEventListener('mouseleave', () => hideTooltip(target));
+                    target.addEventListener('focusin', () => showTooltip(target));
+                    target.addEventListener('focusout', () => hideTooltip(target));
+                });
+
+                window.addEventListener('resize', repositionTooltip);
+                window.addEventListener('scroll', repositionTooltip, true);
+            }
         })();
     </script>
 </body>

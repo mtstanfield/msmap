@@ -160,34 +160,34 @@
     <!-- Status bar -->
     <div id="status-bar">
         <div id="status-left">
-            <div class="status-group status-tooltip-target status-tooltip-align-left" tabindex="0" data-tooltip="Visible markers and total hits after active filters.">
-                <span id="stat-mapped" class="status-item">
+            <div class="status-group">
+                <span id="stat-mapped" class="status-item status-tooltip-target status-tooltip-align-left status-tooltip-compact" tabindex="0" data-tooltip="Visible markers">
                     <span class="status-label">Mapped</span>
                     <span id="stat-mapped-value" class="status-value status-value-ops">0</span>
                 </span>
                 <span class="status-sep" aria-hidden="true">&middot;</span>
-                <span id="stat-total" class="status-item">
-                    <span class="status-label">Hits</span>
+                <span id="stat-total" class="status-item status-tooltip-target status-tooltip-compact" tabindex="0" data-tooltip="Events in current window">
+                    <span class="status-label">Events</span>
                     <span id="stat-total-value" class="status-value status-value-ops">0</span>
                 </span>
             </div>
             <div id="status-ops" class="status-group">
-                <span id="stat-events" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Connection rows retained for the last 24-hour window.">
-                    <span class="status-label">Events</span>
+                <span id="stat-events" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Retained logs&#10;(last 24h)">
+                    <span class="status-label">Logs</span>
                     <span id="stat-events-value" class="status-value status-value-ops">--</span>
                 </span>
                 <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-sources" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Distinct source IPs retained for the last 24-hour window.">
+                <span id="stat-sources" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Distinct source IPs&#10;(last 24h)">
                     <span class="status-label">Sources</span>
                     <span id="stat-sources-value" class="status-value status-value-ops">--</span>
                 </span>
                 <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-intel" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Tor exit and Spamhaus DROP feed refresh state.">
+                <span id="stat-intel" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="Threat intel feeds&#10;status.">
                     <span class="status-label">Feeds</span>
                     <span id="stat-intel-value" class="status-value status-value-ops">--</span>
                 </span>
                 <span class="status-sep status-sep-ops" aria-hidden="true" style="display:none">&middot;</span>
-                <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="AbuseIPDB lookup state and daily quota.">
+                <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" style="display:none" tabindex="0" data-tooltip="AbuseIPDB lookup status&#10;and daily quota.">
                     <span class="status-label">Abuse</span>
                     <span id="stat-abuse-value" class="status-value status-value-ops">--</span>
                 </span>
@@ -195,7 +195,7 @@
             <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">
-            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Age of the current map snapshot from /api/map.">
+            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-compact status-tooltip-align-right" tabindex="0" data-tooltip="Age of current&#10;map snapshot.">
                 <span class="status-dot is-unknown" aria-hidden="true"></span>
                 <span id="stat-time-value">Waiting for data</span>
             </div>
@@ -207,6 +207,7 @@
             <span id="stat-built">built {{BUILD_DATE}}</span>
         </div>
     </div>
+    <div id="status-tooltip" class="status-tooltip-floating" aria-hidden="true"></div>
 
     <script>{{LEAFLET_JS}}</script>
     <script>{{MARKERCLUSTER_JS}}</script>
