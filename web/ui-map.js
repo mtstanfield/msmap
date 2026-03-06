@@ -295,7 +295,7 @@ function setOperatorStatus(status) {
             } else {
                 statIntelValue.textContent = 'syncing';
                 statIntelValue.classList.add('status-state-syncing');
-                statIntel.dataset.tooltip = 'Threat intel feeds are still initializing.';
+                statIntel.dataset.tooltip = 'Threat intel feeds are initializing.';
             }
         } else if ((now - refreshTs) <= (12 * 3600)) {
             statIntelValue.textContent = 'ok';
@@ -311,7 +311,7 @@ function setOperatorStatus(status) {
     if (status.abuse_enabled !== true) {
         statAbuseValue.textContent = 'off';
         statAbuseValue.classList.add('status-state-off');
-        statAbuse.dataset.tooltip = 'AbuseIPDB lookups are disabled. Cached threat data may still be shown.';
+        statAbuse.dataset.tooltip = 'AbuseIPDB lookups are disabled; cached results may still be shown.';
         return;
     }
 
@@ -320,18 +320,16 @@ function setOperatorStatus(status) {
         if (status.abuse_can_accept_new_lookups === false) {
             statAbuseValue.textContent = 'quota';
             statAbuseValue.classList.add('status-state-stale');
-            statAbuse.dataset.tooltip =
-                'AbuseIPDB request budget is currently exhausted. New lookups are paused until reset.';
+            statAbuse.dataset.tooltip = 'AbuseIPDB quota is exhausted; new lookups are paused.';
         } else if (status.abuse_has_pending_work === true) {
             statAbuseValue.textContent = 'syncing';
             statAbuseValue.classList.add('status-state-syncing');
-            statAbuse.dataset.tooltip =
-                'Waiting for the first live AbuseIPDB response to confirm current requests remaining.';
+            statAbuse.dataset.tooltip = 'Waiting for first live AbuseIPDB quota response.';
         } else {
             statAbuseValue.textContent = 'ok';
             statAbuseValue.classList.add('status-state-ok');
             statAbuse.dataset.tooltip =
-                'AbuseIPDB can accept new lookups. Quota has not yet been confirmed by a live response.';
+                'AbuseIPDB can accept new lookups. Quota is not yet confirmed by a live response.';
         }
     } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
@@ -345,24 +343,21 @@ function setOperatorStatus(status) {
             : null;
         if (retryCountdown !== null) {
             if (retryCountdown === 'pending') {
-                statAbuse.dataset.tooltip =
-                    'AbuseIPDB daily quota is exhausted. Next automatic retry is pending.';
+                statAbuse.dataset.tooltip = 'AbuseIPDB quota is exhausted. Next automatic retry is pending.';
             } else {
-                statAbuse.dataset.tooltip =
-                    'AbuseIPDB daily quota is exhausted. Next automatic retry in ' +
-                    retryCountdown + '.';
+                statAbuse.dataset.tooltip = 'AbuseIPDB quota is exhausted. Next automatic retry in ' + retryCountdown + '.';
             }
         } else {
             const quotaResetCountdown = formatUtcMidnightCountdown(now);
             statAbuse.dataset.tooltip = quotaResetCountdown
-                ? ('AbuseIPDB daily quota is exhausted. Quota refresh in ' + quotaResetCountdown + '.')
-                : 'AbuseIPDB daily quota is exhausted. New lookups will resume after the UTC midnight reset.';
+                ? ('AbuseIPDB quota is exhausted. Quota refresh in ' + quotaResetCountdown + '.')
+                : 'AbuseIPDB quota is exhausted. Quota refresh pending.';
         }
     } else {
         statAbuseValue.textContent = 'ok';
         statAbuseValue.classList.add('status-state-ok');
         statAbuse.dataset.tooltip = abuseRemaining !== null
-            ? ('AbuseIPDB can accept new lookups. ' + abuseRemaining + ' requests remaining today.')
+            ? ('AbuseIPDB can accept new lookups. Requests remaining: ' + abuseRemaining + '.')
             : 'AbuseIPDB can accept new lookups.';
     }
 }
