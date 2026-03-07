@@ -365,7 +365,7 @@ function setOperatorStatus(status) {
     if (status.intel_enabled !== true) {
         statIntelValue.textContent = 'off';
         statIntelValue.classList.add('status-state-off');
-        statIntel.dataset.tooltip = 'Threat intel feeds: off.';
+        statIntel.dataset.tooltip = 'Threat intel feeds: off';
     } else {
         const now = typeof status.now === 'number' ? status.now : Math.floor(Date.now() / 1000);
         const refreshTs = typeof status.intel_last_refresh_ts === 'number' ? status.intel_last_refresh_ts : 0;
@@ -373,27 +373,27 @@ function setOperatorStatus(status) {
             if (status.intel_refresh_attempted === true) {
                 statIntelValue.textContent = 'stale';
                 statIntelValue.classList.add('status-state-stale');
-                statIntel.dataset.tooltip = 'Threat intel feeds: stale.';
+                statIntel.dataset.tooltip = 'Threat intel feeds: stale';
             } else {
                 statIntelValue.textContent = 'syncing';
                 statIntelValue.classList.add('status-state-syncing');
-                statIntel.dataset.tooltip = 'Threat intel feeds: syncing.';
+                statIntel.dataset.tooltip = 'Threat intel feeds: syncing';
             }
         } else if ((now - refreshTs) <= (12 * 3600)) {
             statIntelValue.textContent = 'ok';
             statIntelValue.classList.add('status-state-ok');
-            statIntel.dataset.tooltip = 'Threat intel feeds: ok.';
+            statIntel.dataset.tooltip = 'Threat intel feeds: ok';
         } else {
             statIntelValue.textContent = 'stale';
             statIntelValue.classList.add('status-state-stale');
-            statIntel.dataset.tooltip = 'Threat intel feeds: stale.';
+            statIntel.dataset.tooltip = 'Threat intel feeds: stale';
         }
     }
 
     if (status.abuse_enabled !== true) {
         statAbuseValue.textContent = 'off';
         statAbuseValue.classList.add('status-state-off');
-        statAbuse.dataset.tooltip = 'AbuseIPDB lookups disabled.\nCached results shown.';
+        statAbuse.dataset.tooltip = 'AbuseIPDB lookups disabled\nCached results shown';
         return;
     }
 
@@ -402,15 +402,15 @@ function setOperatorStatus(status) {
         if (status.abuse_can_accept_new_lookups === false) {
             statAbuseValue.textContent = 'quota';
             statAbuseValue.classList.add('status-state-stale');
-            statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted.\nNew lookups paused.';
+            statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted\nNew lookups paused';
         } else if (status.abuse_has_pending_work === true) {
             statAbuseValue.textContent = 'syncing';
             statAbuseValue.classList.add('status-state-syncing');
-            statAbuse.dataset.tooltip = 'Waiting for first\nAbuseIPDB quota response.';
+            statAbuse.dataset.tooltip = 'Waiting for first\nAbuseIPDB quota response';
         } else {
             statAbuseValue.textContent = 'ok';
             statAbuseValue.classList.add('status-state-ok');
-            statAbuse.dataset.tooltip = 'AbuseIPDB lookups enabled.\nQuota pending.';
+            statAbuse.dataset.tooltip = 'AbuseIPDB lookups enabled\nQuota pending';
         }
     } else if (status.abuse_quota_exhausted === true) {
         statAbuseValue.textContent = 'quota';
@@ -424,22 +424,22 @@ function setOperatorStatus(status) {
             : null;
         if (retryCountdown !== null) {
             if (retryCountdown === 'pending') {
-                statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted.\nNext retry pending.';
+                statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted\nNext retry pending';
             } else {
-                statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted.\nNext retry in ' + retryCountdown + '.';
+                statAbuse.dataset.tooltip = 'AbuseIPDB quota exhausted\nNext retry in ' + retryCountdown;
             }
         } else {
             const quotaResetCountdown = formatUtcMidnightCountdown(now);
             statAbuse.dataset.tooltip = quotaResetCountdown
-                ? ('AbuseIPDB quota exhausted.\nRefresh in ' + quotaResetCountdown + '.')
-                : 'AbuseIPDB quota exhausted.\nRefresh pending.';
+                ? ('AbuseIPDB quota exhausted\nRefresh in ' + quotaResetCountdown)
+                : 'AbuseIPDB quota exhausted\nRefresh pending';
         }
     } else {
         statAbuseValue.textContent = 'ok';
         statAbuseValue.classList.add('status-state-ok');
         statAbuse.dataset.tooltip = abuseRemaining !== null
-            ? ('AbuseIPDB can accept new lookups.\nRequests remaining: ' + abuseRemaining + '.')
-            : 'AbuseIPDB can accept new lookups.';
+            ? ('AbuseIPDB can accept new lookups\nRequests remaining: ' + abuseRemaining)
+            : 'AbuseIPDB can accept new lookups';
     }
     syncActiveStatusTooltip(statIntel);
     syncActiveStatusTooltip(statAbuse);
@@ -494,8 +494,8 @@ function syncMapFreshnessUi(nowMs = Date.now(), forceStale = false) {
             setStatusFreshness('Waiting for data');
         }
         statTime.dataset.tooltip = forceStale
-            ? 'No map snapshot available.\nLatest map fetch failed.'
-            : 'Waiting for first map snapshot.';
+            ? 'No map snapshot available\nLatest map fetch failed'
+            : 'Waiting for first map snapshot';
         syncActiveStatusTooltip(statTime);
         return;
     }
@@ -512,7 +512,7 @@ function syncMapFreshnessUi(nowMs = Date.now(), forceStale = false) {
                 : 'stale';
     setMapFeedState(nextState);
     setStatusFreshness(nextState === 'healthy' ? 'Fresh' : nextState === 'warning' ? 'Delayed' : 'Stale');
-    statTime.dataset.tooltip = 'Map data age: ' + formatElapsedAge(snapshotAgeSecs) + '.';
+    statTime.dataset.tooltip = 'Map data age: ' + formatElapsedAge(snapshotAgeSecs);
     syncActiveStatusTooltip(statTime);
 }
 

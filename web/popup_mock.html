@@ -199,11 +199,6 @@
             gap: var(--popup-signal-gap);
         }
 
-        .mobile-preview .popup-usage {
-            font-size: 10px;
-            line-height: 1.2;
-        }
-
         .mobile-preview .popup-meta-value,
         .mobile-preview .popup-detail-value {
             font-size: 13px;
@@ -370,15 +365,15 @@
                             <div class="popup-summary-top">
                                 <div class="popup-header">
                                     <div class="popup-kicker">Source</div>
-                                    <button type="button" class="popup-ip-copy" aria-label="Copy source IP" title="Copy source IP">
+                                    <button type="button" class="popup-ip-copy" data-copy-ip="203.0.113.47" aria-label="Copy source IP" title="Copy source IP">
                                         <span class="ip">203.0.113.47</span>
                                     </button>
                                 </div>
                                 <div class="popup-linkouts">
-                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"></path></svg></a>
+                                    <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"></path></svg></a>
                                 </div>
                             </div>
                             <div class="popup-signal-strip">
@@ -387,17 +382,13 @@
                                     <span class="popup-chip popup-chip-intel">Tor exit</span>
                                     <span class="popup-chip popup-chip-intel">DROP</span>
                                 </div>
-                                <div class="popup-usage">
-                                    <span class="popup-usage-label">type</span>
-                                    <span class="popup-usage-value">Data Center / Web Hosting / Transit</span>
-                                </div>
                             </div>
                             <div class="popup-meta-grid">
                                 <div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">38</span></div>
-                                <div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">NL</span></div>
                                 <div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value"><span class="popup-time-full">3/5/2026, 10:14:52 AM</span><span class="popup-time-compact">3/5, 10:14 AM</span></span></div>
                                 <div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value"><span class="popup-time-full">3/5/2026, 10:17:08 AM</span><span class="popup-time-compact">3/5, 10:17 AM</span></span></div>
                                 <div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div>
+                                <div class="popup-meta-item"><span class="popup-meta-label">Type</span><span class="popup-meta-value">Data Center / Web Hosting / Transit</span></div>
                             </div>
                         </div>
 
@@ -460,15 +451,15 @@
                                     <div class="popup-summary-top">
                                         <div class="popup-header">
                                             <div class="popup-kicker">Source</div>
-                                            <button type="button" class="popup-ip-copy" aria-label="Copy source IP" title="Copy source IP">
+                                            <button type="button" class="popup-ip-copy" data-copy-ip="185.242.226.8" aria-label="Copy source IP" title="Copy source IP">
                                                 <span class="ip">185.242.226.8</span>
                                             </button>
                                         </div>
                                         <div class="popup-linkouts">
-                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
-                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10v1H3z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open GreyNoise" title="Open GreyNoise"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.74 3.4H8.8l-.96 1.66H3.18A5 5 0 0 1 8 3Zm-4.82 6.5h3.79L8 7.84l1.03 1.66h3.79A5 5 0 0 1 8 13a5 5 0 0 1-4.82-3.5Z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open Shodan" title="Open Shodan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13A6.5 6.5 0 0 0 8 1.5Zm0 1.5a5 5 0 0 1 4.66 3.2H8.7V5.1H7.3v2.1h5.58A5 5 0 0 1 8 13a5 5 0 0 1-4.88-4.1H7.3v2h1.4v-2h3.92A5 5 0 0 1 8 3Z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AbuseIPDB" title="Open AbuseIPDB"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l5 2v3.9c0 3.2-2.08 6.1-5 7.1c-2.92-1-5-3.9-5-7.1V3l5-2Zm0 2.1L5 4.25V6.9c0 2.18 1.27 4.28 3 5.17c1.73-.89 3-2.99 3-5.17V4.25L8 3.1Zm-.75 1.9h1.5v3.2h2.15v1.4H7.25V5Z"></path></svg></a>
+                                            <a class="popup-linkout" href="#" aria-label="Open AlienVault OTX" title="Open AlienVault OTX"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 0 1 4.46 2.74H9.72l-.9 1.56l.9 1.56h2.74A5 5 0 0 1 8 13a5 5 0 0 1-4.46-2.58h2.74l.9-1.56l-.9-1.56H3.54A5 5 0 0 1 8 3Zm-.62 2.74h1.24l1.77 3.06L8.62 11.9H7.38L5.61 8.8l1.77-3.06Z"></path></svg></a>
                                         </div>
                                     </div>
                                     <div class="popup-signal-strip">
@@ -476,17 +467,13 @@
                                             <span class="popup-chip threat-medium">Threat 44</span>
                                             <span class="popup-chip popup-chip-intel">Tor</span>
                                         </div>
-                                        <div class="popup-usage">
-                                            <span class="popup-usage-label">type</span>
-                                            <span class="popup-usage-value">Data Center</span>
-                                        </div>
                                     </div>
                                     <div class="popup-meta-grid">
                                         <div class="popup-meta-item"><span class="popup-meta-label">Hits</span><span class="popup-meta-value">9</span></div>
-                                        <div class="popup-meta-item"><span class="popup-meta-label">Country</span><span class="popup-meta-value">US</span></div>
                                         <div class="popup-meta-item"><span class="popup-meta-label">First</span><span class="popup-meta-value"><span class="popup-time-full">3/6/2026, 1:21:03 AM</span><span class="popup-time-compact">3/6, 1:21 AM</span></span></div>
                                         <div class="popup-meta-item"><span class="popup-meta-label">Last</span><span class="popup-meta-value"><span class="popup-time-full">3/6/2026, 1:24:44 AM</span><span class="popup-time-compact">3/6, 1:24 AM</span></span></div>
                                         <div class="popup-meta-item"><span class="popup-meta-label">ASN</span><span class="popup-meta-value">AS9009 M247 Europe SRL</span></div>
+                                        <div class="popup-meta-item"><span class="popup-meta-label">Type</span><span class="popup-meta-value">Data Center</span></div>
                                     </div>
                                 </div>
                                 <div class="popup-detail-wrap" aria-hidden="true"></div>
@@ -509,19 +496,19 @@
                             </span>
                         </span>
                         <span class="status-group status-item-ops">
-                            <span class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Threat intel feeds: ok.">
+                            <span class="status-item status-tooltip-target status-tooltip-nowrap" data-tooltip="Threat intel feeds: ok">
                                 <span class="status-label">Feeds</span>
                                 <span class="status-value status-value-ops status-state-ok">ok</span>
                             </span>
                             <span class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-                            <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m.">
+                            <span class="status-item status-tooltip-target" data-tooltip="AbuseIPDB quota exhausted&#10;Next retry in 12h 14m">
                                 <span class="status-label">Abuse</span>
                                 <span class="status-value status-value-ops status-state-syncing">syncing</span>
                             </span>
                         </span>
                     </div>
                     <div class="mobile-status-right">
-                        <span id="mp-stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-align-right" data-tooltip="Map data age: 22s ago.">
+                        <span id="mp-stat-time" class="status-item status-freshness status-tooltip-target status-tooltip-align-right" data-tooltip="Map data age: 22s ago">
                             <span class="status-dot is-healthy" aria-hidden="true"></span>
                             <span class="status-value status-value-ops">Fresh</span>
                         </span>
@@ -702,19 +689,19 @@
                 <span id="stat-sources-value" class="status-value status-value-ops">4.4k</span>
             </span>
             <span id="status-sep-intel" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-            <span id="stat-intel" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" tabindex="0" data-tooltip="Threat intel feeds: ok.">
+            <span id="stat-intel" class="status-item status-item-ops status-tooltip-target status-tooltip-nowrap" tabindex="0" data-tooltip="Threat intel feeds: ok">
                 <span class="status-label">Feeds</span>
                 <span id="stat-intel-value" class="status-value status-value-ops status-state-ok">ok</span>
             </span>
             <span id="status-sep-abuse" class="status-sep status-sep-ops" aria-hidden="true">&middot;</span>
-            <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" tabindex="0" data-tooltip="AbuseIPDB quota exhausted.&#10;Next retry in 12h 14m.">
+            <span id="stat-abuse" class="status-item status-item-ops status-tooltip-target" tabindex="0" data-tooltip="AbuseIPDB quota exhausted&#10;Next retry in 12h 14m">
                 <span class="status-label">Abuse</span>
                 <span id="stat-abuse-value" class="status-value status-value-ops status-state-syncing">syncing</span>
             </span>
             <span id="stat-error" style="display:none"></span>
         </div>
         <div id="status-right">
-            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Map data age: 19s ago.">
+            <div id="stat-time" class="status-group status-freshness status-tooltip-target status-tooltip-align-right" tabindex="0" data-tooltip="Map data age: 19s ago">
                 <span class="status-dot is-healthy" aria-hidden="true"></span>
                 <span id="stat-time-value">Fresh</span>
             </div>
