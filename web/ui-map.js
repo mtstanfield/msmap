@@ -763,6 +763,10 @@ function buildIntelBadges(r) {
  * @returns {string}
  */
 function buildLinkouts(srcIp) {
+    const isDesktopTarget = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const targetAttr = isDesktopTarget
+        ? ' target="_blank" rel="noopener noreferrer"'
+        : '';
     const safeIp = encodeURIComponent(srcIp);
     const links = [
         { href: 'https://viz.greynoise.io/ip/' + safeIp, icon: greyNoiseIconSvg(), title: 'Open GreyNoise' },
@@ -771,7 +775,7 @@ function buildLinkouts(srcIp) {
         { href: 'https://otx.alienvault.com/indicator/ip/' + safeIp, icon: otxIconSvg(), title: 'Open AlienVault OTX' },
     ];
     return '<div class="popup-linkouts">' + links.map((link) =>
-        '<a class="popup-linkout" href="' + link.href + '" target="_blank" rel="noopener noreferrer" title="' +
+        '<a class="popup-linkout" href="' + link.href + '"' + targetAttr + ' title="' +
         link.title + '" aria-label="' + link.title + '">' + link.icon + '</a>'
     ).join('') + '</div>';
 }

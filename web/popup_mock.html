@@ -742,6 +742,7 @@
             const threatText = document.querySelector('.filter-threat-text');
             const motionButtons = document.querySelectorAll('[data-motion]');
             const popupCopy = document.querySelector('.popup-ip-copy');
+            const isDesktopTarget = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
             const mockStatusTooltip = document.getElementById('status-tooltip');
 
             toggle.addEventListener('click', () => {
@@ -790,6 +791,22 @@
             popupCopy.addEventListener('click', () => {
                 popupCopy.classList.add('is-copied');
                 window.setTimeout(() => popupCopy.classList.remove('is-copied'), 650);
+            });
+
+            document.querySelectorAll('.popup-linkout').forEach((link) => {
+                if (link.closest('.mobile-preview')) {
+                    link.removeAttribute('target');
+                    link.removeAttribute('rel');
+                    return;
+                }
+
+                if (isDesktopTarget) {
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                } else {
+                    link.removeAttribute('target');
+                    link.removeAttribute('rel');
+                }
             });
 
             if (mockStatusTooltip) {
