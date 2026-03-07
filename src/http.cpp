@@ -54,7 +54,6 @@ std::string connections_to_json(const std::vector<ConnectionRow>& rows)
         out += "\"proto\":";      json::append_string(out, row.proto);            out += ',';
         out += "\"tcp_flags\":";  json::append_string_or_null(out, row.tcp_flags); out += ',';
         out += "\"rule\":";       json::append_string(out, row.rule);             out += ',';
-        out += "\"country\":";    json::append_string_or_null(out, row.country);  out += ',';
         out += "\"lat\":";        json::append_double_or_null(out, row.lat);       out += ',';
         out += "\"lon\":";        json::append_double_or_null(out, row.lon);       out += ',';
         out += "\"asn\":";        json::append_string_or_null(out, row.asn);       out += ',';
@@ -121,8 +120,6 @@ std::string map_rows_to_json(const std::vector<MapRow>& rows,
         json::append_double_or_null(out, row.lat);
         out += ",\"lon\":";
         json::append_double_or_null(out, row.lon);
-        out += ",\"country\":";
-        json::append_string_or_null(out, row.country);
         out += ",\"asn\":";
         json::append_string_or_null(out, row.asn);
         out += ",\"threat_latest\":";

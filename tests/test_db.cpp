@@ -4,9 +4,11 @@
 #include "parser.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <sqlite3.h>
 #include <algorithm>
 #include <atomic>
 #include <ctime>
+#include <filesystem>
 #include <thread>
 
 // ---------------------------------------------------------------------------
@@ -89,6 +91,23 @@ std::vector<msmap::ConnectionRow> collect_rows(msmap::Database& db,
         filters.cursor = *page.next_cursor;
     }
     return out;
+}
+
+std::string temp_db_path()
+{
+    const auto base = std::filesystem::temp_directory_path();
+    const auto suffix = std::to_string(static_cast<long long>(std::time(nullptr))) + "-" +
+                        std::to_string(static_cast<unsigned long long>(
+                            std::hash<std::thread::id>{}(std::this_thread::get_id())));
+    return (base / ("msmap-migrate-" + suffix + ".db")).string();
+}
+
+bool sqlite_exec(sqlite3* db, const char* sql)
+{
+    char* err = nullptr;
+    const int rc = sqlite3_exec(db, sql, nullptr, nullptr, &err);
+    sqlite3_free(err);
+    return rc == SQLITE_OK;
 }
 
 } // anonymous namespace
@@ -744,4 +763,78 @@ TEST_CASE("concurrency: inserts and detail/map reads run concurrently without co
     const auto snapshot = db.status_snapshot();
     REQUIRE(snapshot.has_value());
     CHECK(snapshot->rows_24h >= 1);
+}
+
+TEST_CASE("legacy connections.country schema is migrated at startup")
+{
+    const std::string path = temp_db_path();
+    sqlite3* raw = nullptr;
+    REQUIRE(sqlite3_open(path.c_str(), &raw) == SQLITE_OK);
+    REQUIRE(sqlite_exec(raw, R"sql(
+CREATE TABLE connections (
+    id         INTEGER PRIMARY KEY,
+    ts         INTEGER NOT NULL,
+    src_ip     TEXT    NOT NULL,
+    src_port   INTEGER,
+    dst_ip     TEXT    NOT NULL,
+    dst_port   INTEGER,
+    proto      TEXT    NOT NULL,
+    tcp_flags  TEXT,
+    rule       TEXT    NOT NULL DEFAULT '',
+    country    TEXT,
+    lat        REAL,
+    lon        REAL,
+    asn        TEXT,
+    threat     INTEGER,
+    usage_type TEXT
+))sql"));
+    REQUIRE(sqlite_exec(raw, "CREATE INDEX IF NOT EXISTS idx_country ON connections(country)"));
+    REQUIRE(sqlite_exec(raw, R"sql(
+INSERT INTO connections(ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags, rule, country, lat, lon, asn, threat, usage_type)
+VALUES (1000, '198.51.100.10', 12345, '203.0.113.10', 443, 'TCP', 'SYN', 'FW_INPUT_NEW', 'US', 37.751, -97.822, 'AS64500 Example', 77, 'Data Center/Web Hosting/Transit')
+)sql"));
+    sqlite3_close(raw);
+
+    msmap::Database db{path};
+    REQUIRE(db.valid());
+
+    const auto rows = collect_rows(db, msmap::QueryFilters{});
+    REQUIRE(rows.size() == 1);
+    CHECK(rows.front().src_ip == "198.51.100.10");
+    REQUIRE(rows.front().lat.has_value());
+    REQUIRE(rows.front().lon.has_value());
+    CHECK(rows.front().asn == "AS64500 Example");
+    REQUIRE(rows.front().threat.has_value());
+    CHECK(*rows.front().threat == 77);
+
+    sqlite3* verify = nullptr;
+    REQUIRE(sqlite3_open(path.c_str(), &verify) == SQLITE_OK);
+    sqlite3_stmt* table_info = nullptr;
+    REQUIRE(sqlite3_prepare_v2(verify, "PRAGMA table_info(connections)", -1, &table_info, nullptr) == SQLITE_OK);
+    bool has_country = false;
+    while (sqlite3_step(table_info) == SQLITE_ROW) {
+        const auto* col_name = sqlite3_column_text(table_info, 1);
+        if (col_name != nullptr && std::string{reinterpret_cast<const char*>(col_name)} == "country") { // NOLINT(*-reinterpret-cast)
+            has_country = true;
+            break;
+        }
+    }
+    sqlite3_finalize(table_info);
+    CHECK_FALSE(has_country);
+
+    sqlite3_stmt* idx_stmt = nullptr;
+    REQUIRE(sqlite3_prepare_v2(verify,
+                               "SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_country'",
+                               -1, &idx_stmt, nullptr) == SQLITE_OK);
+    CHECK(sqlite3_step(idx_stmt) != SQLITE_ROW);
+    sqlite3_finalize(idx_stmt);
+    sqlite3_close(verify);
+
+    msmap::Database reopened{path};
+    REQUIRE(reopened.valid());
+
+    std::error_code ec;
+    (void)std::filesystem::remove(path, ec);
+    (void)std::filesystem::remove(path + "-wal", ec);
+    (void)std::filesystem::remove(path + "-shm", ec);
 }

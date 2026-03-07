@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
@@ -59,7 +60,6 @@ CREATE TABLE IF NOT EXISTS connections (
     proto      TEXT    NOT NULL,
     tcp_flags  TEXT,
     rule       TEXT    NOT NULL DEFAULT '',
-    country    TEXT,
     lat        REAL,
     lon        REAL,
     asn        TEXT,
@@ -81,8 +81,6 @@ constexpr const char* kCreateIndexSrcIp =
     "CREATE INDEX IF NOT EXISTS idx_src_ip   ON connections(src_ip)";
 constexpr const char* kCreateIndexDstPort =
     "CREATE INDEX IF NOT EXISTS idx_dst_port ON connections(dst_port)";
-constexpr const char* kCreateIndexCountry =
-    "CREATE INDEX IF NOT EXISTS idx_country  ON connections(country)";
 constexpr const char* kCreateIndexSrcIpTsId =
     "CREATE INDEX IF NOT EXISTS idx_src_ip_ts_id ON connections(src_ip, ts DESC, id DESC)";
 constexpr const char* kCreateIndexTsSrcIp =
@@ -100,8 +98,37 @@ ON connections(ts, src_ip, dst_ip, proto,
 constexpr const char* kInsertSql = R"sql(
 INSERT OR IGNORE INTO connections(
     ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags,
-    rule, country, lat, lon, asn, threat, usage_type)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+    rule, lat, lon, asn, threat, usage_type)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))sql";
+
+constexpr const char* kMigratedTableCreateSql = R"sql(
+CREATE TABLE connections_new (
+    id         INTEGER PRIMARY KEY,
+    ts         INTEGER NOT NULL,
+    src_ip     TEXT    NOT NULL,
+    src_port   INTEGER,
+    dst_ip     TEXT    NOT NULL,
+    dst_port   INTEGER,
+    proto      TEXT    NOT NULL,
+    tcp_flags  TEXT,
+    rule       TEXT    NOT NULL DEFAULT '',
+    lat        REAL,
+    lon        REAL,
+    asn        TEXT,
+    threat     INTEGER,
+    usage_type TEXT
+))sql";
+
+constexpr const char* kCopyMigratedConnectionRowsSql = R"sql(
+INSERT INTO connections_new(
+    id, ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags, rule,
+    lat, lon, asn, threat, usage_type
+)
+SELECT
+    id, ts, src_ip, src_port, dst_ip, dst_port, proto, tcp_flags, rule,
+    lat, lon, asn, threat, usage_type
+FROM connections
+)sql";
 
 constexpr const char* kPruneSql =
     "DELETE FROM connections WHERE ts < ?";
@@ -153,6 +180,74 @@ bool apply_connection_pragmas(sqlite3* db, bool configure_wal) noexcept
            exec_sql(db, "PRAGMA mmap_size=268435456") &&
            exec_sql(db, "PRAGMA cache_size=-131072") &&
            exec_sql(db, "PRAGMA wal_autocheckpoint=2000");
+}
+
+bool table_exists(sqlite3* db, const char* table) noexcept
+{
+    constexpr const char* k_table_exists_sql =
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?";
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db, k_table_exists_sql, -1, &raw, nullptr) != SQLITE_OK) {
+        std::clog << "[WARN] table_exists prepare: " << sqlite3_errmsg(db) << '\n';
+        return false;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+    (void)sqlite3_bind_text(stmt.get(), 1, table, -1, kStaticText);
+    return sqlite3_step(stmt.get()) == SQLITE_ROW;
+}
+
+bool has_country_column(sqlite3* db) noexcept
+{
+    const std::string pragma = "PRAGMA table_info(connections)";
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db, pragma.c_str(), -1, &raw, nullptr) != SQLITE_OK) {
+        std::clog << "[WARN] has_column prepare: " << sqlite3_errmsg(db) << '\n';
+        return false;
+    }
+    const std::unique_ptr<sqlite3_stmt, StmtFinalizer> stmt{raw};
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        const auto* col_name = sqlite3_column_text(stmt.get(), 1);
+        if (col_name != nullptr && std::strcmp(reinterpret_cast<const char*>(col_name), "country") == 0) { // NOLINT(*-reinterpret-cast)
+            return true;
+        }
+    }
+    return false;
+}
+
+bool migrate_drop_country_column(sqlite3* db) noexcept
+{
+    if (!table_exists(db, "connections") || !has_country_column(db)) {
+        return true;
+    }
+
+    std::clog << "[INFO] migrating connections schema to drop country column\n";
+    if (!exec_sql(db, "BEGIN IMMEDIATE")) {
+        return false;
+    }
+
+    const bool ok =
+        exec_sql(db, kMigratedTableCreateSql) &&
+        exec_sql(db, kCopyMigratedConnectionRowsSql) &&
+        exec_sql(db, "DROP TABLE connections") &&
+        exec_sql(db, "ALTER TABLE connections_new RENAME TO connections") &&
+        exec_sql(db, kCreateIndexTs) &&
+        exec_sql(db, kCreateIndexSrcIp) &&
+        exec_sql(db, kCreateIndexDstPort) &&
+        exec_sql(db, kCreateIndexSrcIpTsId) &&
+        exec_sql(db, kCreateIndexTsSrcIp) &&
+        exec_sql(db, kCreateIndexDedup);
+
+    if (!ok) {
+        (void)exec_sql(db, "ROLLBACK");
+        std::clog << "[FATAL] country-column migration failed (rolled back)\n";
+        return false;
+    }
+    if (!exec_sql(db, "COMMIT")) {
+        (void)exec_sql(db, "ROLLBACK");
+        std::clog << "[FATAL] country-column migration commit failed\n";
+        return false;
+    }
+    return true;
 }
 
 // ── Column-reading helpers ─────────────────────────────────────────────────────
@@ -323,14 +418,13 @@ ConnectionRow read_connection_row_from_offset(sqlite3_stmt* stmt, int base_col) 
     row.proto         = col_text(stmt, base_col + 5);
     row.tcp_flags     = col_text(stmt, base_col + 6);
     row.rule          = col_text(stmt, base_col + 7);
-    row.country       = col_text(stmt, base_col + 8);
-    row.lat           = col_opt_double(stmt, base_col + 9);
-    row.lon           = col_opt_double(stmt, base_col + 10);
-    row.asn           = col_text(stmt, base_col + 11);
-    row.threat        = col_opt_int(stmt, base_col + 12);
-    row.usage_type    = col_text(stmt, base_col + 13);
-    row.tor_exit      = col_opt_bool(stmt, base_col + 14);
-    row.spamhaus_drop = col_opt_bool(stmt, base_col + 15);
+    row.lat           = col_opt_double(stmt, base_col + 8);
+    row.lon           = col_opt_double(stmt, base_col + 9);
+    row.asn           = col_text(stmt, base_col + 10);
+    row.threat        = col_opt_int(stmt, base_col + 11);
+    row.usage_type    = col_text(stmt, base_col + 12);
+    row.tor_exit      = col_opt_bool(stmt, base_col + 13);
+    row.spamhaus_drop = col_opt_bool(stmt, base_col + 14);
     return row;
 }
 
@@ -394,13 +488,16 @@ Database::Database(const std::string& path) noexcept
         write_db_.reset();
         return;
     }
+    if (!migrate_drop_country_column(write_db_.get())) {
+        write_db_.reset();
+        return;
+    }
 
     if (!exec_sql(write_db_.get(), kCreateTable)          ||
         !exec_sql(write_db_.get(), kCreateIpIntelTable)   ||
         !exec_sql(write_db_.get(), kCreateIndexTs)        ||
         !exec_sql(write_db_.get(), kCreateIndexSrcIp)     ||
         !exec_sql(write_db_.get(), kCreateIndexDstPort)   ||
-        !exec_sql(write_db_.get(), kCreateIndexCountry)   ||
         !exec_sql(write_db_.get(), kCreateIndexSrcIpTsId) ||
         !exec_sql(write_db_.get(), kCreateIndexTsSrcIp)   ||
         !exec_sql(write_db_.get(), kCreateIndexDedup)) {
@@ -579,7 +676,7 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
 
     sqlite3_stmt* const stmt = insert_stmt_.get();
 
-    // Bind all fourteen parameters (1-indexed).
+    // Bind all thirteen parameters (1-indexed).
     (void)sqlite3_bind_int64(stmt,  1, entry.ts);
     (void)sqlite3_bind_text( stmt,  2, entry.src_ip.c_str(), -1, kStaticText);
 
@@ -608,25 +705,24 @@ bool Database::insert(const LogEntry& entry, const GeoIpResult& geo,
     (void)sqlite3_bind_text(stmt, 8, entry.rule.c_str(), -1, kStaticText);
 
     // GeoIP enrichment — renderable rows only.
-    (void)sqlite3_bind_text(  stmt,  9, geo.country.c_str(), -1, kStaticText);
-    (void)sqlite3_bind_double(stmt, 10, geo.lat);
-    (void)sqlite3_bind_double(stmt, 11, geo.lon);
+    (void)sqlite3_bind_double(stmt, 9, geo.lat);
+    (void)sqlite3_bind_double(stmt, 10, geo.lon);
 
     if (!geo.asn.empty()) {
-        (void)sqlite3_bind_text(stmt, 12, geo.asn.c_str(), -1, kStaticText);
+        (void)sqlite3_bind_text(stmt, 11, geo.asn.c_str(), -1, kStaticText);
     } else {
-        (void)sqlite3_bind_null(stmt, 12);
+        (void)sqlite3_bind_null(stmt, 11);
     }
 
     // AbuseIPDB threat score — NULL when not yet enriched.
     if (threat.has_value()) {
-        (void)sqlite3_bind_int(stmt, 13, *threat);
+        (void)sqlite3_bind_int(stmt, 12, *threat);
     } else {
-        (void)sqlite3_bind_null(stmt, 13);
+        (void)sqlite3_bind_null(stmt, 12);
     }
 
     // usage_type is NULL at insert time; AbuseCache backfills it later.
-    (void)sqlite3_bind_null(stmt, 14);
+    (void)sqlite3_bind_null(stmt, 13);
 
     const int rc = sqlite3_step(stmt);
     const int changed = sqlite3_changes(write_db_.get());
@@ -790,7 +886,7 @@ DetailPage Database::query_detail_page(const QueryFilters& f) const noexcept
     std::string sql =
         "SELECT connections.id, ts, src_ip, src_port, dst_ip, dst_port, "
         "proto, tcp_flags, rule, "
-        "country, lat, lon, asn, threat, usage_type, "
+        "lat, lon, asn, threat, usage_type, "
         "intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
@@ -891,7 +987,7 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
 
     std::string sql =
         "WITH filtered AS ("
-        "SELECT connections.id, ts, src_ip, dst_port, country, lat, lon, asn, "
+        "SELECT connections.id, ts, src_ip, dst_port, lat, lon, asn, "
         "threat, usage_type, intel.tor_exit, intel.spamhaus_drop "
         "FROM connections "
         "LEFT JOIN ip_intel_cache AS intel ON intel.ip = connections.src_ip";
@@ -901,9 +997,9 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
     sql += "), "
            "latest AS ("
            "SELECT src_ip, threat AS threat_latest, dst_port AS sample_dst_port, "
-           "country, lat, lon, asn, tor_exit, spamhaus_drop "
+           "lat, lon, asn, tor_exit, spamhaus_drop "
            "FROM ("
-           "SELECT src_ip, threat, dst_port, country, lat, lon, asn, tor_exit, spamhaus_drop, "
+           "SELECT src_ip, threat, dst_port, lat, lon, asn, tor_exit, spamhaus_drop, "
            "ROW_NUMBER() OVER (PARTITION BY src_ip ORDER BY ts DESC, id DESC) AS rn "
            "FROM filtered"
            ") WHERE rn = 1"
@@ -926,7 +1022,7 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
            "FROM filtered GROUP BY src_ip"
            ") "
            "SELECT agg.src_ip, agg.first_ts, agg.last_ts, agg.count, "
-           "latest.lat, latest.lon, latest.country, latest.asn, "
+           "latest.lat, latest.lon, latest.asn, "
            "latest.threat_latest, agg.threat_max, latest.sample_dst_port, "
            "usage_pick.usage_type, latest.tor_exit, latest.spamhaus_drop "
            "FROM agg "
@@ -956,14 +1052,13 @@ std::vector<MapRow> Database::query_map_rows(const MapFilters& f) const noexcept
         row.count           = sqlite3_column_int(stmt.get(), 3);
         row.lat             = col_opt_double(stmt.get(), 4);
         row.lon             = col_opt_double(stmt.get(), 5);
-        row.country         = col_text(stmt.get(), 6);
-        row.asn             = col_text(stmt.get(), 7);
-        row.threat_latest   = col_opt_int(stmt.get(), 8);
-        row.threat_max      = col_opt_int(stmt.get(), 9);
-        row.sample_dst_port = col_opt_int(stmt.get(), 10);
-        row.usage_type      = col_text(stmt.get(), 11);
-        row.tor_exit        = col_opt_bool(stmt.get(), 12);
-        row.spamhaus_drop   = col_opt_bool(stmt.get(), 13);
+        row.asn             = col_text(stmt.get(), 6);
+        row.threat_latest   = col_opt_int(stmt.get(), 7);
+        row.threat_max      = col_opt_int(stmt.get(), 8);
+        row.sample_dst_port = col_opt_int(stmt.get(), 9);
+        row.usage_type      = col_text(stmt.get(), 10);
+        row.tor_exit        = col_opt_bool(stmt.get(), 11);
+        row.spamhaus_drop   = col_opt_bool(stmt.get(), 12);
         rows.push_back(std::move(row));
     }
     release_read_slot(*slot);

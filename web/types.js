@@ -15,7 +15,6 @@
  *   first_ts: number,
  *   last_ts: number,
  *   threat_max: number|null|undefined,
- *   country?: string,
  *   asn?: string,
  *   usage_type?: string,
  *   spamhaus_drop?: boolean,

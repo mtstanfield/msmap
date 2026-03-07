@@ -46,7 +46,6 @@ struct ConnectionRow {
     std::string        proto;
     std::string        tcp_flags;       // empty string when not TCP
     std::string        rule;
-    std::string        country;         // empty string when no GeoIP
     std::optional<double> lat;          // nullopt when no GeoIP
     std::optional<double> lon;          // nullopt when no GeoIP
     std::string        asn;             // empty string when no GeoIP
@@ -89,7 +88,6 @@ struct MapRow {
     int                    count{};
     std::optional<double>  lat;
     std::optional<double>  lon;
-    std::string            country;
     std::string            asn;
     std::optional<int>     threat_latest;
     std::optional<int>     threat_max;

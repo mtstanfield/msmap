@@ -256,7 +256,6 @@ TEST_CASE("query_detail_page: GeoIP columns round-trip correctly", "[db][query]"
 
     const auto rows = query_rows(db, {});
     REQUIRE(rows.size() == 1);
-    REQUIRE(rows.at(0).country        == "DE");
     REQUIRE(rows.at(0).lat.has_value());
     REQUIRE(rows.at(0).lon.has_value());
     REQUIRE(rows.at(0).asn            == "AS1234 Example ISP");

@@ -802,7 +802,6 @@ function buildSummaryItem(label, value) {
 function buildAggregateSummary(r) {
     const metaItems = [
         buildSummaryItem('Hits', escapeHtml(String(r.count))),
-        buildSummaryItem('Country', r.country ? escapeHtml(r.country) : ''),
         buildSummaryItem('First', buildResponsiveTimestamp(r.first_ts)),
         buildSummaryItem('Last', buildResponsiveTimestamp(r.last_ts)),
         buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : ''),

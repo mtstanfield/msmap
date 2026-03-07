@@ -189,6 +189,8 @@ Notes:
 - `msmap` now fails fast at startup if `GeoLite2-City.mmdb` is missing or
   invalid.
 - `GeoLite2-ASN.mmdb` is optional and only affects ASN enrichment.
+- Startup performs an in-app schema migration to drop the legacy
+  `connections.country` column when present.
 - `ABUSEIPDB_API_KEY` is optional; without it, existing cached AbuseIPDB data is
   still readable but new threat/usage lookups are disabled.
 - `MSMAP_HOME_HOST` is optional; without it, the home marker, home-directed
@@ -200,7 +202,7 @@ Download `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` from
 [MaxMind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)
 (free account required) and place them in the directory mounted at
 `/var/lib/msmap/geoip/`. `GeoLite2-City.mmdb` is required for map markers and
-country/location data. `GeoLite2-ASN.mmdb` is optional and only adds ASN
+source coordinate data. `GeoLite2-ASN.mmdb` is optional and only adds ASN
 enrichment. `msmap` fails fast if the City DB is missing or invalid, retains
 only rows whose source GeoIP resolves to a renderable map point, and
 transactionally reloads changed `.mmdb` files so a bad update does not replace
@@ -428,9 +430,9 @@ Clicking a marker shows:
 
 - First/last seen timestamps for the aggregate source IP marker
 - Hit count within the selected window
-- Country and map placement from GeoLite2 City; ASN from GeoLite2 ASN when
-  mounted. Marker placement remains approximate and should be read as a
-  location hint, not an exact device position.
+- Map placement from GeoLite2 City and ASN from GeoLite2 ASN when mounted.
+  Marker placement remains approximate and should be read as a location hint,
+  not an exact device position.
 - **Threat score** chip from AbuseIPDB
 - **Usage type** — e.g. `Data Center/Web Hosting/Transit`, `Fixed Line ISP`
 - **Tor exit** badge from Tor Project bulk exit data
