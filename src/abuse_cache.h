@@ -39,6 +39,12 @@ struct AbuseCacheEntry {
     std::int64_t last_checked{0};
 };
 
+/// Parse an AbuseIPDB /api/v2/check JSON body into AbuseResult.
+/// Returns nullopt when abuseConfidenceScore is missing/invalid.
+/// Exposed primarily for deterministic parser unit tests.
+[[nodiscard]] std::optional<AbuseResult>
+parse_abuse_response(const std::string& json) noexcept;
+
 enum class AbuseLookupState : std::uint8_t {
     kMissing,
     kFresh,

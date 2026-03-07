@@ -118,6 +118,26 @@ TEST_CASE("AbuseCache: cache_store zero score round-trips")
     REQUIRE(hit->score == 0);
 }
 
+TEST_CASE("AbuseCache: parser unescapes usageType JSON escapes")
+{
+    const std::string json =
+        R"({"data":{"abuseConfidenceScore":91,"usageType":"Data Center\/Web Hosting\/Transit"}})";
+    const auto parsed = msmap::parse_abuse_response(json);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->score == 91);
+    CHECK(parsed->usage_type == "Data Center/Web Hosting/Transit");
+}
+
+TEST_CASE("AbuseCache: parser handles escaped quotes, backslashes, and unicode")
+{
+    const std::string json =
+        R"({"abuseConfidenceScore":5,"usageType":"Quote: \"x\" Path: C:\\tools Unicode: \u0026 \u03A9"})";
+    const auto parsed = msmap::parse_abuse_response(json);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->score == 5);
+    CHECK(parsed->usage_type == "Quote: \"x\" Path: C:\\tools Unicode: & Ω");
+}
+
 TEST_CASE("AbuseCache: lookup returns cached result for soft-refresh eligible entries")
 {
     msmap::AbuseCache cache{":memory:", ""};

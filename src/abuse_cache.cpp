@@ -15,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace msmap {
 
@@ -100,6 +101,138 @@ std::size_t curl_header_cb(const char* ptr, std::size_t size,
 
 // ── Minimal JSON extractor ────────────────────────────────────────────────────
 
+constexpr int hex_nibble(char ch) noexcept
+{
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0';
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return 10 + (ch - 'a');
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return 10 + (ch - 'A');
+    }
+    return -1;
+}
+
+bool parse_hex4(const char* p, std::uint32_t& codepoint) noexcept
+{
+    codepoint = 0;
+    for (int i = 0; i < 4; ++i) {
+        const int nib = hex_nibble(p[i]);
+        if (nib < 0) {
+            return false;
+        }
+        codepoint = (codepoint << 4U) | static_cast<std::uint32_t>(nib);
+    }
+    return true;
+}
+
+void append_replacement_utf8(std::string& out)
+{
+    out.push_back(static_cast<char>(0xEF));
+    out.push_back(static_cast<char>(0xBF));
+    out.push_back(static_cast<char>(0xBD));
+}
+
+void append_codepoint_utf8(std::string& out, std::uint32_t codepoint)
+{
+    if (codepoint <= 0x7FU) {
+        out.push_back(static_cast<char>(codepoint));
+        return;
+    }
+    if (codepoint <= 0x7FFU) {
+        out.push_back(static_cast<char>(0xC0U | (codepoint >> 6U)));
+        out.push_back(static_cast<char>(0x80U | (codepoint & 0x3FU)));
+        return;
+    }
+    if (codepoint <= 0xFFFFU) {
+        out.push_back(static_cast<char>(0xE0U | (codepoint >> 12U)));
+        out.push_back(static_cast<char>(0x80U | ((codepoint >> 6U) & 0x3FU)));
+        out.push_back(static_cast<char>(0x80U | (codepoint & 0x3FU)));
+        return;
+    }
+    if (codepoint <= 0x10FFFFU) {
+        out.push_back(static_cast<char>(0xF0U | (codepoint >> 18U)));
+        out.push_back(static_cast<char>(0x80U | ((codepoint >> 12U) & 0x3FU)));
+        out.push_back(static_cast<char>(0x80U | ((codepoint >> 6U) & 0x3FU)));
+        out.push_back(static_cast<char>(0x80U | (codepoint & 0x3FU)));
+        return;
+    }
+    append_replacement_utf8(out);
+}
+
+bool parse_json_unicode_escape(const char*& p, std::string& out) noexcept
+{
+    std::uint32_t codepoint = 0;
+    if (!parse_hex4(p, codepoint)) {
+        return false;
+    }
+    p += 4;
+
+    if (codepoint >= 0xD800U && codepoint <= 0xDBFFU) {
+        if (p[0] != '\\' || p[1] != 'u') {
+            return false;
+        }
+        std::uint32_t low = 0;
+        if (!parse_hex4(p + 2, low) || low < 0xDC00U || low > 0xDFFFU) {
+            return false;
+        }
+        p += 6;
+        codepoint = 0x10000U + (((codepoint - 0xD800U) << 10U) | (low - 0xDC00U));
+    } else if (codepoint >= 0xDC00U && codepoint <= 0xDFFFU) {
+        return false;
+    }
+
+    append_codepoint_utf8(out, codepoint);
+    return true;
+}
+
+bool parse_json_escape(const char*& p, std::string& out) noexcept
+{
+    const char esc = *p++;
+    if (esc == '\0') {
+        return false;
+    }
+    switch (esc) {
+    case '"': out.push_back('"'); return true;
+    case '\\': out.push_back('\\'); return true;
+    case '/': out.push_back('/'); return true;
+    case 'b': out.push_back('\b'); return true;
+    case 'f': out.push_back('\f'); return true;
+    case 'n': out.push_back('\n'); return true;
+    case 'r': out.push_back('\r'); return true;
+    case 't': out.push_back('\t'); return true;
+    case 'u': return parse_json_unicode_escape(p, out);
+    default: return false;
+    }
+}
+
+bool parse_json_quoted_string(const char* p,
+                              std::string& out) noexcept
+{
+    if (p == nullptr || *p != '"') {
+        return false;
+    }
+    ++p; // opening quote
+    out.clear();
+
+    while (*p != '\0') {
+        const char ch = *p++;
+        if (ch == '"') {
+            return true;
+        }
+        if (ch != '\\') {
+            out.push_back(ch);
+            continue;
+        }
+        if (!parse_json_escape(p, out)) {
+            return false;
+        }
+    }
+    return false;
+}
+
 /// Extract abuseConfidenceScore and usageType from the AbuseIPDB response.
 /// Returns nullopt if the score key is absent or its value is not a valid integer.
 std::optional<AbuseResult> extract_abuse(const std::string& json) noexcept
@@ -122,13 +255,23 @@ std::optional<AbuseResult> extract_abuse(const std::string& json) noexcept
     result.score = static_cast<int>(score_val);
 
     // ── usageType (optional string) ───────────────────────────────────────────
-    constexpr std::string_view k_usage_key{R"("usageType":")"};
+    constexpr std::string_view k_usage_key{R"("usageType")"};
     const auto usage_pos = json.find(k_usage_key);
     if (usage_pos != std::string::npos) {
-        const char* start = json.c_str() + usage_pos + k_usage_key.size();
-        const char* q = start;
-        while (*q != '\0' && *q != '"') { ++q; }
-        result.usage_type.assign(start, static_cast<std::size_t>(q - start));
+        const char* usage_ptr = json.c_str() + usage_pos + static_cast<std::ptrdiff_t>(k_usage_key.size());
+        while (*usage_ptr == ' ' || *usage_ptr == '\t' || *usage_ptr == '\n' || *usage_ptr == '\r') {
+            ++usage_ptr;
+        }
+        if (*usage_ptr == ':') {
+            ++usage_ptr;
+            while (*usage_ptr == ' ' || *usage_ptr == '\t' || *usage_ptr == '\n' || *usage_ptr == '\r') {
+                ++usage_ptr;
+            }
+            std::string decoded;
+            if (parse_json_quoted_string(usage_ptr, decoded)) {
+                result.usage_type = std::move(decoded);
+            }
+        }
     }
 
     return result;
@@ -147,6 +290,11 @@ std::int64_t next_utc_midnight_ts(std::int64_t day) noexcept
 }
 
 } // anonymous namespace
+
+std::optional<AbuseResult> parse_abuse_response(const std::string& json) noexcept
+{
+    return extract_abuse(json);
+}
 
 // ── AbuseCache implementation ─────────────────────────────────────────────────
 
@@ -909,7 +1057,7 @@ std::optional<AbuseResult> AbuseCache::fetch_abuse(const std::string& ip,
         return std::nullopt;
     }
 
-    return extract_abuse(body);
+    return parse_abuse_response(body);
 }
 
 } // namespace msmap
