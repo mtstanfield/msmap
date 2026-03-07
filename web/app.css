@@ -880,28 +880,6 @@ html, body {
     word-break: break-word;
 }
 
-.popup-usage {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 6px;
-    color: #c9d1d9;
-    font-size: 13px;
-    line-height: 1.25;
-}
-
-.popup-usage-label {
-    color: #8b949e;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-}
-
-.popup-usage-value {
-    color: #c9d1d9;
-}
-
 .popup-time-compact {
     display: none;
 }
@@ -1203,11 +1181,6 @@ html, body {
 
     .popup-signal-strip {
         gap: var(--popup-signal-gap);
-    }
-
-    .popup-usage {
-        font-size: 10px;
-        line-height: 1.2;
     }
 
     .popup-meta-value,

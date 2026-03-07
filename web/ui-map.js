@@ -805,12 +805,9 @@ function buildAggregateSummary(r) {
         buildSummaryItem('First', buildResponsiveTimestamp(r.first_ts)),
         buildSummaryItem('Last', buildResponsiveTimestamp(r.last_ts)),
         buildSummaryItem('ASN', r.asn ? escapeHtml(r.asn) : ''),
+        buildSummaryItem('Type', r.usage_type ? escapeHtml(r.usage_type) : ''),
     ].filter(Boolean).join('');
     const intel = buildIntelBadges(r);
-    const usage = r.usage_type
-        ? '<div class="popup-usage"><span class="popup-usage-label">type</span><span class="popup-usage-value">' +
-            escapeHtml(r.usage_type) + '</span></div>'
-        : '';
 
     return [
         '<div class="popup-summary">',
@@ -823,7 +820,7 @@ function buildAggregateSummary(r) {
         '</div>',
         buildLinkouts(r.src_ip),
         '</div>',
-        intel || usage ? '<div class="popup-signal-strip">' + intel + usage + '</div>' : '',
+        intel ? '<div class="popup-signal-strip">' + intel + '</div>' : '',
         '<div class="popup-meta-grid">' + metaItems + '</div>',
         '</div>',
     ].join('');
