@@ -130,6 +130,7 @@ add_custom_command(
         "${WEB_DIR}/app.js"
         "${WEB_DIR}/app.css"
         "${WEB_DIR}/vendor/leaflet.min.js"
+        "${WEB_DIR}/vendor/protomaps-leaflet.js"
         "${WEB_DIR}/vendor/leaflet.min.css"
         "${WEB_DIR}/vendor/leaflet.markercluster.js"
         "${WEB_DIR}/vendor/MarkerCluster.css"

@@ -20,6 +20,7 @@ _PLACEHOLDERS = [
     ('{{MARKERCLUSTER_DEFAULT_CSS}}', 'vendor/MarkerCluster.Default.css'),
     ('{{APP_CSS}}',                 'app.css'),
     ('{{LEAFLET_JS}}',              'vendor/leaflet.min.js'),
+    ('{{PROTOMAPS_LEAFLET_JS}}',    'vendor/protomaps-leaflet.js'),
     ('{{MARKERCLUSTER_JS}}',        'vendor/leaflet.markercluster.js'),
     ('{{STATE_JS}}',                'state.js'),
     ('{{FILTERS_JS}}',              'filters.js'),
