@@ -156,7 +156,8 @@ const lmap = L.map('map', {
 // (/basemap.pmtiles, Range requests). z7–9 render overzoomed z6 geometry.
 protomapsL.leafletLayer({
     url:         '/basemap.pmtiles',
-    theme:       'dark',
+    flavor:      'dark',
+    lang:        'en',
     maxDataZoom: 6,
     attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +

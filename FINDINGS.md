@@ -361,3 +361,27 @@ all characters are digits.  Numeric protocols use the portless `IP->IP` format (
 src/dst port, same as ICMP); `parse_portless_addrs()` is extracted as a shared helper
 called by both `parse_icmp()` and the numeric-protocol path.  The proto value is stored
 as the decimal string (e.g. `"2"`) in `LogEntry::proto` and the database.
+
+---
+
+### FIND-018: Basemap rendered without boundaries or labels (tile-schema mismatch)
+**Severity**: Medium
+**Status**:   Fixed (web/vendor/protomaps-leaflet.js, web/state.js)
+**File(s)**:  web/vendor/protomaps-leaflet.js, web/state.js
+**Found**:    2026-08-28
+
+The self-hosted basemap drew land/water fills but no country boundaries and no
+place labels.  protomaps-leaflet 4.0.1's built-in themes filter features on the
+old tile-schema property names (`pmap:kind`, `pmap:min_admin_level`), while the
+current Protomaps daily builds use the unprefixed v4 schema (`kind`,
+`min_admin_level`).  Layer-wide fill rules (earth, water) carry no property
+filter, so they still rendered — which let the mismatch pass a pixel-sampling
+acceptance check.
+
+**Resolution**: Vendor protomaps-leaflet 5.1.0 (sha256
+26af014f7b1af308ec120b791cff76657bb9c3383633b52033e6edf9e5e4cdb5), which
+targets the v4 schema, and switch the layer options from `theme: 'dark'` to
+the 5.x API `flavor: 'dark', lang: 'en'`.  The dark flavor's background is
+unchanged (#34373d), so web/app.css stays in sync.  Lesson: when the renderer
+and the tile data are versioned independently, verify a *filtered* feature
+(a boundary line or label), not just painted pixels.
