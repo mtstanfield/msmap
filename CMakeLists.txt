@@ -148,6 +148,7 @@ add_executable(msmap
     src/geoip.cpp
     src/home_resolver.cpp
     src/http.cpp
+    src/basemap.cpp
     src/listener.cpp
     src/parser.cpp
     src/abuse_cache.cpp
@@ -263,6 +264,19 @@ if(MSMAP_ENABLE_TESTS)
         PkgConfig::MAXMINDDB)
 
     catch_discover_tests(test_http)
+
+    add_executable(test_basemap
+        tests/test_basemap.cpp
+        src/basemap.cpp)
+
+    target_compile_features(test_basemap PRIVATE cxx_std_23)
+    msmap_apply_cpu_target(test_basemap)
+    target_include_directories(test_basemap PRIVATE src)
+    msmap_set_warnings(test_basemap)
+    msmap_enable_sanitizers(test_basemap)
+    target_link_libraries(test_basemap PRIVATE Catch2::Catch2WithMain)
+
+    catch_discover_tests(test_basemap)
 
     add_executable(test_status_cache
         tests/test_status_cache.cpp
