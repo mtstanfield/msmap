@@ -7,8 +7,7 @@
 /// libFuzzer entry point: first 8 bytes are the file size, the rest is the
 /// Range header value. The parser must never crash, overflow, or return a
 /// range that reaches past EOF.
-extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size)
-{
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) { // NOLINT(readability-identifier-naming)
     if (size < 8) {
         return 0;
     }
