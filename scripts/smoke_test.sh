@@ -72,10 +72,10 @@ info "Starting msmap…"
 (cd "${WORK_DIR}" && "${BINARY}") 2>&1 &
 MSMAP_PID=$!
 
-# Wait for the listener to be ready using bash /dev/tcp (no nc required).
+# Wait for the HTTP server to come up (same process also owns the UDP syslog listener).
 READY=0
 for i in $(seq 1 20); do
-    if (echo "" > /dev/tcp/${LOG_HOST}/${LOG_PORT}) 2>/dev/null; then
+    if curl -sf -o /dev/null "http://${LOG_HOST}:${HTTP_PORT}/api/status"; then
         READY=1
         break
     fi
@@ -83,7 +83,7 @@ for i in $(seq 1 20); do
 done
 
 if [[ ${READY} -eq 0 ]]; then
-    red "msmap did not accept connections on ${LOG_HOST}:${LOG_PORT} within 10 s"
+    red "msmap did not respond on http://${LOG_HOST}:${HTTP_PORT}/api/status within 10 s"
     red "Check that the build succeeded: ninja -C build"
     exit 1
 fi
@@ -113,15 +113,14 @@ LINES=(
     "2026-02-27T10:14:31+02:00 router firewall,info FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (SYN,ACK), 91.108.4.1:443->203.0.113.1:59000, len 52"
 )
 
-# Open one persistent TCP connection and stream all lines (mirrors rsyslog).
-{
-    for line in "${LINES[@]}"; do
-        printf '%s\n' "${line}"
-        sleep 0.05
-    done
-    # Brief pause so msmap flushes the last insert before we close.
-    sleep 0.3
-} > /dev/tcp/${LOG_HOST}/${LOG_PORT}
+# Send each line as its own UDP datagram, the same way the Mikrotik router
+# talks to msmap directly (no rsyslog relay involved).
+for line in "${LINES[@]}"; do
+    printf '%s\n' "${line}" > /dev/udp/${LOG_HOST}/${LOG_PORT}
+    sleep 0.05
+done
+# Brief pause so msmap flushes the last insert.
+sleep 0.3
 
 green "${#LINES[@]} log lines sent"
 echo
