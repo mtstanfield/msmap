@@ -147,25 +147,23 @@ const lmap = L.map('map', {
     center:             [20, 0],
     zoom:               2,
     minZoom:            2,
+    maxZoom:            9,
     maxBounds:          [[-90, -180], [90, 180]],
     maxBoundsViscosity: 1.0,
 });
 
-L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {
-        attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
-            ' contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains:        'abcd',
-        maxZoom:           19,
-        noWrap:            true,
-        bounds:            [[-90, -180], [90, 180]],
-        updateWhenIdle:    false,
-        updateWhenZooming: false,
-        keepBuffer:        4,
-    }
-).addTo(lmap);
+// Self-hosted Protomaps basemap: z0–6 vector data served by msmap itself
+// (/basemap.pmtiles, Range requests). z7–9 render overzoomed z6 geometry.
+protomapsL.leafletLayer({
+    url:         '/basemap.pmtiles',
+    theme:       'dark',
+    maxDataZoom: 6,
+    attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
+        ' contributors &copy; <a href="https://protomaps.com">Protomaps</a>',
+    noWrap:      true,
+    bounds:      [[-90, -180], [90, 180]],
+}).addTo(lmap);
 
 const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
