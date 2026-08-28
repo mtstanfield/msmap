@@ -1,6 +1,9 @@
 #include "basemap.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 // ── parse_range_header ────────────────────────────────────────────────────────
 
@@ -98,4 +101,79 @@ TEST_CASE("range: zero-size file rejects all ranges", "[range]")
 TEST_CASE("range: suffix of zero bytes is invalid", "[range]")
 {
     REQUIRE_FALSE(msmap::parse_range_header("bytes=-0", 1000).valid);
+}
+
+// ── load_basemap_info ─────────────────────────────────────────────────────────
+
+namespace {
+
+/// Write `bytes` to a uniquely named temp file and return its path.
+std::filesystem::path write_temp(const std::string& name, std::string_view bytes)
+{
+    const auto p = std::filesystem::temp_directory_path() / name;
+    std::ofstream out{p, std::ios::binary | std::ios::trunc};
+    out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    return p;
+}
+
+constexpr std::string_view kMagic{"PMTiles\x03", 8};
+
+} // namespace
+
+TEST_CASE("basemap: valid v3 magic yields info with size and quoted etag", "[basemap]")
+{
+    std::string content{kMagic};
+    content += "trailing archive bytes";
+    const auto p    = write_temp("msmap_test_valid.pmtiles", content);
+    const auto info = msmap::load_basemap_info(p.string());
+    REQUIRE(info.has_value());
+    REQUIRE(info->path == p.string());
+    REQUIRE(info->size == content.size());
+    REQUIRE(info->etag.size() >= 3);
+    REQUIRE(info->etag.front() == '"');
+    REQUIRE(info->etag.back() == '"');
+    std::filesystem::remove(p);
+}
+
+TEST_CASE("basemap: wrong magic is rejected", "[basemap]")
+{
+    const auto p = write_temp("msmap_test_badmagic.pmtiles",
+                              "NOTTILES this is not a pmtiles archive");
+    REQUIRE_FALSE(msmap::load_basemap_info(p.string()).has_value());
+    std::filesystem::remove(p);
+}
+
+TEST_CASE("basemap: wrong version byte is rejected", "[basemap]")
+{
+    const auto p = write_temp("msmap_test_badver.pmtiles",
+                              std::string_view{"PMTiles\x02........", 16});
+    REQUIRE_FALSE(msmap::load_basemap_info(p.string()).has_value());
+    std::filesystem::remove(p);
+}
+
+TEST_CASE("basemap: truncated file is rejected", "[basemap]")
+{
+    const auto p = write_temp("msmap_test_trunc.pmtiles", "PM");
+    REQUIRE_FALSE(msmap::load_basemap_info(p.string()).has_value());
+    std::filesystem::remove(p);
+}
+
+TEST_CASE("basemap: missing file is rejected", "[basemap]")
+{
+    REQUIRE_FALSE(
+        msmap::load_basemap_info("/nonexistent/msmap_no_such.pmtiles").has_value());
+}
+
+TEST_CASE("basemap: etag changes when file size changes", "[basemap]")
+{
+    std::string content{kMagic};
+    const auto p  = write_temp("msmap_test_etag.pmtiles", content);
+    const auto a  = msmap::load_basemap_info(p.string());
+    content += "more bytes";
+    (void)write_temp("msmap_test_etag.pmtiles", content);
+    const auto b  = msmap::load_basemap_info(p.string());
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    REQUIRE(a->etag != b->etag);
+    std::filesystem::remove(p);
 }

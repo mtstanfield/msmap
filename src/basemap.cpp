@@ -1,6 +1,10 @@
 #include "basemap.h"
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <optional>
 
@@ -74,6 +78,38 @@ RangeSpec parse_range_header(std::string_view value,
     }
     const std::uint64_t end = std::min(*last, file_size - 1);
     return {.valid = true, .offset = *first, .length = end - *first + 1};
+}
+
+std::optional<BasemapInfo> load_basemap_info(const std::string& path)
+{
+    std::error_code ec;
+    const std::uint64_t size = std::filesystem::file_size(path, ec);
+    if (ec) {
+        return std::nullopt;
+    }
+
+    std::ifstream in{path, std::ios::binary};
+    std::array<char, 8> header{};
+    if (!in.read(header.data(), header.size())) {
+        return std::nullopt;
+    }
+    constexpr std::string_view k_magic{"PMTiles\x03", 8};
+    if (std::string_view{header.data(), header.size()} != k_magic) {
+        return std::nullopt;
+    }
+
+    const auto mtime = std::filesystem::last_write_time(path, ec);
+    if (ec) {
+        return std::nullopt;
+    }
+    const auto mtime_s = std::chrono::duration_cast<std::chrono::seconds>(
+                             mtime.time_since_epoch())
+                             .count();
+    return BasemapInfo{
+        .path = path,
+        .size = size,
+        .etag = "\"" + std::to_string(size) + "-" + std::to_string(mtime_s) + "\"",
+    };
 }
 
 } // namespace msmap
