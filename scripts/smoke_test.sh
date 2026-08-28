@@ -46,11 +46,20 @@ if [[ ! -x "${BINARY}" ]]; then
     exit 1
 fi
 
+BASEMAP="${MSMAP_BASEMAP_PMTILES:-/workspace/data/basemap/basemap.pmtiles}"
+if [[ ! -r "${BASEMAP}" ]]; then
+    red "Basemap not found at ${BASEMAP}"
+    red "Run once: bash scripts/fetch_basemap.sh   (~50-100 MB download)"
+    exit 1
+fi
+export MSMAP_BASEMAP_PMTILES="${BASEMAP}"
+
 # ── start msmap ───────────────────────────────────────────────────────────────
 
 bold "=== msmap smoke test ==="
 info "Work dir : ${WORK_DIR}"
 info "Binary   : ${BINARY}"
+info "Basemap  : ${BASEMAP}"
 info "GeoIP    : ${MSMAP_CITY_MMDB:-<not set — geo columns will be NULL>}"
 info "AbuseIPDB: ${ABUSEIPDB_API_KEY:+<key set — OSINT enrichment active>}${ABUSEIPDB_API_KEY:-<not set — threat scores disabled>}"
 echo
@@ -150,6 +159,18 @@ for r in rows:
 print()
 print(f'  Total rows: {len(rows)}')
 " "${RESULT}"
+echo
+
+bold "=== Basemap range request ==="
+RANGE_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+    -H "Range: bytes=0-13" \
+    "http://${LOG_HOST}:${HTTP_PORT}/basemap.pmtiles")
+if [[ "${RANGE_STATUS}" == "206" ]]; then
+    green "GET /basemap.pmtiles with Range → 206 Partial Content"
+else
+    red "GET /basemap.pmtiles with Range returned ${RANGE_STATUS} (expected 206)"
+    exit 1
+fi
 echo
 
 # ── AbuseIPDB enrichment wait ─────────────────────────────────────────────────

@@ -13,6 +13,8 @@ High-level architecture:
 - 24-hour retention only
 - aggregate-first map rendering via `GET /api/map`
 - lazy raw-event drilldown via `GET /api/detail`
+- self-hosted Protomaps PMTiles basemap served via `GET /basemap.pmtiles` (no
+  external tile CDN)
 - AbuseIPDB for threat score and usage classification
 - Tor Project and Spamhaus DROP enrichment for popup/source intel
 - distroless runtime with embedded web assets
@@ -32,13 +34,14 @@ msmap binary
     ├── parser          (hand-written tokenizer, fuzz-tested)
     ├── SQLite DB       (WAL mode, 24h retention)
     ├── GeoIP           (libmaxminddb + local GeoLite2 City/ASN mmdb; City required for map markers, ASN optional)
+    ├── Basemap         (self-hosted PMTiles extract, served with Range support; required at startup)
     ├── Abuse cache     (AbuseIPDB score + usage_type, SQLite-backed)
     ├── Intel cache     (Tor Project + Spamhaus DROP, background refreshed)
     ├── Home resolver   (optional home marker / arcs / RFC1918 dst rewrite)
     └── HTTP server     (libmicrohttpd, embedded assets + JSON API)
             │
             ▼
-        browser (Leaflet.js map, vanilla JS)
+        browser (Leaflet.js + protomaps-leaflet map, vanilla JS)
 ```
 
 ---
@@ -52,9 +55,10 @@ msmap binary
 | HTTP server | `libmicrohttpd` | embedded, no framework |
 | Database | SQLite | WAL mode, parameterized queries only |
 | GeoIP | `libmaxminddb` + GeoLite2 City/ASN | local `.mmdb`, no serve-time lookups; City required for map markers, ASN optional enrichment |
+| Basemap | Protomaps PMTiles | self-hosted OSM-derived vector extract (ODbL), z0–6 data, served by msmap at `/basemap.pmtiles`; required for msmap to start |
 | Threat / usage | AbuseIPDB | 30-day SQLite cache, optional API key |
 | Source intel | Tor Project + Spamhaus DROP | background-refreshed local cache |
-| Frontend | Leaflet.js + MarkerCluster | local copies, vanilla JS |
+| Frontend | Leaflet.js + MarkerCluster + `protomaps-leaflet` | local copies, vanilla JS, no CDN |
 | Runtime | `distroless/cc-debian12:nonroot` | distroless runtime, nonroot uid 65532 |
 
 The published release container targets `x86-64-v3` class CPUs. If you need an
@@ -72,6 +76,7 @@ image that runs on older x86-64 hardware, rebuild with
 | `MSMAP_DB_PATH` | `/data/msmap.db` | SQLite database path |
 | `MSMAP_CITY_MMDB` | `/var/lib/msmap/geoip/GeoLite2-City.mmdb` | GeoLite2 City database; required for map markers |
 | `MSMAP_ASN_MMDB` | `/var/lib/msmap/geoip/GeoLite2-ASN.mmdb` | GeoLite2 ASN database; optional ASN enrichment |
+| `MSMAP_BASEMAP_PMTILES` | `/var/lib/msmap/basemap/basemap.pmtiles` | Self-hosted PMTiles basemap extract served at `/basemap.pmtiles`; msmap fails to start if missing or invalid |
 | `MSMAP_LISTEN_PORT` | `5140` | UDP syslog ingest port |
 | `MSMAP_HTTP_PORT` | `8080` | Web UI / API port |
 | `MSMAP_HTTP_THREADS` | `4` | libmicrohttpd thread-pool size (`1`-`16`) |
@@ -88,6 +93,7 @@ image that runs on older x86-64 hardware, rebuild with
 |---|---|
 | `/data` | SQLite database and caches — persist this across restarts |
 | `/var/lib/msmap/geoip` | GeoLite2 `.mmdb` files — City is required for map markers, ASN is optional; mount read-only |
+| `/var/lib/msmap/basemap` | PMTiles basemap extract — required for msmap to start; mount read-only |
 
 ### docker run
 
@@ -101,6 +107,7 @@ docker run -d \
   -p 8080:8080 \
   -v msmap-data:/data \
   -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -v /path/to/basemap:/var/lib/msmap/basemap:ro \
   -e MSMAP_INGEST_ALLOW=192.168.88.1 \
   ghcr.io/mtstanfield/msmap:latest
 ```
@@ -109,7 +116,9 @@ docker run -d \
 
 A valid GeoLite2 City database must be mounted at
 `/var/lib/msmap/geoip/GeoLite2-City.mmdb` for `msmap` to start and render map
-markers.
+markers. A valid basemap PMTiles archive must likewise be mounted at
+`/var/lib/msmap/basemap/basemap.pmtiles` — see
+[Basemap](#basemap-required) below.
 
 With AbuseIPDB threat scoring:
 
@@ -121,6 +130,7 @@ docker run -d \
   -p 8080:8080 \
   -v msmap-data:/data \
   -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -v /path/to/basemap:/var/lib/msmap/basemap:ro \
   -e MSMAP_INGEST_ALLOW=192.168.88.1 \
   -e ABUSEIPDB_API_KEY=your_key_here \
   ghcr.io/mtstanfield/msmap:latest
@@ -136,6 +146,7 @@ docker run -d \
   -p 8080:8080 \
   -v msmap-data:/data \
   -v /path/to/geoip:/var/lib/msmap/geoip:ro \
+  -v /path/to/basemap:/var/lib/msmap/basemap:ro \
   -e MSMAP_INGEST_ALLOW=192.168.88.1 \
   -e MSMAP_HOME_HOST=your.public.hostname.or.ip \
   -e MSMAP_INTEL_REFRESH_SECS=21600 \
@@ -168,6 +179,7 @@ services:
     volumes:
       - msmap-data:/data
       - geoip-data:/var/lib/msmap/geoip:ro
+      - basemap-data:/var/lib/msmap/basemap:ro
     environment:
       MSMAP_INGEST_ALLOW: "192.168.88.1"
       MSMAP_HTTP_THREADS: "4"
@@ -180,6 +192,7 @@ services:
 volumes:
   msmap-data:
   geoip-data:
+  basemap-data:
 ```
 
 Notes:
@@ -189,6 +202,9 @@ Notes:
 - `msmap` now fails fast at startup if `GeoLite2-City.mmdb` is missing or
   invalid.
 - `GeoLite2-ASN.mmdb` is optional and only affects ASN enrichment.
+- `msmap` also fails fast at startup if the basemap PMTiles archive is missing
+  or invalid; run `scripts/fetch_basemap.sh` once to produce it (see
+  [Basemap](#basemap-required) below).
 - Startup performs an in-app schema migration to drop the legacy
   `connections.country` column when present.
 - `ABUSEIPDB_API_KEY` is optional; without it, existing cached AbuseIPDB data is
@@ -207,6 +223,26 @@ enrichment. `msmap` fails fast if the City DB is missing or invalid, retains
 only rows whose source GeoIP resolves to a renderable map point, and
 transactionally reloads changed `.mmdb` files so a bad update does not replace
 the last good City database.
+
+### Basemap (required)
+
+The map's base layer is a self-hosted Protomaps PMTiles extract — OSM-derived
+vector tiles (ODbL) — served by `msmap` itself at `GET /basemap.pmtiles` with
+HTTP Range support. There is no external tile CDN and no API key. Produce the
+archive once with:
+
+```bash
+bash scripts/fetch_basemap.sh
+```
+
+By default this downloads the latest daily Protomaps build, extracts zoom
+levels 0–6, and writes `data/basemap/basemap.pmtiles` (a one-time ~50–100 MB
+download; the result works offline afterward). Mount or copy the resulting
+file to `/var/lib/msmap/basemap/basemap.pmtiles`, or point
+`MSMAP_BASEMAP_PMTILES` at it. `msmap` fails fast at startup if the archive is
+missing or invalid. The frontend renders the extract with the vendored
+`protomaps-leaflet` library using a dark theme; the browser caps the display
+zoom at 9 even though the archive only carries data up to zoom 6.
 
 ### Mikrotik router configuration
 

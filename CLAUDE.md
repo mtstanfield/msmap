@@ -52,6 +52,11 @@ docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
 docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 
+# One-time: fetch the z0–6 basemap extract (~50–100 MB)
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "C:/Users/ms/projects/msmap:/workspace" \
+  msmap-dev bash -c "bash /workspace/scripts/fetch_basemap.sh"
+
 # Local smoke test (listener + DB + HTTP + optional AbuseIPDB)
 # Opens web UI at http://localhost:8080; Ctrl-C to stop.
 MSYS_NO_PATHCONV=1 docker run --rm \
@@ -59,6 +64,7 @@ MSYS_NO_PATHCONV=1 docker run --rm \
   -p 8080:8080 \
   [-e ABUSEIPDB_API_KEY=<key>] \
   [-e MSMAP_CITY_MMDB=/path/to/GeoLite2-City.mmdb] \
+  [-e MSMAP_BASEMAP_PMTILES=/path/to/basemap.pmtiles] \
   msmap-dev bash -c "bash /workspace/scripts/smoke_test.sh"
 ```
 
