@@ -7,6 +7,7 @@
 #include <fstream>
 #include <limits>
 #include <optional>
+#include <system_error>
 
 namespace {
 

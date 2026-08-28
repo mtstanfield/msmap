@@ -26,6 +26,11 @@ it by self-hosting the basemap, consistent with the project's
   support; all tile logic lives client-side in vendored JS
   (protomaps-leaflet). No PMTiles parsing in C++ beyond a magic-byte
   check.
+- **Deliberate strictness:** malformed or multipart `Range` headers get
+  `416` (stricter than RFC 9110's SHOULD-ignore) because the only
+  intended client sends well-formed single ranges. `If-Range` is not
+  implemented because the archive only changes across a restart (the
+  ETag changes atomically with it).
 
 ## Architecture
 

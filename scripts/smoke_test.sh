@@ -4,12 +4,16 @@
 # Run inside the msmap-dev container (no extra packages needed):
 #
 #   MSYS_NO_PATHCONV=1 docker run --rm \
-#     -v "C:/Users/ms/projects/msmap/.claude/worktrees/loving-robinson:/workspace" \
+#     -v "C:/Users/ms/projects/msmap:/workspace" \
 #     -p 8080:8080 \
 #     [-e ABUSEIPDB_API_KEY=<your_key>] \
 #     [-e MSMAP_CITY_MMDB=/path/to/GeoLite2-City.mmdb] \
 #     [-e MSMAP_ASN_MMDB=/path/to/GeoLite2-ASN.mmdb] \
+#     [-e MSMAP_BASEMAP_PMTILES=/path/to/basemap.pmtiles] \
 #     msmap-dev bash -c "bash /workspace/scripts/smoke_test.sh"
+#
+# A basemap file is required (see scripts/fetch_basemap.sh) unless
+# MSMAP_BASEMAP_PMTILES points at one already.
 #
 # The web UI will be reachable at http://localhost:8080 while the script runs.
 # Hit Ctrl-C to stop and clean up.
@@ -18,6 +22,8 @@ set -euo pipefail
 
 BINARY="/workspace/build/msmap"
 WORK_DIR="$(mktemp -d)"
+# The container default DB path (/data) does not exist in the dev image.
+export MSMAP_DB_PATH="${WORK_DIR}/msmap.db"
 LOG_HOST="127.0.0.1"
 LOG_PORT=5140
 HTTP_PORT=8080
