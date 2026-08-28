@@ -14,6 +14,7 @@ class Database;
 class AbuseCache;
 class IpIntelCache;
 class StatusCache;
+struct BasemapInfo;
 
 /// Context bundle passed to the MHD request callback as `cls`.
 /// Groups the server-owned state the callback needs.
@@ -23,6 +24,7 @@ struct HandlerCtx {
     const AbuseCache*    abuse_cache;    // null when AbuseIPDB is disabled
     const IpIntelCache*  intel_cache;    // null when Tor/DROP intel is disabled
     const StatusCache*   status_cache;   // null only during tests/unsupported wiring
+    const BasemapInfo*   basemap;        // null only in tests; main requires it
     bool                 abuse_enabled;
     bool                 intel_enabled;
 };
@@ -45,6 +47,7 @@ struct MhdDaemonCloser {
 ///   GET /api/detail        — paginated raw rows for popup drilldown
 ///   GET /api/home          — JSON {lat,lon} if MSMAP_HOME_HOST is set, else 404
 ///   GET /api/status        — cached operator status snapshot
+///   GET /basemap.pmtiles   — PMTiles basemap archive (supports Range requests)
 ///   GET /                  — full map UI (HTML)
 class HttpServer {
 public:
@@ -56,6 +59,7 @@ public:
                const AbuseCache*   abuse_cache,
                const IpIntelCache* intel_cache,
                const StatusCache*  status_cache,
+               const BasemapInfo*  basemap,
                bool                abuse_enabled,
                bool                intel_enabled,
                unsigned int        thread_pool_size = 4) noexcept;

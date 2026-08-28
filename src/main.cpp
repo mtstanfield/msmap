@@ -1,6 +1,7 @@
 // msmap – Mikrotik Firewall Log Viewer
 
 #include "abuse_cache.h"
+#include "basemap.h"
 #include "db.h"
 #include "geoip.h"
 #include "home_resolver.h"
@@ -16,6 +17,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +28,7 @@ namespace {
 constexpr const char* kDefaultDbPath    {"/data/msmap.db"};
 constexpr const char* kDefaultCityMmdb  {"/var/lib/msmap/geoip/GeoLite2-City.mmdb"};
 constexpr const char* kDefaultAsnMmdb   {"/var/lib/msmap/geoip/GeoLite2-ASN.mmdb"};
+constexpr const char* kDefaultBasemapPmtiles{"/var/lib/msmap/basemap/basemap.pmtiles"};
 constexpr int         kDefaultListenPort{5140};
 constexpr int         kDefaultHttpPort  {8080};
 constexpr unsigned int kDefaultHttpThreads{4};
@@ -103,6 +106,8 @@ int main() {
     const std::string db_path     = env_or("MSMAP_DB_PATH",      kDefaultDbPath);
     const std::string city_path   = env_or("MSMAP_CITY_MMDB",    kDefaultCityMmdb);
     const std::string asn_path    = env_or("MSMAP_ASN_MMDB",     kDefaultAsnMmdb);
+    const std::string basemap_path =
+        env_or("MSMAP_BASEMAP_PMTILES", kDefaultBasemapPmtiles);
     const std::string abuse_key   = env_or("ABUSEIPDB_API_KEY",  "");
     const std::string home_host   = env_or("MSMAP_HOME_HOST",    "");
     const int         listen_port = env_int("MSMAP_LISTEN_PORT",  kDefaultListenPort);
@@ -121,6 +126,7 @@ int main() {
     std::clog << "[INFO] db        : " << db_path     << '\n'
               << "[INFO] city mmdb : " << city_path   << '\n'
               << "[INFO] asn mmdb  : " << asn_path    << '\n'
+              << "[INFO] basemap   : " << basemap_path << '\n'
               << "[INFO] home host : " << (home_host.empty() ? "(not set)" : home_host) << '\n'
               << "[INFO] tor intel : " << tor_exit_url << '\n'
               << "[INFO] drop intel: " << spamhaus_drop_url << '\n'
@@ -145,6 +151,17 @@ int main() {
         return EXIT_FAILURE;
     }
     (void)db.prune_expired();
+
+    // Basemap archive is required: the map is unusable without tiles, and a
+    // silent blank map would hide an ops mistake. Fail fast with remediation.
+    const std::optional<msmap::BasemapInfo> basemap =
+        msmap::load_basemap_info(basemap_path);
+    if (!basemap.has_value()) {
+        std::clog << "[FATAL] basemap PMTiles missing or invalid: " << basemap_path
+                  << "\n        run scripts/fetch_basemap.sh to create it, then "
+                     "mount it or set MSMAP_BASEMAP_PMTILES\n";
+        return EXIT_FAILURE;
+    }
 
     // GeoLite2 City is required for map markers; fail fast if it is absent or invalid.
     msmap::GeoIp geoip{city_path, asn_path};
@@ -209,6 +226,7 @@ int main() {
                                  abuse_ptr,
                                  intel_ptr,
                                  &status_cache,
+                                 &*basemap,
                                  abuse_enabled,
                                  intel_enabled,
                                  http_threads};

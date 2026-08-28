@@ -1,0 +1,10 @@
+# Vendored assets are byte-exact artifacts (sha256-pinned at vendoring time)
+# and are inlined into the binary by web/bundle.py — never eol-convert them.
+web/vendor/** -text
+
+# Shell scripts run inside Linux containers; CRLF breaks them.
+*.sh text eol=lf
+
+# Binary data formats.
+*.pmtiles binary
+*.mmdb binary

@@ -345,6 +345,19 @@ TEST_CASE("Missing BSD syslog tag colon returns error", "[parser][error]") {
     CHECK(result.error.find("expected BSD syslog tag") != std::string::npos);
 }
 
+TEST_CASE("Legacy rsyslog TOPIC,LEVEL field is rejected (FIND-014)", "[parser][error]") {
+    // Early fixtures assumed "firewall,info" after the hostname; live traffic
+    // showed the router sends a colon-terminated BSD TAG there instead
+    // (FINDINGS.md FIND-014). Pin the rejection so re-adding topics support is
+    // a deliberate choice, not silent drift.
+    const auto result = parse_log("2026-02-27T08:14:23+00:00 router firewall,info "
+                                  "FW_INPUT_NEW input: in:ether1 out:(unknown 0), "
+                                  "connection-state:new proto TCP (ACK), "
+                                  "1.2.3.4:1->2.3.4.5:2, len 1");
+    CHECK_FALSE(result.ok());
+    CHECK(result.error.find("expected BSD syslog tag") != std::string::npos);
+}
+
 TEST_CASE("Unknown chain name returns error", "[parser][error]") {
     const auto result = parse_log("2026-02-27T08:14:23+00:00 router sometag: "
                                   "boguschain: in:ether1 out:ether2, "

@@ -52,6 +52,11 @@ docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
 docker run --rm -v "C:/Users/ms/projects/msmap:/workspace" msmap-dev \
   cppcheck --enable=style,performance,warning,portability --error-exitcode=1 src/
 
+# One-time: fetch the z0–6 basemap extract (~50–100 MB)
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "C:/Users/ms/projects/msmap:/workspace" \
+  msmap-dev bash -c "bash /workspace/scripts/fetch_basemap.sh"
+
 # Local smoke test (listener + DB + HTTP + optional AbuseIPDB)
 # Opens web UI at http://localhost:8080; Ctrl-C to stop.
 MSYS_NO_PATHCONV=1 docker run --rm \
@@ -59,6 +64,7 @@ MSYS_NO_PATHCONV=1 docker run --rm \
   -p 8080:8080 \
   [-e ABUSEIPDB_API_KEY=<key>] \
   [-e MSMAP_CITY_MMDB=/path/to/GeoLite2-City.mmdb] \
+  [-e MSMAP_BASEMAP_PMTILES=/path/to/basemap.pmtiles] \
   msmap-dev bash -c "bash /workspace/scripts/smoke_test.sh"
 ```
 
@@ -99,10 +105,13 @@ msmap parses BSD syslog sent directly by the router:
 <134>Mar  2 08:14:23 MikroTik FW_INPUT_NEW: FW_INPUT_NEW input: in:ether1 out:(unknown 0), connection-state:new src-mac bc:9a:8e:fb:12:f1, proto TCP (ACK), 172.234.31.140:65226->108.89.67.16:44258, len 52
 ```
 
-RFC 3339 format (rsyslog relay) is also accepted via auto-detection:
+RFC 3339 format (rsyslog relay) is also accepted via auto-detection. The
+field after the hostname is the same colon-terminated BSD TAG as above —
+NOT the rsyslog "firewall,info" topics field, which never occurs on the
+wire and is rejected (FINDINGS.md FIND-014):
 
 ```
-2026-02-27T08:14:23+00:00 router firewall,info FW_INPUT_NEW input: ...
+2026-02-27T08:14:23+00:00 router FW_INPUT_NEW: FW_INPUT_NEW input: ...
 ```
 
 **Protocol variants:**

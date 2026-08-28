@@ -72,6 +72,9 @@ logs/
 tmp/
 .cache/
 
+## Runtime data (DB, basemap extract — see scripts/fetch_basemap.sh)
+/data/
+
 ## Testing
 coverage/
 test-results/
